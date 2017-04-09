@@ -5,5 +5,5 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]]
 
-  :main knode.core
-  :aot [knode.core])
+  :main knode.cli
+  :aot [knode.cli])

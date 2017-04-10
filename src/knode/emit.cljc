@@ -3,15 +3,28 @@
             [hiccup.core :as html]))
 
 ;;;;;;;;;; TTL emission
+(defn link->ttl [link]
+  (case (:type link)
+    :prefixed-name (str (:prefix link) ":" (:name link))
+    :label-name (:name link)
+    :literal (:string link)
+    :iri (str "<" (:iriref link) ">")))
+
 (defn statement->ttl [env statement]
-  [(:predicate statement) (:object statement)])
+  (str (link->ttl (:predicate statement)) ": "
+       (link->ttl (:object statement))
+       (if-let [tp (get-in statement [:object :datatype])]
+         (str "^^" tp))))
 
 (defn stanza->ttl [env form]
   (case (:type form)
     (:prefix :base :graph :label) [(str (:origin form) " .")]
     :blank-line [(:origin form)]
-    :stanza (concat [(str "<" (:target (:subject form)) ">")]
-                    (map (partial statement->ttl env) (:statements form))
+    :stanza (concat [(link->ttl (:target (:subject form)))]
+                    (map
+                     #(str %1 %2)
+                     (cons "  " (repeat "; "))
+                     (map (partial statement->ttl env) (:statements form)))
                     ["."])
     [(str "TODO" (:type form) (:subject form))]))
 
@@ -37,7 +50,7 @@
      forms)))
 
 (defn emit-ttl [env forms]
-  (mapcat (partial stanza->ttl env) (forms->stanzas forms)))
+  (clojure.string/join \newline (mapcat (partial stanza->ttl env) (forms->stanzas forms))))
 
 ;;;;;;;;;; HTML emission
 (defn emit-html [env forms]

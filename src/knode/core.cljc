@@ -66,7 +66,9 @@ obsolete: false> boolean")
   (let [[_ predicate _ object _ datatype] (re-find #"^(.*?):\s+((.*?)(> (.*))?)$" ln)]
     {:type :predicate+object
      :predicate (string->name-or-blank predicate)
-     :object (assoc (string->name-or-blank object) :datatype datatype)}))
+     :object (assoc
+              (string->name-or-blank object)
+              :datatype datatype)}))
 
 (defn parse-line [ln]
   (assoc
@@ -126,9 +128,11 @@ obsolete: false> boolean")
     (assoc link-map :iriref (str prefix (:name link-map)))))
 
 (defn expand-string [env link-map]
-  (if (get-in env [:labels (:string link-map)])
-    {:type :label-name :name (:string link-map)}
-    {:type :literal :string (:string link-map)}))
+  (assoc
+   (if (get-in env [:labels (:string link-map)])
+     {:type :label-name :name (:string link-map)}
+     {:type :literal :string (:string link-map)})
+   :datatype (:datatype link-map)))
 
 (defn expand-iri-map [env link-map]
   (update link-map :iriref (partial util/expand-iri (:base env))))
@@ -150,10 +154,10 @@ obsolete: false> boolean")
   (let [expand (partial expand-link expanded-env)]
     (map
      (fn [line]
-       (if (= :statement (:type line))
+       (if (contains? #{:statement :subject} (:type line))
          (reduce
           (fn [ln key] (if (get ln key) (update ln key expand) ln))
-          line [:object :predicate :subject :graph])
+          line [:object :predicate :subject :graph :target])
          line))
      propagated-lines)))
 

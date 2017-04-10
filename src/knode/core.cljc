@@ -146,12 +146,20 @@ obsolete: false> boolean")
   (let [expanded-prefixes (update env :prefixes #(map-vals (partial expand-iri-map env) %))]
     (update expanded-prefixes :labels #(map-vals (partial expand-link env) %))))
 
-;; (defn expand-all-links [expanded-env propagated-lines]
-;;   )
+(defn expand-all-links [expanded-env propagated-lines]
+  (let [expand (partial expand-link expanded-env)]
+    (map
+     (fn [line]
+       (if (= :statement (:type line))
+         (reduce
+          (fn [ln key] (if (get ln key) (update ln key expand) ln))
+          line [:object :predicate :subject :graph])
+         line))
+     propagated-lines)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; External interface
 (defn parse-lines [line-seq]
   (let [propagated (propagate-subjectives (map parse-line line-seq))
         env (expand-environment (collect-environment propagated))]
-    {:env env :forms propagated}))
+    {:env env :forms (expand-all-links env propagated)}))

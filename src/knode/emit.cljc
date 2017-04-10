@@ -3,24 +3,25 @@
             [hiccup.core :as html]))
 
 ;;;;;;;;;; TTL emission
-(defn link->ttl [link]
+(defn link->ttl [env link]
   (case (:type link)
     :prefixed-name (str (:prefix link) ":" (:name link))
-    :label-name (:name link)
+    :label-name (str "<" (get-in env [:labels (:name link) :iriref]) ">")
     :literal (:string link)
     :iri (str "<" (:iriref link) ">")))
 
 (defn statement->ttl [env statement]
-  (str (link->ttl (:predicate statement)) ": "
-       (link->ttl (:object statement))
+  (str (link->ttl env (:predicate statement)) ": "
+       (link->ttl env (:object statement))
        (if-let [tp (get-in statement [:object :datatype])]
          (str "^^" tp))))
 
 (defn stanza->ttl [env form]
   (case (:type form)
-    (:prefix :base :graph :label) [(str (:origin form) " .")]
+    (:prefix :base :graph) [(str (:origin form) " .")]
+    :label []
     :blank-line [(:origin form)]
-    :stanza (concat [(link->ttl (:target (:subject form)))]
+    :stanza (concat [(link->ttl env (:target (:subject form)))]
                     (map
                      #(str %1 %2)
                      (cons "  " (repeat "; "))

@@ -50,8 +50,11 @@ obsolete: false> boolean")
        "prefix" (let [[_ name target] (re-find #"^@prefix\s+(\w+?):\s+(\S+?)\s*$" ln)]
                   {:name name :target (string->iriref target)})
        "label"  (let [[_ name target _ datatype] (re-find #"^@label\s+(.*?):\s+(.*?)( > \s*(.*))?\s*$" ln)]
-                  {:target (or (string->iriref target)
-                               (string->prefixed-name target))
+                  {:target
+                   (assoc
+                    (or (string->iriref target)
+                        (string->prefixed-name target))
+                    :datatype (when datatype (string->name-or-blank datatype)))
                    :name name
                    :datatype (when datatype (string->name-or-blank datatype))})
        "graph"  (let [[_ target] (re-find #"^@graph\s+(\S+?)\s*$" ln)]
@@ -102,7 +105,6 @@ obsolete: false> boolean")
    parsed-lines nil nil))
 
 ;;;;; Collect and process environments
-
 ;; TODO - throw error if an additional @base is declared
 (defn collect-environment
   ([parsed-lines] (collect-environment {} parsed-lines))
@@ -120,6 +122,16 @@ obsolete: false> boolean")
         env))
     starting-env
     parsed-lines)))
+
+(defn add-to-environment [env additons]
+  (reduce
+   (fn [env [target name datatype]]
+     (assoc-in
+      env [:labels name]
+      (assoc
+       (or (string->iriref target)
+           (string->prefixed-name target))
+       :datatype (string->name-or-blank datatype))))))
 
 ;;;;; Expand links
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)

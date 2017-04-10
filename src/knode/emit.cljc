@@ -14,10 +14,13 @@
     :iri (str "<" (:iriref link) ">")))
 
 (defn statement->ttl [env statement]
-  (str (link->ttl env (:predicate statement)) ": "
-       (link->ttl env (:object statement))
-       (if-let [tp (get-in statement [:object :datatype])]
-         (str "^^" (link->ttl env tp)))))
+  (let [object (:object statement)]
+    (str (link->ttl env (:predicate statement)) ": "
+         (link->ttl env object)
+         (if-let [tp (get-in statement [:object :datatype])]
+           (str "^^" (link->ttl env tp)))
+         (when (= :label-name (:type object))
+           (str " # " (:name object))))))
 
 (defn stanza->ttl [env form]
   (case (:type form)

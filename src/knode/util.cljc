@@ -17,5 +17,3 @@
   (if (absolute-uri-string? iri)
     iri
     (str base iri)))
-
-;; (let [res (in/parse-lines (string/split-lines in/basic-lines))] (out/emit-ttl (:env res) (:forms res)))

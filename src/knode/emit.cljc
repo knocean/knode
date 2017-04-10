@@ -6,15 +6,18 @@
 (defn link->ttl [env link]
   (case (:type link)
     :prefixed-name (str (:prefix link) ":" (:name link))
-    :label-name (str "<" (get-in env [:labels (:name link) :iriref]) ">")
-    :literal (:string link)
+    :label-name (let [label (get-in env [:labels (:name link)])]
+                  (if-let [curie (:curie label)]
+                    curie
+                    (str "<" (:iriref label) ">")))
+    :string (:string link)
     :iri (str "<" (:iriref link) ">")))
 
 (defn statement->ttl [env statement]
   (str (link->ttl env (:predicate statement)) ": "
        (link->ttl env (:object statement))
        (if-let [tp (get-in statement [:object :datatype])]
-         (str "^^" tp))))
+         (str "^^" (link->ttl env tp)))))
 
 (defn stanza->ttl [env form]
   (case (:type form)
@@ -50,8 +53,10 @@
               (cons head (rec tail)))))))
      forms)))
 
-(defn emit-ttl [env forms]
-  (clojure.string/join \newline (mapcat (partial stanza->ttl env) (forms->stanzas forms))))
+(defn emit-ttl [env+forms]
+  (clojure.string/join \newline (mapcat
+                                 (partial stanza->ttl (:env env+forms))
+                                 (forms->stanzas (:forms env+forms)))))
 
 ;;;;;;;;;; HTML emission
 (defn emit-html [env forms]

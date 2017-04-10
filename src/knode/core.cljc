@@ -1,24 +1,6 @@
 (ns knode.core
   (:require [knode.util :as util]))
 
-(def basic-lines
-  "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#>
-@prefix owl: <http://www.w3.org/2002/07/owl#>
-@prefix obo: <http://purl.obolibrary.org/obo/>
-@prefix oio: <http://www.geneontology.org/formats/oboInOwl#>
-@prefix IAO: <http://purl.obolibrary.org/obo/IAO_>
-@prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_>
-@prefix ONTIE: <https://ontology.iedb.org/ONTIE_>
-
-: Mus musculus BALB/c
-type: owl:Class
-alternative term: BALB/c
-subclass of: Mus musculus
-rank: subspecies
-obsolete: false> boolean")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; Parsing pass
 (defn string->iriref [string]
@@ -54,9 +36,9 @@ obsolete: false> boolean")
                    (assoc
                     (or (string->iriref target)
                         (string->prefixed-name target))
-                    :datatype (when datatype (string->name-or-blank datatype)))
+                    :datatype (when datatype (string->name datatype)))
                    :name name
-                   :datatype (when datatype (string->name-or-blank datatype))})
+                   :datatype (when datatype (string->name datatype))})
        "graph"  (let [[_ target] (re-find #"^@graph\s+(\S+?)\s*$" ln)]
                   {:target (string->name target)}))
      :type (keyword declaration))))
@@ -71,7 +53,7 @@ obsolete: false> boolean")
      :predicate (string->name-or-blank predicate)
      :object (assoc
               (string->name-or-blank object)
-              :datatype datatype)}))
+              :datatype (when datatype (string->name datatype)))}))
 
 (defn parse-line [ln]
   (assoc
@@ -123,37 +105,47 @@ obsolete: false> boolean")
     starting-env
     parsed-lines)))
 
-(defn add-to-environment [env additons]
+(defn add-labels-to-environment [env additions]
   (reduce
-   (fn [env [target name datatype]]
+   (fn [env ln]
      (assoc-in
-      env [:labels name]
-      (assoc
-       (or (string->iriref target)
-           (string->prefixed-name target))
-       :datatype (string->name-or-blank datatype))))))
+      env [:labels (:label ln)]
+      (assoc (string->prefixed-name (:curie ln))
+             :datatype (string->name-or-blank (:type ln)))))
+   env additions))
 
 ;;;;; Expand links
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)
 (defn expand-prefixed-name [env link-map]
-  (let [prefix (get-in env [:prefixes (:prefix link-map)])]
-    (assoc link-map :iriref (str prefix (:name link-map)))))
+  (let [prefix (get-in env [:prefixes (:prefix link-map) :iriref])]
+    (assoc
+     link-map :iriref (str prefix (:name link-map))
+     :curie (str (:prefix link-map) ":" (:name link-map)))))
 
 (defn expand-string [env link-map]
   (assoc
-   (if (get-in env [:labels (:string link-map)])
+   (if (and (:string link-map) (get-in env [:labels (:string link-map)]))
      {:type :label-name :name (:string link-map)}
-     {:type :literal :string (:string link-map)})
+     link-map)
    :datatype (:datatype link-map)))
 
 (defn expand-iri-map [env link-map]
-  (update link-map :iriref (partial util/expand-iri (:base env))))
+  (update link-map :iriref (partial util/expand-iri (get-in env [:base :iriref]))))
+
+(declare expand-link)
+
+(defn expand-datatype [env link-map]
+  (if-let [dat (:datatype link-map)]
+    (assoc link-map :datatype (expand-link env dat))
+    link-map))
 
 (defn expand-link [env link-map]
-  (case (:type link-map)
-    :string (expand-string env link-map)
-    :prefixed-name (expand-prefixed-name env link-map)
-    :iri (expand-iri-map env link-map)))
+  (expand-datatype
+   env (case (:type link-map)
+         :string (expand-string env link-map)
+         :prefixed-name (expand-prefixed-name env link-map)
+         :label-name link-map
+         :iri (expand-iri-map env link-map))))
 
 (defn map-vals [f dict]
   (into {} (map (fn [[k v]] [k (f v)]) dict)))
@@ -175,7 +167,49 @@ obsolete: false> boolean")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; External interface
+
+;; NOTE - currently kinda useless, but this is going to be where we implement line grouping in a bit
 (defn parse-lines [line-seq]
   (let [propagated (propagate-subjectives (map parse-line line-seq))
         env (expand-environment (collect-environment propagated))]
     {:env env :forms (expand-all-links env propagated)}))
+
+(defn add-labels-to-env+forms [env+forms label-maps]
+  (let [added (expand-environment (add-labels-to-environment (:env env+forms) label-maps))]
+    {:env added :forms (expand-all-links added (:forms env+forms))}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;; Tests
+
+(def basic-lines
+  "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+@prefix owl: <http://www.w3.org/2002/07/owl#>
+@prefix obo: <http://purl.obolibrary.org/obo/>
+@prefix oio: <http://www.geneontology.org/formats/oboInOwl#>
+@prefix IAO: <http://purl.obolibrary.org/obo/IAO_>
+@prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_>
+@prefix ONTIE: <https://ontology.iedb.org/ONTIE_>
+
+: Mus musculus BALB/c
+type: owl:Class
+alternative term: BALB/c
+subclass of: Mus musculus
+rank: subspecies
+obsolete: false> boolean")
+
+;; (let [res (in/parse-lines (string/split-lines in/basic-lines))]
+;;   (out/emit-ttl
+;;    (add-tsv-to-env
+;;     (add-tsv-to-env
+;;      (:env res)
+;;      "/home/inaimathi/projects/ONTIE/ontology/index.tsv")
+;;     "/home/inaimathi/projects/ONTIE/ontology/external.tsv")
+;;    (:forms res)))
+
+;; (println (out/emit-ttl (add-tsv-to-env+forms
+;;     (add-tsv-to-env+forms
+;;      (in/parse-lines (string/split-lines in/basic-lines))
+;;      "/home/inaimathi/projects/ONTIE/ontology/index.tsv")
+;;     "/home/inaimathi/projects/ONTIE/ontology/external.tsv")))

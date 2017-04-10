@@ -10,9 +10,16 @@
            (parse-declaration "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>")))
     (is (= {:type :base :target {:type :iri :iriref "http://example.com/"}}
            (parse-declaration "@base <http://example.com/>")))
-    (is (= {:type :label
-            :name "type" :target {:type :prefixed-name :prefix "rdf", :name "type"}
-            :datatype {:type :string :string "link"}}
+    (is (= {:name "type"
+            :type :label
+            :datatype {:type :string, :string "link"}
+            :target {:type :prefixed-name
+                     :prefix "rdf" :name "type"
+                     :datatype {:type :string, :string "link"}}}
            (parse-declaration "@label type: rdf:type > link")))
-    (is (= {:type :graph :target {:type :iri :iriref "http:://example.com/graph"}}
-           (parse-declaration "@graph <http:://example.com/graph>")))))
+    (is (= {:type :graph :target {:type :iri :iriref "http://example.com/graph"}}
+           (parse-declaration "@graph <http://example.com/graph>")))))
+
+;; TODO
+;; Things that I've fixed, that I should therefore write test-cases for
+;; - test that expand-string uses the iriref of base, not its identity

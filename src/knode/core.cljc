@@ -1,4 +1,5 @@
-(ns knode.core)
+(ns knode.core
+  (:require [knode.util :as util]))
 
 (def basic-lines
   "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -83,21 +84,20 @@ obsolete: false> boolean")
 ;;;; Propagate information to statement blocks
 ;; TODO - may actually want to break this up into separate propagators for base, graph and subject. If you keep it lazy and effect-free, there's no additional overhead from additional traversals, and it might simplify things.
 (defn propagate-subjectives [parsed-lines]
-  ((fn rec [lines base graph subject]
+  ((fn rec [lines graph subject]
      (when (not (empty? lines))
        (lazy-seq
         (let [ln (first lines)
-              next (fn [head base graph subject]
-                     (cons head (rec (rest lines) base graph subject)))]
+              next (fn [head graph subject]
+                     (cons head (rec (rest lines) graph subject)))]
           (case (:type ln)
-            :base    (next ln (:target ln) graph subject)
-            :graph   (next ln base (:target ln) subject)
-            :subject (next ln base graph (:target ln))
+            :graph   (next ln (:target ln) subject)
+            :subject (next ln graph (:target ln))
             :predicate+object (next
-                               (assoc ln :type :statement :base base :graph graph :subject subject)
-                               base graph subject)
-            (next ln base graph subject))))))
-   parsed-lines nil nil nil))
+                               (assoc ln :type :statement :graph graph :subject subject)
+                               graph subject)
+            (next ln graph subject))))))
+   parsed-lines nil nil))
 
 ;;;;; Collect and process environments
 
@@ -121,22 +121,30 @@ obsolete: false> boolean")
 
 ;;;;; Expand links
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)
-(defn expand-prefixed-name [env name-map]
-  :expand-to-prefixed-name-with-absolute-IRI)
+(defn expand-prefixed-name [env link-map]
+  (let [prefix (get-in env [:prefixes (:prefix link-map)])]
+    (assoc link-map :iriref (str prefix (:name link-map)))))
 
-(defn expand-string [env name-map]
-  (if (get-in env [:labels (:string name-map)])
-    {:type :label-name :name (:string name-map)}
-    {:type :literal :string (:string name-map)}))
+(defn expand-string [env link-map]
+  (if (get-in env [:labels (:string link-map)])
+    {:type :label-name :name (:string link-map)}
+    {:type :literal :string (:string link-map)}))
+
+(defn expand-iri-map [env link-map]
+  (update link-map :iriref (partial util/expand-iri (:base env))))
 
 (defn expand-link [env link-map]
   (case (:type link-map)
     :string (expand-string env link-map)
     :prefixed-name (expand-prefixed-name env link-map)
-    :iri :expand-to-iri-with-absolute-IRI))
+    :iri (expand-iri-map env link-map)))
+
+(defn map-vals [f dict]
+  (into {} (map (fn [[k v]] [k (f v)]) dict)))
 
 (defn expand-environment [env]
-  env)
+  (let [expanded-prefixes (update env :prefixes #(map-vals (partial expand-iri-map env) %))]
+    (update expanded-prefixes :labels #(map-vals (partial expand-link env) %))))
 
 ;; (defn expand-all-links [expanded-env propagated-lines]
 ;;   )

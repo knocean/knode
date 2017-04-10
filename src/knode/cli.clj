@@ -1,5 +1,7 @@
 (ns knode.cli
-  (:require [knode.core :as core])
+  (:require
+   [knode.core :as in]
+   [knode.emit :as out])
   (:gen-class))
 
 (defn serve [port directory]

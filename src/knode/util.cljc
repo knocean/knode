@@ -17,3 +17,11 @@
   (if (absolute-uri-string? iri)
     iri
     (str base iri)))
+
+(defn throw-exception
+  "Given a sequence of arguments,
+   throw a cross-platform exception."
+  [& messages]
+  (throw
+   (#?(:clj Exception. :cljs js/Error.)
+    (->> messages (map str) (clojure.string/join " ")))))

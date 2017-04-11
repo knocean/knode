@@ -109,6 +109,10 @@
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)
 (defn expand-prefixed-name [env link-map]
   (let [prefix (get-in env [:prefixes (:prefix link-map) :iriref])]
+    (when (not prefix)
+      (util/throw-exception
+       "expand-prefixed-name -- No such prefix: "
+       (:prefix link-map)))
     (assoc
      link-map :iriref (str prefix (:name link-map))
      :curie (str (:prefix link-map) ":" (:name link-map)))))
@@ -172,17 +176,21 @@
    :labels   (merge (:labels a) (:labels b))
    :prefixes (merge (:prefixes a) (:prefixes b))})
 
-(defn parse-lines [line-seq] (map parse-line line-seq))
+(defn parse-lines [line-seq]
+  (propagate-subjectives (map parse-line line-seq)))
 
 (defn parsed-lines->env+forms [parsed-lines]
-  (let [propagated (propagate-subjectives parsed-lines)
-        env (expand-environment (collect-environment propagated))]
-    {:env env :forms (expand-all-links env propagated)}))
+  (let [env (expand-environment (collect-environment parsed-lines))]
+    {:env env :forms (expand-all-links env parsed-lines)}))
 
 (defn expand-env+forms [env+forms]
-  (let [propagated (propagate-subjectives (:forms env+forms))
-        expanded (expand-environment (merge (:env env+forms) (collect-environment propagated)))]
-    {:env expanded :forms (expand-all-links expanded propagated)}))
+  (let [forms (:forms env+forms)
+        expanded
+        (expand-environment
+         (merge-environments
+          (:env env+forms)
+          (collect-environment forms)))]
+    {:env expanded :forms (expand-all-links expanded forms)}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; Tests

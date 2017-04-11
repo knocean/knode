@@ -31,7 +31,7 @@
                   {:target (string->iriref target)})
        "prefix" (let [[_ name target] (re-find #"^@prefix\s+(\w+?):\s+(\S+?)\s*$" ln)]
                   {:name name :target (string->iriref target)})
-       "label"  (let [[_ name target _ datatype] (re-find #"^@label\s+(.*?):\s+(.*?)( > \s*(.*))?\s*$" ln)]
+       "label"  (let [[_ name target _ datatype] (re-find #"^@label\s+(.*?):\s+(.*?)( ?> \s*(.*))?\s*$" ln)]
                   {:target
                    (assoc
                     (or (string->iriref target)
@@ -105,15 +105,6 @@
     starting-env
     parsed-lines)))
 
-(defn add-labels-to-environment [env additions]
-  (reduce
-   (fn [env ln]
-     (assoc-in
-      env [:labels (:label ln)]
-      (assoc (string->prefixed-name (:curie ln))
-             :datatype (string->name-or-blank (:type ln)))))
-   env additions))
-
 ;;;;; Expand links
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)
 (defn expand-prefixed-name [env link-map]
@@ -167,16 +158,31 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; External interface
+(defn add-labels-to-environment [env additions]
+  (reduce
+   (fn [env ln]
+     (assoc-in
+      env [:labels (:label ln)]
+      (assoc (string->prefixed-name (:curie ln))
+             :datatype (string->name-or-blank (:type ln)))))
+   env additions))
 
-;; NOTE - currently kinda useless, but this is going to be where we implement line grouping in a bit
-(defn parse-lines [line-seq]
-  (let [propagated (propagate-subjectives (map parse-line line-seq))
+(defn merge-environments [a b]
+  {:base     (or (:base a) (:base b))
+   :labels   (merge (:labels a) (:labels b))
+   :prefixes (merge (:prefixes a) (:prefixes b))})
+
+(defn parse-lines [line-seq] (map parse-line line-seq))
+
+(defn parsed-lines->env+forms [parsed-lines]
+  (let [propagated (propagate-subjectives parsed-lines)
         env (expand-environment (collect-environment propagated))]
     {:env env :forms (expand-all-links env propagated)}))
 
-(defn add-labels-to-env+forms [env+forms label-maps]
-  (let [added (expand-environment (add-labels-to-environment (:env env+forms) label-maps))]
-    {:env added :forms (expand-all-links added (:forms env+forms))}))
+(defn expand-env+forms [env+forms]
+  (let [propagated (propagate-subjectives (:forms env+forms))
+        expanded (expand-environment (merge (:env env+forms) (collect-environment propagated)))]
+    {:env expanded :forms (expand-all-links expanded propagated)}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; Tests
@@ -208,8 +214,12 @@ obsolete: false> boolean")
 ;;     "/home/inaimathi/projects/ONTIE/ontology/external.tsv")
 ;;    (:forms res)))
 
-;; (println (out/emit-ttl (add-tsv-to-env+forms
-;;     (add-tsv-to-env+forms
-;;      (in/parse-lines (string/split-lines in/basic-lines))
-;;      "/home/inaimathi/projects/ONTIE/ontology/index.tsv")
-;;     "/home/inaimathi/projects/ONTIE/ontology/external.tsv")))
+;; (println
+;;  (out/emit-ttl
+;;   (add-tsv-to-env+forms
+;;    (add-tsv-to-env+forms
+;;     (in/parse-lines (string/split-lines in/basic-lines))
+;;     "/home/inaimathi/projects/ONTIE/ontology/index.tsv")
+;;    "/home/inaimathi/projects/ONTIE/ontology/external.tsv")))
+
+;; (parse-files ["/home/inaimathi/projects/ONTIE/ontology/context.kn" "/home/inaimathi/projects/ONTIE/ontology/external.tsv" "/home/inaimathi/projects/ONTIE/ontology/index.tsv" "/home/inaimathi/projects/ONTIE/ontology/ontie.kn"])

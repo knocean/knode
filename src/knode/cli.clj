@@ -7,13 +7,29 @@
    [knode.emit :as out])
   (:gen-class))
 
-(defn add-tsv-to-env+forms [env+forms filename]
+(defn tsv-rows [filename]
   (with-open [reader (io/reader filename)]
     (doall
      (let [lns (map #(string/split % #"\t") (line-seq reader))
            headers (map #(keyword (string/lower-case %)) (first lns))]
-       (in/add-labels-to-env+forms
-        env+forms (map #(into {} (map vector headers %)) (rest lns)))))))
+       (map #(into {} (map vector headers %)) (rest lns))))))
+
+(defn add-tsv-to-env [env filename]
+  (in/add-labels-to-environment env (tsv-rows filename)))
+
+(defn parse-kn-file [filename]
+  (with-open [reader (io/reader filename)]
+    (doall (in/parse-lines (line-seq reader)))))
+
+(defn parse-files [filenames]
+  (in/expand-env+forms
+   (reduce
+    (fn [state fname]
+      (cond (re-find #"\.tsv" fname)
+            (assoc state :env (add-tsv-to-env (:env state) fname))
+            (re-find #"\.kn" fname)
+            (assoc state :forms (concat (:forms state) (parse-kn-file fname)))))
+    {:env {} :forms ()} filenames)))
 
 (defn serve [port directory]
   (println "TODO - serve the given kn files in html/JSON/ttl format"))

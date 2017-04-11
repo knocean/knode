@@ -10,7 +10,7 @@
                   (if-let [curie (:curie label)]
                     curie
                     (str "<" (:iriref label) ">")))
-    :string (:string link)
+    :string (str \" (:string link) \")
     :iri (str "<" (:iriref link) ">")))
 
 (defn statement->ttl [env statement]
@@ -27,7 +27,7 @@
     (:prefix :base :graph) [(str (:origin form) " .")]
     :label []
     :blank-line [(:origin form)]
-    :stanza (concat [(link->ttl env (:target (:subject form)))]
+    :stanza (concat ["" (link->ttl env (:target (:subject form)))]
                     (map
                      #(str %1 %2)
                      (cons "  " (repeat "; "))

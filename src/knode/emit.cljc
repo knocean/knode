@@ -94,7 +94,8 @@
     :stanza [:ul {:resource (link->html-property env (:target (:subject form)))}
              (map (fn [statement]
                     [:li
-                     [:a {:href (link->html-link env (:predicate statement))}]
+                     [:a {:href (link->html-link env (:predicate statement))}
+                      (link->html-property env (:predicate statement))]
                      (statement->html-object env statement)])
                   (:statements form))]))
 

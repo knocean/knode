@@ -5,6 +5,7 @@
 
    [org.httpkit.server :as server]
    [compojure.route :as route]
+   [hiccup.core :as html]
 
    [knode.core :as in]
    [knode.emit :as out])
@@ -39,13 +40,34 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; Server infrastructure
+(def state (atom {}))
+
+(defn render-html [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (html/html (out/emit-html @state))})
+
+(defn render-ttl [req]
+  {:status 200
+   :headers {"Content-Type" "text/plain"}
+   :body (out/emit-ttl @state)})
+
+(defn render-json [req]
+  {:status 200
+   :headers {"Content-Type" "application/json"}
+   :body "{\"status\": \"still TODO\"}"})
+
 (defroutes knode-routes
-  (GET "/" [] (fn [req]
-                {:status 200
-                 :headers {"Content-Type" "text/plain"}
-                 :body "Hello there"})))
+  (GET "/" [] render-html)
+  (GET "/ttl" [] render-ttl)
+  (GET "/json" [] render-json))
 
 (defn serve [port directory]
+  (let [dir (str directory "ontology/")]
+    (println "Parsing from " dir "...")
+    (let [fnames (vec (reverse (map #(.getPath %) (rest (file-seq (io/file dir))))))]
+      (swap! state (fn [_] (parse-files fnames)))))
+
   (println "Listening on" port "...")
   (server/run-server knode-routes {:port (read-string port)}))
 

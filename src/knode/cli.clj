@@ -3,10 +3,16 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
 
+   [org.httpkit.server :as server]
+   [compojure.route :as route]
+
    [knode.core :as in]
    [knode.emit :as out])
+  (:use [compojure.core :only [defroutes GET POST DELETE ANY context]])
   (:gen-class))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;; Filesystem manipulation
 (defn tsv-rows [filename]
   (with-open [reader (io/reader filename)]
     (doall
@@ -31,8 +37,17 @@
             (assoc state :forms (concat (:forms state) (parse-kn-file fname)))))
     {:env {} :forms ()} filenames)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;; Server infrastructure
+(defroutes knode-routes
+  (GET "/" [] (fn [req]
+                {:status 200
+                 :headers {"Content-Type" "text/plain"}
+                 :body "Hello there"})))
+
 (defn serve [port directory]
-  (println "TODO - serve the given kn files in html/JSON/ttl format"))
+  (println "Listening on" port "...")
+  (server/run-server knode-routes {:port (read-string port)}))
 
 (defn test [source-dir expected-dir]
   (println "TODO - slurp files from source dir, check that the outputs match expected-dir"))

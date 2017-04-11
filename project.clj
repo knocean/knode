@@ -6,7 +6,10 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
 
                  [org.clojure/data.csv "0.1.3"]
-                 [hiccup "1.0.5"]]
+                 [hiccup "1.0.5"]
+
+                 [http-kit "2.1.18"]
+                 [compojure "1.5.1"]]
 
   :main knode.cli
   :aot [knode.cli])

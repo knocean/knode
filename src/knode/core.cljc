@@ -107,6 +107,24 @@
 
 ;;;;; Expand links
 ;; (at the end 'cause we need complete environments, minus resolution to take this step properly)
+(defn find-prefix
+  "Given an environment with a :iri-prefix map,
+   return the [prefix-iri prefix] pair
+   for which the given iri starts with the prefix-iri,
+   and prefix-iri is the longest available."
+  [env iri]
+  (->> (:prefixes env)
+       clojure.set/map-invert
+       (sort-by (comp count :iriref first) >)
+       (filter
+        (fn [[prefix-iri prefix]]
+          (util/starts-with? iri (:iriref prefix-iri))))
+       first))
+
+(defn compute-curie [env iri]
+  (if-let [[prefix name] (find-prefix env iri)]
+    (clojure.string/replace iri (:iriref prefix) (str name ":"))))
+
 (defn expand-prefixed-name [env link-map]
   (let [prefix (get-in env [:prefixes (:prefix link-map) :iriref])]
     (when (not prefix)

@@ -65,7 +65,8 @@
 (defn serve [port directory]
   (let [dir (str directory "ontology/")]
     (println "Parsing from " dir "...")
-    (let [fnames (vec (reverse (map #(.getPath %) (rest (file-seq (io/file dir))))))]
+    (let [fnames (vec
+                  (reverse (map #(.getPath %) (rest (file-seq (io/file dir))))))]
       (swap! state (fn [_] (parse-files fnames)))))
 
   (println "Listening on" port "...")

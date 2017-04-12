@@ -1,5 +1,6 @@
 (ns knode.core
   (:require [clojure.test :refer [deftest testing is]]
+            clojure.set
             [knode.util :as util]))
 
 ;; # Overview
@@ -148,13 +149,27 @@
   (when (label? string)
     {:label string}))
 
+(defn find-prefix
+  [env iri]
+  (->> (clojure.set/map-invert (get env :prefixes))
+       (sort-by (comp count first) >)
+       (filter
+        (fn [[prefix-iri prefix]]
+          (util/starts-with? iri prefix-iri)))
+       first))
+
+(defn iri->curie
+  [env iri]
+  (if-let [[prefix name] (find-prefix env iri)]
+    (clojure.string/replace iri prefix (str name ":"))))
+
 (defn resolve-label
   "Given an environment with :labels and a name-map with a :label,
    return a name-map with an :iri."
   [{:keys [labels] :as env} {:keys [label] :as name-map}]
   (let [iri (get-in labels [label :iri])]
     (if iri
-      (assoc name-map :iri iri)
+      (assoc name-map :iri iri :curie (or (:curie name-map) (iri->curie env iri)))
       (util/throw-exception
        "Could not resolve label:"
        label))))
@@ -193,7 +208,7 @@
    return a name-map with a primary name."
   [env {:keys [iri bnode label curie name] :as name-map}]
   (cond
-    iri name-map
+    iri (assoc name-map :curie (or (:curie name-map) (iri->curie env iri)))
     bnode name-map
     label (resolve-label env name-map)
     curie (resolve-curie env name-map)
@@ -261,6 +276,7 @@
               :plain)]
       (assoc
        (dissoc block-map :datatype)
+       :predicate (assoc predicate :curie (or (:curie predicate) (iri->curie env (:iri predicate))))
        :object
        (cond
          (= :link datatype) (resolve-name env {:name content})

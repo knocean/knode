@@ -61,10 +61,9 @@
 
 (defn emit-statement2
   [{:keys [predicate object] :as block}]
+  (println "PRED" predicate)
   (str
-   "<"
-   (:iri predicate)
-   ">"
+   (:curie predicate)
    " "
    (cond
      (:language object)
@@ -73,6 +72,8 @@
      (format "\"%s\"^^%s" (:lexical object) (get-in object [:datatype :curie]))
      (:lexical object)
      (format "\"%s\"" (:lexical object))
+     (:curie object)
+     (:curie object)
      :else
      (format "<%s>" (:iri object)))))
 

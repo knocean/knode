@@ -8,7 +8,8 @@
    [hiccup.core :as html]
 
    [knode.core :as core]
-   [knode.emit :as emit])
+   [knode.emit :as emit]
+   [knode.util :as util])
   (:use [compojure.core :only [defroutes GET POST DELETE ANY context]])
   (:gen-class))
 

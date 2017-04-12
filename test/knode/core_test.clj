@@ -95,7 +95,8 @@
             {:predicate
              {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
               :label "type"
-              :name "type"}
+              :name "type"
+              :curie nil}
              :content "ex:000001"
              :object {:iri "http://example.com/000001" :curie "ex:000001" :name "ex:000001"}}]))
     (is (= (process-line basic-env "type: ex:000001")
@@ -103,7 +104,8 @@
             {:predicate
              {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
               :label "type"
-              :name "type"}
+              :name "type"
+              :curie nil}
              :content "ex:000001"
              :object {:iri "http://example.com/000001" :curie "ex:000001" :name "ex:000001"}}]))
     (is (= (process-line basic-env "ex:comment: some text")

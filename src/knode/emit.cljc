@@ -59,6 +59,37 @@
                                  (partial stanza->ttl (:env env+forms))
                                  (forms->stanzas (:forms env+forms)))))
 
+(defn emit-statement2
+  [{:keys [predicate object] :as block}]
+  (str
+   "<"
+   (:iri predicate)
+   ">"
+   " "
+   (cond
+     (:language object)
+     (format "\"%s\"%s" (:lexical object) (:language object))
+     (:datatype object)
+     (format "\"%s\"^^%s" (:lexical object) (get-in object [:datatype :curie]))
+     (:lexical object)
+     (format "\"%s\"" (:lexical object))
+     :else
+     (format "<%s>" (:iri object)))))
+
+(defn emit-ttl2
+  [context-blocks subject blocks]
+  (clojure.string/join
+   \newline
+   (concat
+    (->> context-blocks
+         (filter :prefix)
+         (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> .")))
+    [""]
+    [(get-in subject [:subject :curie])]
+    (->> blocks
+         (filter :predicate)
+         (map emit-statement2)))))
+
 ;;;;;;;;;; HTML emission
 (defn forms->prefixes [forms]
   (filter #(= :prefix (:type %)) forms))

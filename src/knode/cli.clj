@@ -7,73 +7,94 @@
    [compojure.route :as route]
    [hiccup.core :as html]
 
-   [knode.core :as in]
-   [knode.emit :as out])
+   [knode.core :as core]
+   [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET POST DELETE ANY context]])
   (:gen-class))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;; Filesystem manipulation
-(defn tsv-rows [filename]
-  (with-open [reader (io/reader filename)]
-    (doall
-     (let [lns (map #(string/split % #"\t") (line-seq reader))
-           headers (map #(keyword (string/lower-case %)) (first lns))]
-       (map #(into {} (map vector headers %)) (rest lns))))))
+(def state (atom {}))
 
-(defn add-tsv-to-env [env filename]
-  (in/add-labels-to-environment env (tsv-rows filename)))
-
-(defn parse-kn-file [filename]
-  (with-open [reader (io/reader filename)]
-    (doall (in/parse-lines (line-seq reader)))))
-
-(defn parse-files [filenames]
-  (in/expand-env+forms
-   (reduce
-    (fn [state fname]
-      (cond (re-find #"\.tsv" fname)
-            (assoc state :env (add-tsv-to-env (:env state) fname))
-            (re-find #"\.kn" fname)
-            (assoc state :forms (concat (:forms state) (parse-kn-file fname)))))
-    {:env {} :forms ()} filenames)))
+(defn load-state
+  "Given a directory, load data into the atoms."
+  [dir]
+  (with-open [reader (io/reader (str dir "context.kn"))]
+    (let [[env blocks] (core/process-lines {} (line-seq reader))]
+      (swap! state assoc :context blocks)
+      (swap! state assoc :env env)))
+  (with-open [reader (io/reader (str dir "external.tsv"))]
+    (->> reader
+         line-seq
+         rest
+         (map #(string/split % #"\t"))
+         (map (fn [[label target _]] (str "@label " label ": " target)))
+         (core/process-lines (:env @state))
+         first
+         (swap! state assoc :env)))
+  (with-open [reader (io/reader (str dir "index.tsv"))]
+    (->> reader
+         line-seq
+         rest
+         (map #(string/split % #"\t" 3))
+         (map (fn [[curie label _]] (str "@label " label ": " curie)))
+         (core/process-lines (:env @state))
+         first
+         (swap! state assoc :env)))
+  (with-open [reader (io/reader (str dir "ontie.kn"))]
+    (->> (core/process-lines (:env @state) (line-seq reader))
+         second
+         (partition-by :subject)
+         (partition 2)
+         (map
+          (fn [[[subject] blocks]]
+            [(get-in subject [:subject :iri])
+             {:subject subject
+              :blocks blocks}]))
+         (into {})
+         (swap! state assoc :terms))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;; Server infrastructure
-(def state (atom {}))
+(def root-iri (atom ""))
 
-(defn render-html [req]
+(defn render-index
+  [req]
   {:status 200
    :headers {"Content-Type" "text/html"}
-   :body (html/html (out/emit-html @state))})
+   :body "INDEX"})
 
-(defn render-ttl [req]
+(defn render-html
+  [req]
   {:status 200
-   :headers {"Content-Type" "text/plain"}
-   :body (out/emit-ttl @state)})
+   :headers {"Content-Type" "text/html"}
+   :body "BROKEN"}) ; (html/html (out/emit-html @state))}))
 
-(defn render-json [req]
-  {:status 200
-   :headers {"Content-Type" "application/json"}
-   :body "{\"status\": \"still TODO\"}"})
+(defn render-ttl
+  [req]
+  (let [iri (str @root-iri (get-in req [:route-params :id]))
+        term (get-in @state [:terms iri])]
+    {:status 200
+     :headers {"Content-Type" "text/plain"}
+     :body
+     (emit/emit-ttl2
+      (:context @state)
+      (:subject term)
+      (:blocks term))}))
 
 (defroutes knode-routes
-  (GET "/" [] render-html)
-  (GET "/ttl" [] render-ttl)
-  (GET "/json" [] render-json))
+  (GET "/" [] render-index)
+  (GET "/index.html" [] render-index)
+  (GET "/:id.html" [id] render-html)
+  (GET "/:id.ttl" [id] render-ttl))
 
-(defn serve [port directory]
-  (let [dir (str directory "ontology/")]
-    (println "Parsing from " dir "...")
-    (let [fnames (vec
-                  (reverse (map #(.getPath %) (rest (file-seq (io/file dir))))))]
-      (swap! state (fn [_] (parse-files fnames)))))
-
+(defn serve
+  "Load data and serve pages on a given port."
+  [dir port]
+  (println "Loading data from" dir "...")
+  (load-state dir)
   (println "Listening on" port "...")
   (server/run-server knode-routes {:port (read-string port)}))
 
-(defn test [source-dir expected-dir]
-  (println "TODO - slurp files from source dir, check that the outputs match expected-dir"))
-
-(defn -main [task & args]
-  (println "TODO - " task args))
+;; TODO: test command
+(defn -main [task dir root port & args]
+  (reset! root-iri root)
+  (serve dir port))

@@ -143,7 +143,8 @@
    :datatype (:datatype link-map)))
 
 (defn expand-iri-map [env link-map]
-  (update link-map :iriref (partial util/expand-iri (get-in env [:base :iriref]))))
+  (let [full-iri (util/expand-iri (get-in env [:base :iriref]) (:iriref link-map))]
+    (assoc link-map :iriref full-iri :curie (compute-curie env full-iri))))
 
 (declare expand-link)
 
@@ -164,7 +165,7 @@
   (into {} (map (fn [[k v]] [k (f v)]) dict)))
 
 (defn expand-environment [env]
-  (let [expanded-prefixes (update env :prefixes #(map-vals (partial expand-iri-map env) %))]
+  (let [expanded-prefixes (update env :prefixes #(map-vals (fn [link] (dissoc (expand-iri-map env link) :curie)) %))]
     (update expanded-prefixes :labels #(map-vals (partial expand-link env) %))))
 
 (defn expand-all-links [expanded-env propagated-lines]

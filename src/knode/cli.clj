@@ -29,9 +29,15 @@
          line-seq
          rest
          (map #(string/split % #"\t" 3))
-         (map (fn [[curie label _]] (str "@label " label ": " curie)))
-         (core/process-lines (:env @state))
-         first
+         ; TODO: Fix this hack! Inserts labels directly into environment.
+         (map
+          (juxt
+           second
+           (fn [[x _ _]]
+             {:iri
+              (str (:root-iri @state) (string/replace x ":" "_"))})))
+         (into (get-in @state [:env :labels]))
+         (assoc (:env @state) :labels)
          (swap! state assoc :env)))
   (with-open [reader (io/reader (str dir "ontie.kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))

@@ -5,19 +5,26 @@
 
    [org.httpkit.server :as server]
    [compojure.route :as route]
-   [net.cgrand.enlive-html :as enlive]
+   [hiccup.core :as hiccup]
 
    [knode.state :refer [state]]
    [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET]]))
 
-;; Use the index.html page as a template.
-(def base-path (str (:root-dir @state) "www/index.html"))
-
-(enlive/deftemplate base-template (io/reader base-path)
+(defn base-template
   [title content]
-  [:title] (enlive/content title)
-  [:#content] (enlive/content (enlive/html content)))
+  (-> (str (:root-dir @state) "www/index.html")
+      slurp
+      (string/replace-first
+       #"<title>.*</title>"
+       (format
+        "<title>%s</title>"
+        title))
+      (string/replace-first
+       #"(?s)<div id=\"content\".*\/content -->"
+       (format
+        "<div id=\"content\">%s</div"
+        (hiccup/html content)))))
 
 (defn render-html
   "Given a request, try to find a matching term,
@@ -33,7 +40,7 @@
        :headers {"Content-Type" "text/html"}
        :body
        (base-template
-        (:label subject)
+        label
         [:div
          [:h2 (:curie subject) " " label]
          [:p [:a {:href iri} iri]]

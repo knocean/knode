@@ -63,7 +63,8 @@
   [{:keys [predicate object] :as block}]
   (println "PRED" predicate)
   (str
-   (:curie predicate)
+   (:
+    )
    " "
    (cond
      (:language object)

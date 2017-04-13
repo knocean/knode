@@ -1,6 +1,5 @@
 (ns knode.emit
-  (:require [knode.core :as core]
-            [hiccup.core :as html]))
+  (:require [knode.core :as core]))
 
 (defn forms->stanzas [forms]
   (let [subject-map (reduce
@@ -61,10 +60,8 @@
 
 (defn emit-statement2
   [{:keys [predicate object] :as block}]
-  (println "PRED" predicate)
   (str
-   (:
-    )
+   (:curie predicate)
    " "
    (cond
      (:language object)
@@ -133,7 +130,6 @@
                   (:statements form))]))
 
 (defn emit-html [env+forms]
-  ;;(html/html [:p "Hello world"])
   (let [prefixes (forms->prefixes (:forms env+forms))
         prefix-prop (clojure.string/join
                      \newline

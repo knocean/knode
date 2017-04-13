@@ -8,10 +8,8 @@
    [markdown.core :as md]
    [hiccup.page :as html]
 
-   [knode.core :as core]
    [knode.state :as state]
-   [knode.emit :as emit]
-   [knode.util :as util])
+   [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET POST DELETE ANY context]]))
 
 (defn render-index

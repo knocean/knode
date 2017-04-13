@@ -8,7 +8,7 @@
    [knode.state :as state])
   (:gen-class))
 
-(defn load-state
+(defn load-state!
   "Given a directory, load data into the atoms."
   [dir]
   (with-open [reader (io/reader (str dir "context.kn"))]
@@ -51,6 +51,6 @@
   (reset! state/root-iri root)
   (case task
     "serve" (do (println "Loading data from" dir "...")
-                (load-state dir)
+                (load-state! dir)
                 (server/serve dir port))
     "test" (println "TODO")))

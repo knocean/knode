@@ -33,7 +33,7 @@
         (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> ."))
         (string/join "\n"))
    "\n\n"
-   (get-in subject [:subject :curie])
+   (:curie subject)
    "\n  "
    (->> blocks
         (filter :predicate)
@@ -82,7 +82,7 @@
           (filter :prefix)
           (map #(str "prefix " (:prefix %) ": " (:iri %)))
           (string/join "\n"))
-     :resource (get-in subject [:subject :curie])}]
+     :resource (:curie subject)}]
    (->> blocks
         (filter :predicate)
         (map emit-rdfa-statement)

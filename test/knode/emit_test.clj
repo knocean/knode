@@ -6,7 +6,7 @@
   [{:prefix "ex" :iri "http://ex.com/"}])
 
 (def subject
-  {:subject {:iri "http://ex.com/foo" :curie "ex:foo"}})
+  {:iri "http://ex.com/foo" :curie "ex:foo"})
 
 (def blocks
   [{:predicate {:iri "http://ex.com/type" :curie "ex:type" :label "type"}

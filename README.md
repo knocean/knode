@@ -1,1 +1,2 @@
-resources/README.md
+# knode
+Knowledge Development Environment

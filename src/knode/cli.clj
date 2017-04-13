@@ -41,10 +41,17 @@
          (map
           (fn [[[subject] blocks]]
             [(get-in subject [:subject :iri])
-             {:subject subject
+             {:subject (:subject subject)
               :blocks blocks}]))
          (into {})
-         (swap! state assoc :terms))))
+         (swap! state assoc :terms)))
+  ; TODO: This belongs elsewhere.
+  (->> @state
+       :env
+       :labels
+       (map (juxt (comp :iri val) key))
+       (into {})
+       (swap! state assoc :iri-labels)))
 
 ;; TODO: test command
 (defn -main [task & args]

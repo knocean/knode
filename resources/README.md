@@ -1,2 +1,0 @@
-# knode
-Knowledge Development Environment

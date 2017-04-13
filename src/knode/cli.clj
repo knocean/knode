@@ -3,9 +3,9 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
 
+   [knode.state :refer [state]]
    [knode.core :as core]
-   [knode.server :as server]
-   [knode.state :as state])
+   [knode.server :as server])
   (:gen-class))
 
 (defn load-state!
@@ -13,28 +13,28 @@
   [dir]
   (with-open [reader (io/reader (str dir "context.kn"))]
     (let [[env blocks] (core/process-lines {} (line-seq reader))]
-      (swap! state/state assoc :context blocks)
-      (swap! state/state assoc :env env)))
+      (swap! state assoc :context blocks)
+      (swap! state assoc :env env)))
   (with-open [reader (io/reader (str dir "external.tsv"))]
     (->> reader
          line-seq
          rest
          (map #(string/split % #"\t"))
          (map (fn [[label target _]] (str "@label " label ": " target)))
-         (core/process-lines (:env @state/state))
+         (core/process-lines (:env @state))
          first
-         (swap! state/state assoc :env)))
+         (swap! state assoc :env)))
   (with-open [reader (io/reader (str dir "index.tsv"))]
     (->> reader
          line-seq
          rest
          (map #(string/split % #"\t" 3))
          (map (fn [[curie label _]] (str "@label " label ": " curie)))
-         (core/process-lines (:env @state/state))
+         (core/process-lines (:env @state))
          first
-         (swap! state/state assoc :env)))
+         (swap! state assoc :env)))
   (with-open [reader (io/reader (str dir "ontie.kn"))]
-    (->> (core/process-lines (:env @state/state) (line-seq reader))
+    (->> (core/process-lines (:env @state) (line-seq reader))
          second
          (partition-by :subject)
          (partition 2)
@@ -44,13 +44,13 @@
              {:subject subject
               :blocks blocks}]))
          (into {})
-         (swap! state/state assoc :terms))))
+         (swap! state assoc :terms))))
 
 ;; TODO: test command
-(defn -main [task dir root port & args]
-  (reset! state/root-iri root)
+(defn -main [task & args]
   (case task
-    "serve" (do (println "Loading data from" dir "...")
-                (load-state! dir)
-                (server/serve dir port))
+    "serve" (let [dir (str (:root-dir @state) "ontology/")]
+              (println "Loading data from" dir "...")
+              (load-state! dir)
+              (server/serve))
     "test" (println "TODO")))

@@ -98,4 +98,6 @@
 ;; TODO: test command
 (defn -main [task dir root port & args]
   (reset! root-iri root)
-  (serve dir port))
+  (case task
+    "serve" (serve dir port)
+    "test" (println "TODO")))

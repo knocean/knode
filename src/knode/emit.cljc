@@ -77,10 +77,10 @@
   (apply
    conj
    [:ul
-    {:prefixes
+    {:prefix
      (->> context-blocks
           (filter :prefix)
-          (map #(str "prefix " (:prefix %) ": " (:iri %)))
+          (map #(str (:prefix %) ": " (:iri %)))
           (string/join "\n"))
      :resource (:curie subject)}]
    (->> blocks

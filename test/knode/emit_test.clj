@@ -31,7 +31,7 @@ ex:foo
 
 (def example-rdfa
   [:ul
-   {:prefixes "prefix ex: http://ex.com/"
+   {:prefix "ex: http://ex.com/"
     :resource "ex:foo"}
    [:li
     [:a {:href "http://ex.com/type"} "type"]

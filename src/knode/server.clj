@@ -72,10 +72,11 @@
 
 (defroutes knode-routes
   (route/files "" {:root (str (:root-dir @state) "www/")})
-  (GET "/:id.html" [id] render-html)
-  (GET "/:id.ttl" [id] render-ttl)
-  (GET "/:id" [id] render-html)
+  (GET "/ontology/:id.html" [id] render-html)
+  (GET "/ontology/:id.ttl" [id] render-ttl)
+  (GET "/ontology/:id" [id] render-html)
   (route/not-found
+   ;(fn [req] (str req))))
    (base-template
     "Not Found"
     [:div

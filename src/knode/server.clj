@@ -6,25 +6,21 @@
    [org.httpkit.server :as server]
    [compojure.route :as route]
    [hiccup.core :as hiccup]
+   [markdown.core :as md]
+   [yaml.core :as yaml]
 
    [knode.state :refer [state]]
    [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET]]))
 
 (defn base-template
+  "Given a title and a Hiccup vector,
+   load an HTML template, insert the values, and return the HTML string."
   [title content]
-  (-> (str (:root-dir @state) "www/index.html")
+  (-> "resources/base.html"
       slurp
-      (string/replace-first
-       #"<title>.*</title>"
-       (format
-        "<title>%s</title>"
-        title))
-      (string/replace-first
-       #"(?s)<div id=\"content\".*\/content -->"
-       (format
-        "<div id=\"content\">%s</div"
-        (hiccup/html content)))))
+      (string/replace "{{TITLE}}" title)
+      (string/replace-first "{{CONTENT}}" (hiccup/html content))))
 
 (defn render-html
   "Given a request, try to find a matching term,
@@ -70,13 +66,36 @@
       (:subject term)
       (:blocks term))}))
 
+(defn render-doc
+  [doc]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body
+   (let [path (str (:root-dir @state) "doc/" doc ".md")
+         file (io/file path)]
+     (when (.exists file)
+       (let [[_ _ header content] (re-find #"(?s)(---(.*?)---)(.*)" (slurp file))
+             metadata (yaml/parse-string header)]
+         (base-template
+          (:title metadata)
+          (md/md-to-html-string content)))))})
+
 (defroutes knode-routes
-  (route/files "" {:root (str (:root-dir @state) "www/")})
+  ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
   (GET "/ontology/:id.ttl" [id] render-ttl)
   (GET "/ontology/:id" [id] render-html)
+
+  ; doc directory
+  (GET "/doc/:doc.html" [doc] (render-doc doc))
+  (GET "/index.html" [] (render-doc "index"))
+  (GET "/" [] (render-doc "index"))
+
+  ; static resources
+  (route/resources "")
+
+  ; not found
   (route/not-found
-   ;(fn [req] (str req))))
    (base-template
     "Not Found"
     [:div
@@ -84,8 +103,22 @@
      [:p "Sorry, the page you requested was not found."]
      [:p [:a {:href "/"} "Return to home page."]]])))
 
+; Start/Restart http://www.http-kit.org/server.html#stop-server
+(defonce server (atom nil))
+
 (defn serve
   "Load data and serve pages on a given port."
   []
   (println "Listening on" (:port @state) "...")
-  (server/run-server knode-routes {:port (:port @state)}))
+  (reset! server (server/run-server knode-routes {:port (:port @state)})))
+
+(defn stop
+  []
+  (when-not (nil? @server)
+    (@server :timeout 100)
+    (reset! server nil)))
+
+(defn restart
+  []
+  (stop)
+  (serve))

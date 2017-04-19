@@ -28,7 +28,7 @@
    and return a response map for HTML."
   [req]
   (let [id (get-in req [:route-params :id])
-        iri (str (:root-iri @state) id)
+        iri (str (:root-iri @state) "ontology/" id)
         term (get-in @state [:terms iri])
         subject (:subject term)
         label (get-in @state [:iri-labels (:iri subject)])]
@@ -57,15 +57,16 @@
   "Given a request, try to find a matching term,
    and return a response map for Turtle."
   [req]
-  (let [iri (str (:root-iri @state) (get-in req [:route-params :id]))
+  (let [iri (str (:root-iri @state) "ontology/" (get-in req [:route-params :id]))
         term (get-in @state [:terms iri])]
-    {:status 200
-     :headers {"Content-Type" "text/turtle"}
-     :body
-     (emit/emit-ttl
-      (:context @state)
-      (:subject term)
-      (:blocks term))}))
+    (when term
+      {:status 200
+       :headers {"Content-Type" "text/turtle"}
+       :body
+       (emit/emit-ttl
+        (:context @state)
+        (:subject term)
+        (:blocks term))})))
 
 (defn render-doc
   [doc]

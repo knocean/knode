@@ -1,0 +1,6 @@
+label	target	type
+label	rdfs:label	owl:AnnotationProperty
+type	rdf:type > link	rdf:Property
+subclass of	rdfs:subClassOf > link	rdf:Property
+obsolete	owl:deprecated > xsd:boolean	owl:DatatypeProperty
+alternative term	obo:IAO_0000118	owl:AnnotationProperty

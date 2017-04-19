@@ -10,7 +10,7 @@
 
 (defn load-state!
   "Given a directory, load data into the atoms."
-  [dir]
+  [dir project-name]
   (with-open [reader (io/reader (str dir "context.kn"))]
     (let [[env blocks] (core/process-lines {} (line-seq reader))]
       (swap! state assoc :context blocks)
@@ -39,7 +39,7 @@
          (into (get-in @state [:env :labels]))
          (assoc (:env @state) :labels)
          (swap! state assoc :env)))
-  (with-open [reader (io/reader (str dir "ontie.kn"))]
+  (with-open [reader (io/reader (str dir project-name ".kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))
          second
          (partition-by :subject)
@@ -64,6 +64,6 @@
   (case task
     "serve" (let [dir (str (:root-dir @state) "ontology/")]
               (println "Loading data from" dir "...")
-              (load-state! dir)
+              (load-state! dir (:project-name @state))
               (server/serve))
     "test" (println "TODO")))

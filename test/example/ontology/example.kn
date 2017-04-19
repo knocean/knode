@@ -1,0 +1,5 @@
+: EXAMPLE:0000001
+type: owl:Class
+label: Example One
+alternative term: ex 1
+subclass of: owl:Thing

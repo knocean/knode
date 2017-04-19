@@ -17,7 +17,8 @@
   "Given a title and a Hiccup vector,
    load an HTML template, insert the values, and return the HTML string."
   [title content]
-  (-> "resources/base.html"
+  (-> "base.html"
+      io/resource
       slurp
       (string/replace "{{TITLE}}" title)
       (string/replace-first "{{CONTENT}}" (hiccup/html content))))

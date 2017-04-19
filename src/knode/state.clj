@@ -1,5 +1,6 @@
 (ns knode.state
   (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [environ.core :refer [env]]))
 
 (def state
@@ -19,7 +20,7 @@
   (if (:knode-project-name env)
     (swap! state assoc :project-name (:knode-project-name env))
     (let [path (.getAbsolutePath (io/file (:root-dir @state)))
-          name (.getName (io/file path))]
+          name (string/lower-case (.getName (io/file path)))]
       (swap! state assoc :project-name name))))
 
 (defn testing-state!

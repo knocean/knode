@@ -29,15 +29,10 @@
          line-seq
          rest
          (map #(string/split % #"\t" 3))
-         ; TODO: Fix this hack! Inserts labels directly into environment.
-         (map
-          (juxt
-           second
-           (fn [[x _ _]]
-             {:iri
-              (str (:root-iri @state) (string/replace x ":" "_"))})))
-         (into (get-in @state [:env :labels]))
-         (assoc (:env @state) :labels)
+         (reduce
+          (fn [env [label target _]]
+            (core/add-label env label target nil))
+          (:env @state))
          (swap! state assoc :env)))
   (with-open [reader (io/reader (str dir project-name ".kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))
@@ -50,14 +45,7 @@
              {:subject (:subject subject)
               :blocks blocks}]))
          (into {})
-         (swap! state assoc :terms)))
-  ; TODO: This belongs elsewhere.
-  (->> @state
-       :env
-       :labels
-       (map (juxt (comp :iri val) key))
-       (into {})
-       (swap! state assoc :iri-labels)))
+         (swap! state assoc :terms))))
 
 ;; TODO: test command
 (defn -main [task & args]

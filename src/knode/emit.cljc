@@ -5,19 +5,21 @@
 (defn emit-ttl-statement
   "Given a block-map with :predicate and :object,
    return a Turtle statement string."
-  [{:keys [predicate object] :as block}]
+  [env {:keys [predicate object] :as block}]
   (str
-   (:curie predicate)
+   (core/get-curie env (:iri predicate))
    " "
    (cond
      (:language object)
      (format "\"%s\"%s" (:lexical object) (:language object))
      (:datatype object)
-     (format "\"%s\"^^%s" (:lexical object) (get-in object [:datatype :curie]))
+     (format "\"%s\"^^%s"
+             (:lexical object)
+             (core/get-curie env (get-in object [:datatype :iri])))
      (:lexical object)
      (format "\"%s\"" (:lexical object))
-     (:curie object)
-     (:curie object)
+     (core/get-curie env (:iri object))
+     (core/get-curie env (:iri object))
      :else
      (format "<%s>" (:iri object)))))
 
@@ -26,54 +28,55 @@
    a subject block-map, and a sequence of block-maps (statements),
    return a stand-alone Turtle string
    with prefixes and a stanza for that subject with those statements."
-  [context-blocks subject blocks]
+  [env context-blocks subject blocks]
   (str
    (->> context-blocks
         (filter :prefix)
         (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> ."))
         (string/join "\n"))
    "\n\n"
-   (:curie subject)
+   (core/get-curie env (:iri subject))
    "\n  "
    (->> blocks
         (filter :predicate)
-        (map emit-ttl-statement)
+        (map (partial emit-ttl-statement env))
         (string/join "\n; "))
    "\n."))
 
 (defn emit-rdfa-statement
   "Given a block-map with :predicate and :object,
    return a list item using Hiccup for HTML+RDFa."
-  [{:keys [predicate object] :as block}]
-  [:li
-   [:a {:href (:iri predicate)} (:label predicate)]
-   ": "
-   (cond
-     (:language object)
-     [:span
-      {:property (:curie predicate)
-       :xml:lang (string/replace (:language object) #"^@" "")}
-      (:lexical object)]
+  [env {:keys [predicate object] :as block}]
+  (let [property (core/get-curie env (:iri predicate))]
+    [:li
+     [:a {:href (:iri predicate)} (core/get-name env (:iri predicate))]
+     ": "
+     (cond
+       (:language object)
+       [:span
+        {:property property
+         :xml:lang (string/replace (:language object) #"^@" "")}
+        (:lexical object)]
 
-     (:datatype object)
-     [:span
-      {:property (:curie predicate)
-       :datatype (get-in object [:datatype :curie])}
-      (:lexical object)]
+       (:datatype object)
+       [:span
+        {:property property
+         :datatype (core/get-curie env (get-in object [:datatype :iri]))}
+        (:lexical object)]
 
-     (:lexical object)
-     [:span {:property (:curie predicate)} (:lexical object)]
+       (:lexical object)
+       [:span {:property property} (:lexical object)]
 
-     :else
-     [:a
-      {:href (:iri object) :property (:curie predicate)}
-      (or (:label object) (:curie object) (:iri object))])])
+       :else
+       [:a
+        {:href (:iri object) :property property}
+        (core/get-name env (:iri object))])]))
 
 (defn emit-rdfa
   "Given a sequence of context block-maps (prefixes),
    a subject block-map, and a sequence of block-maps (statements),
    return an HTML+RDFa <ul> element in Hiccup format."
-  [context-blocks subject blocks]
+  [env context-blocks subject blocks]
   (apply
    conj
    [:ul
@@ -82,8 +85,8 @@
           (filter :prefix)
           (map #(str (:prefix %) ": " (:iri %)))
           (string/join "\n"))
-     :resource (:curie subject)}]
+     :resource (core/get-curie env (:iri subject))}]
    (->> blocks
         (filter :predicate)
-        (map emit-rdfa-statement)
+        (map (partial emit-rdfa-statement env))
         vec)))

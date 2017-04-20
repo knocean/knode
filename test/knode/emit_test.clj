@@ -1,24 +1,32 @@
 (ns knode.emit-test
   (:require [clojure.test :refer [deftest testing is]]
+            [knode.core :as core]
             [knode.emit :refer :all]))
 
 (def context-blocks
-  [{:prefix "ex" :iri "http://ex.com/"}])
+  [{:prefix "ex" :iri "http://ex.com/"}
+   {:label "type" :target {:iri "http://ex.com/type"}}
+   {:label "label" :target {:iri "http://ex.com/label"}}
+   {:label "obsolete" :target {:iri "http://ex.com/obsolete"}}
+   {:label "Bar" :target {:iri "http://ex.com/bar"}}
+   {:label "French" :target {:iri "http://ex.com/french"}}])
 
-(def subject
-  {:iri "http://ex.com/foo" :curie "ex:foo"})
+(def environment
+  (reduce core/update-environment {} context-blocks))
+
+(def subject {:iri "http://ex.com/foo"})
 
 (def blocks
-  [{:predicate {:iri "http://ex.com/type" :curie "ex:type" :label "type"}
-    :object {:iri "http://ex.com/bar" :curie "ex:bar" :label "Bar"}}
-   {:predicate {:iri "http://ex.com/label" :curie "ex:label" :label "label"}
+  [{:predicate {:iri "http://ex.com/type"}
+    :object {:iri "http://ex.com/bar"}}
+   {:predicate {:iri "http://ex.com/label"}
     :object {:lexical "Foo"}}
-   {:predicate {:iri "http://ex.com/french" :curie "ex:french" :label "French"}
+   {:predicate {:iri "http://ex.com/french"}
     :object {:lexical "Fou" :language "@fr"}}
-   {:predicate {:iri "http://ex.com/obsolete" :curie "ex:obsolete" :label "obsolete"}
+   {:predicate {:iri "http://ex.com/obsolete"}
     :object
     {:lexical "true"
-     :datatype {:iri "http://ex.com/boolean" :curie "ex:boolean"}}}])
+     :datatype {:iri "http://ex.com/boolean"}}}])
 
 (def example-ttl "@prefix ex: <http://ex.com/> .
 
@@ -52,8 +60,8 @@ ex:foo
 
 (deftest test-emit
   (testing "Emit Turtle"
-    (is (= (emit-ttl context-blocks subject blocks)
+    (is (= (emit-ttl environment context-blocks subject blocks)
            example-ttl)))
   (testing "Emit HTML+RDFa"
-    (is (= (emit-rdfa context-blocks subject blocks)
+    (is (= (emit-rdfa environment context-blocks subject blocks)
            example-rdfa))))

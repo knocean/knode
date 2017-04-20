@@ -74,6 +74,13 @@
   {:iri ""
    :datatype :link}}}
 
+(defn add-label
+  "Add a label to the environment."
+  [env label target datatype]
+  (-> env
+      (assoc-in [:labels label] {:iri (:iri target) :datatype datatype})
+      (assoc-in [:iri-labels (:iri target)] label)))
+
 (defn update-environment
   "Given an environment and a block-map,
    add any prefixes or labels,
@@ -83,7 +90,7 @@
     (and prefix iri)
     (assoc-in env [:prefixes prefix] iri)
     (and label target)
-    (assoc-in env [:labels label] {:iri (:iri target) :datatype datatype})
+    (add-label env label target datatype)
     subject
     (assoc env :subject subject)
     :else
@@ -125,6 +132,20 @@
        "Could not find prefix:"
        prefix))))
 
+(defn find-prefix
+  [env iri]
+  (->> (clojure.set/map-invert (get env :prefixes))
+       (sort-by (comp count first) >)
+       (filter
+        (fn [[prefix-iri prefix]]
+          (util/starts-with? iri prefix-iri)))
+       first))
+
+(defn get-curie
+  [env iri]
+  (if-let [[prefix name] (find-prefix env iri)]
+    (clojure.string/replace iri prefix (str name ":"))))
+
 ;; ### Label
 ;;
 ;; A label is a string meant to be meaningful to human readers.
@@ -149,27 +170,13 @@
   (when (label? string)
     {:label string}))
 
-(defn find-prefix
-  [env iri]
-  (->> (clojure.set/map-invert (get env :prefixes))
-       (sort-by (comp count first) >)
-       (filter
-        (fn [[prefix-iri prefix]]
-          (util/starts-with? iri prefix-iri)))
-       first))
-
-(defn iri->curie
-  [env iri]
-  (if-let [[prefix name] (find-prefix env iri)]
-    (clojure.string/replace iri prefix (str name ":"))))
-
 (defn resolve-label
   "Given an environment with :labels and a name-map with a :label,
    return a name-map with an :iri."
   [{:keys [labels] :as env} {:keys [label] :as name-map}]
   (let [iri (get-in labels [label :iri])]
     (if iri
-      (assoc name-map :iri iri :curie (or (:curie name-map) (iri->curie env iri)))
+      (assoc name-map :iri iri)
       (util/throw-exception
        "Could not resolve label:"
        label))))
@@ -208,12 +215,21 @@
    return a name-map with a primary name."
   [env {:keys [iri bnode label curie name] :as name-map}]
   (cond
-    iri (assoc name-map :curie (or (:curie name-map) (iri->curie env iri)))
+    iri name-map
     bnode name-map
     label (resolve-label env name-map)
     curie (resolve-curie env name-map)
     (get-in env [:labels name]) (resolve-label env (assoc name-map :label name))
     :else (merge name-map (resolve-name env (parse-non-label name)))))
+
+(defn get-name
+  "Given an IRI, return the best name: label, CURIE, or the original IRI."
+  [env iri]
+  (or
+   (get-in env [:iri-labels iri])
+   (get-curie env iri)
+   ; TODO: relative IRI
+   iri))
 
 ;; # Objects
 ;;
@@ -276,7 +292,6 @@
               :plain)]
       (assoc
        (dissoc block-map :datatype)
-       :predicate (assoc predicate :curie (or (:curie predicate) (iri->curie env (:iri predicate))))
        :object
        (cond
          (= :link datatype) (resolve-name env {:name content})

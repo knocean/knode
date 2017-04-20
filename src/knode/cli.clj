@@ -30,7 +30,7 @@
          rest
          (map #(string/split % #"\t" 3))
          (reduce
-          (fn [env [label target _]]
+          (fn [env [target label _]]
             (core/add-label env label target nil))
           (:env @state))
          (swap! state assoc :env)))

@@ -8,6 +8,8 @@
    [knode.server :as server])
   (:gen-class))
 
+; TODO: This is a big mess. The TSV code should be generalized.
+
 (defn load-state!
   "Given a directory, load data into the atoms."
   [dir project-name]
@@ -25,15 +27,11 @@
          first
          (swap! state assoc :env)))
   (with-open [reader (io/reader (str dir "index.tsv"))]
-    (->> reader
-         line-seq
-         rest
-         (map #(string/split % #"\t" 3))
-         (reduce
-          (fn [env [target label _]]
-            (core/add-label env label target nil))
-          (:env @state))
-         (swap! state assoc :env)))
+    (doseq [line (->> reader line-seq rest)]
+      (let [[curie label _] (string/split line #"\t" 3)
+            target (core/resolve-name (:env @state) {:curie curie})
+            new-env (core/add-label (:env @state) label target nil)]
+        (swap! state assoc :env new-env))))
   (with-open [reader (io/reader (str dir project-name ".kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))
          second

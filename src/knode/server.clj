@@ -31,7 +31,7 @@
         iri (str (:root-iri @state) "ontology/" id)
         term (get-in @state [:terms iri])
         subject (:subject term)
-        label (get-in @state [:env :iri-labels (:iri subject)])]
+        label (get-in @state [:iri-labels (:iri subject)] "MISSING")]
     (when term
       {:status 200
        :headers {"Content-Type" "text/html"}
@@ -43,6 +43,7 @@
          [:p [:a {:href iri} iri]]
          (doall
           (emit/emit-rdfa
+           (:env @state)
            (:context @state)
            (:subject term)
            (:blocks term)))
@@ -64,6 +65,7 @@
        :headers {"Content-Type" "text/turtle"}
        :body
        (emit/emit-ttl
+        (:env @state)
         (:context @state)
         (:subject term)
         (:blocks term))})))

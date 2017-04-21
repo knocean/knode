@@ -43,4 +43,13 @@ EXAMPLE:0000002
 ; EXAMPLE:name \"Two\"
 ; rdf:type owl:Class
 ; rdfs:label \"Example Two\"
-."))))
+."))
+    (is (= (emit/emit-kn
+            (:env @state)
+            nil
+            {:iri example-iri}
+            (->> (get-in @state [:terms example-iri :blocks])
+                 (remove :template)))
+           ": EXAMPLE:0000002
+template: example class
+name: Two"))))

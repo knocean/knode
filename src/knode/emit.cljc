@@ -90,3 +90,42 @@
         (filter :predicate)
         (map (partial emit-rdfa-statement env))
         vec)))
+
+(defn emit-kn-statement
+  [env {:keys [prefix iri label target datatype predicate object] :as block}]
+  (cond
+    (and prefix iri)
+    (format "@prefix %s: <%s>" prefix iri)
+    (and label target datatype)
+    (format "@label %s: %s > %s"
+            label
+            (core/get-curie env (:iri target))
+            (or
+             (core/get-curie env (:iri datatype))
+             (:language datatype)
+             (when (keyword? datatype) (name datatype))))
+    (and label target)
+    (format "@label %s: %s" label (core/get-curie env (:iri target)))
+    (and predicate (:lexical object))
+    (format "%s: %s"
+            (core/get-name env (:iri predicate))
+            (:lexical object))
+    (and predicate (:iri object))
+    (format "%s: %s"
+            (core/get-name env (:iri predicate))
+            (core/get-name env (:iri object)))))
+
+(defn emit-kn
+  "Given a sequence of context block-maps (prefixes),
+   a subject block-map, and a sequence of block-maps,
+   return a Knotation string."
+  [env context-blocks subject blocks]
+  (string/join
+   "\n"
+   (remove
+    nil?
+    (concat
+     (map (partial emit-kn-statement env) context-blocks)
+     (when context-blocks [""])
+     [(str ": " (core/get-curie env (:iri subject)))]
+     (map (partial emit-kn-statement env) blocks)))))

@@ -77,7 +77,7 @@
         iri (str (:root-iri @state) "ontology/" id)
         term (get-in @state [:terms iri])
         subject (:subject term)
-        label (get-in @state [:iri-labels (:iri subject)] "MISSING")]
+        label (get-in @state [:env :iri-labels (:iri subject)])]
     (when term
       {:status 200
        :headers {"Content-Type" "text/html"}

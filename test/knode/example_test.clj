@@ -26,6 +26,8 @@
             {:template "http://example.com/template-1"
              :predicate {:iri "http://www.w3.org/2000/01/rdf-schema#label"}
              :object {:lexical "Example Two"}}]))
+    (is (= (string/trim (emit/emit-index (:env @state) (:terms @state)))
+           (string/trim (slurp "test/example/ontology/index.tsv"))))
     (is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
            (string/trim (slurp "test/example/ontology/example.ttl"))))
     (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))

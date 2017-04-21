@@ -157,6 +157,7 @@
   "Given an environment, a sequence of context-blocks, and a map from IRI to term map,
    return a Knotation string."
   [env context-blocks terms]
+  ; TODO: context-blocks is currently ignored.
   (->> terms
        (into (sorted-map))
        vals
@@ -164,3 +165,27 @@
         (fn [{:keys [subject blocks] :as term}]
           (emit-kn-term env nil subject (remove :template blocks))))
        (string/join "\n\n")))
+
+(def rdfs:label "http://www.w3.org/2000/01/rdf-schema#label")
+(def rdf:type "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+(def owl:deprecated "http://www.w3.org/2002/07/owl#deprecated")
+(def iao:replacement "http://purl.obolibrary.org/obo/IAO_0100001")
+
+(defn emit-index
+  "Given an environment and a map from IRI to term map,
+   return a tab-separated index table for the terms."
+  [env terms]
+  (->> terms
+       (into (sorted-map))
+       vals
+       (map
+        (fn [{:keys [subject blocks] :as term}]
+          (let [values (core/collect-values blocks)]
+            [(core/get-curie env (:iri subject))
+             (get-in values [rdfs:label 0 :lexical])
+             (core/get-curie env (get-in values [rdf:type 0 :iri]))
+             (get-in values [owl:deprecated 0 :lexical] "false")
+             (get-in values [iao:replacement 0 :iri])])))
+       (concat [["CURIE" "label" "type" "obsolete" "replacement"]])
+       (map (partial string/join "\t"))
+       (string/join "\n")))

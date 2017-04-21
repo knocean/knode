@@ -3,7 +3,7 @@
             [knode.core :as core]))
 
 (defn emit-ttl-statement
-  "Given a block-map with :predicate and :object,
+  "Given an environment and a block-map with :predicate and :object,
    return a Turtle statement string."
   [env {:keys [predicate object] :as block}]
   (str
@@ -23,8 +23,8 @@
      :else
      (format "<%s>" (:iri object)))))
 
-(defn emit-ttl
-  "Given a sequence of context block-maps (prefixes),
+(defn emit-ttl-term
+  "Given an environment, a sequence of context block-maps (prefixes),
    a subject block-map, and a sequence of block-maps (statements),
    return a stand-alone Turtle string
    with prefixes and a stanza for that subject with those statements."
@@ -34,7 +34,7 @@
         (filter :prefix)
         (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> ."))
         (string/join "\n"))
-   "\n\n"
+   (when context-blocks "\n\n")
    (core/get-curie env (:iri subject))
    "\n  "
    (->> blocks
@@ -43,8 +43,26 @@
         (string/join "\n; "))
    "\n."))
 
+(defn emit-ttl-terms
+  "Given an environment, a sequence of context-blocks, and a map from IRI to term map,
+   return a Turtle string."
+  [env context-blocks terms]
+  (string/join
+   "\n\n"
+   (concat
+    [(->> context-blocks
+          (filter :prefix)
+          (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> ."))
+          (string/join "\n"))]
+    (->> terms
+         (into (sorted-map))
+         vals
+         (map
+          (fn [{:keys [subject blocks] :as term}]
+            (emit-ttl-term env nil subject (remove :template blocks))))))))
+
 (defn emit-rdfa-statement
-  "Given a block-map with :predicate and :object,
+  "Given an environment and a block-map with :predicate and :object,
    return a list item using Hiccup for HTML+RDFa."
   [env {:keys [predicate object] :as block}]
   (let [property (core/get-curie env (:iri predicate))]
@@ -72,8 +90,8 @@
         {:href (:iri object) :property property}
         (core/get-name env (:iri object))])]))
 
-(defn emit-rdfa
-  "Given a sequence of context block-maps (prefixes),
+(defn emit-rdfa-term
+  "Given an environment, a sequence of context block-maps (prefixes),
    a subject block-map, and a sequence of block-maps (statements),
    return an HTML+RDFa <ul> element in Hiccup format."
   [env context-blocks subject blocks]
@@ -92,8 +110,12 @@
         vec)))
 
 (defn emit-kn-statement
+  "Given a block-map, return a Knotation string."
   [env {:keys [prefix iri label target datatype predicate object] :as block}]
   (cond
+    ; TODO: comment
+    ; TODO: blank
+    ; TODO: base
     (and prefix iri)
     (format "@prefix %s: <%s>" prefix iri)
     (and label target datatype)
@@ -106,6 +128,7 @@
              (when (keyword? datatype) (name datatype))))
     (and label target)
     (format "@label %s: %s" label (core/get-curie env (:iri target)))
+    ; TODO: non-default datatypes
     (and predicate (:lexical object))
     (format "%s: %s"
             (core/get-name env (:iri predicate))
@@ -115,7 +138,7 @@
             (core/get-name env (:iri predicate))
             (core/get-name env (:iri object)))))
 
-(defn emit-kn
+(defn emit-kn-term
   "Given a sequence of context block-maps (prefixes),
    a subject block-map, and a sequence of block-maps,
    return a Knotation string."
@@ -129,3 +152,15 @@
      (when context-blocks [""])
      [(str ": " (core/get-curie env (:iri subject)))]
      (map (partial emit-kn-statement env) blocks)))))
+
+(defn emit-kn-terms
+  "Given an environment, a sequence of context-blocks, and a map from IRI to term map,
+   return a Knotation string."
+  [env context-blocks terms]
+  (->> terms
+       (into (sorted-map))
+       vals
+       (map
+        (fn [{:keys [subject blocks] :as term}]
+          (emit-kn-term env nil subject (remove :template blocks))))
+       (string/join "\n\n")))

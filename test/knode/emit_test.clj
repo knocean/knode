@@ -79,11 +79,11 @@ obsolete: true")
 
 (deftest test-emit
   (testing "Emit Turtle"
-    (is (= (emit-ttl environment context-blocks subject blocks)
+    (is (= (emit-ttl-term environment context-blocks subject blocks)
            example-ttl)))
   (testing "Emit HTML+RDFa"
-    (is (= (emit-rdfa environment context-blocks subject blocks)
+    (is (= (emit-rdfa-term environment context-blocks subject blocks)
            example-rdfa)))
   (testing "Emit Knotation"
-    (is (= (emit-kn environment context-blocks subject blocks)
+    (is (= (emit-kn-term environment context-blocks subject blocks)
            example-kn))))

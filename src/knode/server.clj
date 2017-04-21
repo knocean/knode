@@ -88,7 +88,7 @@
          [:h2 (:curie subject) " " label]
          [:p [:a {:href iri} iri]]
          (doall
-          (emit/emit-rdfa
+          (emit/emit-rdfa-term
            (:env @state)
            (:context @state)
            (:subject term)
@@ -110,7 +110,7 @@
       {:status 200
        :headers {"Content-Type" "text/turtle"}
        :body
-       (emit/emit-ttl
+       (emit/emit-ttl-term
         (:env @state)
         (:context @state)
         (:subject term)

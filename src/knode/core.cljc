@@ -1,5 +1,5 @@
 (ns knode.core
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clojure.string :as string]
             clojure.set
             [knode.util :as util]))
 
@@ -412,3 +412,83 @@
        [env (conj blocks block)]))
    [env []]
    lines))
+
+(defn minimal-statement
+  "Given a statement block, return a block map with just IRIs and minimal object values."
+  [{:keys [predicate object] :as block}]
+  (merge
+   (select-keys block [:template])
+   {:predicate {:iri (:iri predicate)}
+    :object
+    (cond
+      (:iri object)
+      (select-keys object [:iri])
+      (:language object)
+      (select-keys object [:lexical :language])
+      (:datatype object)
+      {:lexical (:lexical object)
+       :datatype {:iri (get-in object [:datatype :iri])}}
+      :else
+      (select-keys object [:lexical]))}))
+
+(defn collect-values
+  "Given a sequence of blocks (presumably for the same subject),
+   use the statement blocks to return a map
+   from predicate IRI to a sequence of object maps."
+  [blocks]
+  (reduce
+   (fn [coll {:keys [predicate object] :as block}]
+     (update coll (:iri predicate) (fnil conj []) object))
+   {}
+   (filter :predicate blocks)))
+
+; TODO: multiple values
+
+(defn substitute
+  "Given an environment, a map from collect-values,
+   and a statement map,
+   substitute a value from into the statement and return it."
+  [env coll statement]
+  (assoc
+   statement
+   :content
+   (-> statement
+       :content
+       (string/replace
+        #"\{(.*?)\}"
+        (fn [[_ x]]
+          (let [iri (get-in env [:labels x :iri])
+                value (get-in coll [iri 0])]
+            (or
+             (:lexical value)
+             (:label value)
+             (:curie value)
+             (:iri value)
+             (:bnode value)
+             "MISSING")))))))
+
+(defn expand-templates
+  "Given an environment, a map of templates, and a sequence of blocks,
+   if the block calls for a template, expand it,
+   and return a new sequence of blocks."
+  [env templates blocks]
+  (let [coll (collect-values blocks)]
+    (apply
+     concat
+     blocks
+     (for [template (get coll "https://knotation.org/apply-template")]
+       (let [template-iri (:iri template)
+             {:keys [required-predicates statements] :as template}
+             (get templates template-iri)]
+         (doseq [label required-predicates]
+           (let [iri (get-in env [:labels label :iri])]
+             (when-not (= 1 (count (get coll iri)))
+               (util/throw-exception
+                "Predicate '"
+                label
+                "' must have exactly one value in "
+                coll))))
+         (for [statement statements]
+           (let [block (substitute env coll statement)]
+             (->> (assoc block :template template-iri)
+                  (resolve-content env)))))))))

@@ -120,3 +120,45 @@
             {:predicate {:iri "http://example.com/obsolete" :curie "ex:obsolete" :name "ex:obsolete"}
              :content "false"
              :object {:lexical "false" :datatype {:iri "http://example.com/boolean" :curie "ex:boolean" :name "ex:boolean"}}}]))))
+
+(def example-blocks
+  [{:predicate {:iri "https://knotation.org/apply-template"}
+    :object {:iri "http://example.com/template-1"}}
+   {:predicate {:iri "http://example.com/name"}
+    :object {:lexical "Foo"}}
+   {:predicate {:iri "http://example.com/taxon"}
+    :object {:label "mouse" :iri "http://example.com/mouse"}}])
+
+(deftest test-collect-values
+  (testing "Collect some values"
+    (is (= (collect-values example-blocks)
+           {"https://knotation.org/apply-template"
+            [{:iri "http://example.com/template-1"}]
+            "http://example.com/name"
+            [{:lexical "Foo"}]
+            "http://example.com/taxon"
+            [{:label "mouse" :iri "http://example.com/mouse"}]}))))
+
+(def example-env
+  {:labels
+   {"name" {:iri "http://example.com/name"}
+    "taxon" {:iri "http://example.com/taxon" :datatype :link}
+    "mouse" {:iri "http://example.com/mouse"}}})
+
+(def example-templates
+  {"http://example.com/template-1"
+   {:required-predicates ["name" "taxon"]
+    :statements
+    [{:predicate {:iri "http://example.com/label"}
+      :content "Example {name} {taxon}"}]}})
+
+(deftest test-expand-templates
+  (testing "Expand some templates"
+    (is (= (expand-templates example-env example-templates example-blocks)
+           (concat
+            example-blocks
+            [{:template "http://example.com/template-1"
+              :predicate
+              {:iri "http://example.com/label"}
+              :content "Example Foo mouse"
+              :object {:lexical "Example Foo mouse"}}])))))

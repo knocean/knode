@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as string]
+   [clojure.data.json :as json]
 
    [knode.state :refer [state]]
    [knode.core :as core]
@@ -32,6 +33,22 @@
             target (core/resolve-name (:env @state) {:curie curie})
             new-env (core/add-label (:env @state) label target nil)]
         (swap! state assoc :env new-env))))
+  (let [path (str dir "templates.json")]
+    (when (.exists (io/file path))
+      (->> (json/read-str (slurp path) :key-fn keyword)
+           (map
+            (fn [template]
+              (assoc
+               template
+               :statements
+               (map (partial core/resolve-block (:env @state))
+                    (:statements template)))))
+           (map (juxt :iri identity))
+           (into {})
+           (swap! state assoc :templates)))
+    (doseq [{:keys [label iri]} (->> @state :templates vals)]
+      (let [new-env (core/add-label (:env @state) label {:iri iri} nil)]
+        (swap! state assoc :env new-env))))
   (with-open [reader (io/reader (str dir project-name ".kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))
          second
@@ -41,7 +58,11 @@
           (fn [[[subject] blocks]]
             [(get-in subject [:subject :iri])
              {:subject (:subject subject)
-              :blocks blocks}]))
+              :blocks
+              (core/expand-templates
+               (:env @state)
+               (:templates @state)
+               blocks)}]))
          (into {})
          (swap! state assoc :terms))))
 

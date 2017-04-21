@@ -3,3 +3,7 @@ type: owl:Class
 label: Example One
 alternative term: ex 1
 subclass of: owl:Thing
+
+: EXAMPLE:0000002
+template: example class
+name: Two

@@ -5,7 +5,9 @@
 
    [org.httpkit.server :as server]
    [compojure.route :as route]
+
    [hiccup.core :as hiccup]
+   [hiccup.page :as pg]
    [markdown.core :as md]
    [yaml.core :as yaml]
 
@@ -13,15 +15,59 @@
    [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET]]))
 
+(defn stylesheet
+  [name]
+  [:link {:href (str "/assets/" name) :rel "stylesheet"}])
+
 (defn base-template
-  "Given a title and a Hiccup vector,
-   load an HTML template, insert the values, and return the HTML string."
   [title content]
-  (-> "base.html"
-      io/resource
-      slurp
-      (string/replace "{{TITLE}}" title)
-      (string/replace-first "{{CONTENT}}" (hiccup/html content))))
+  (pg/html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:http-equiv "X-UA-Compatible" :content "IE=edge"}]
+    [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+    [:meta {:name "description" :content ""}]
+    [:meta {:name "author" :content ""}]
+
+    [:title title]
+
+    (map
+     stylesheet
+     ["bootstrap.min.css"
+      "ie10-viewport-bug-workaround.css"
+      "style.css"])
+
+    "<!--[if lt IE 9]>" [:script "/assets/ie8-responsive-file-warning.js"] "<![endif]-->"
+    [:script {:src "/assets/ie-emulation-modes-warning.js"}]
+
+    ;; HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries
+    "<!--[if lt IE 9]>"
+    [:script {:src "https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"}]
+    [:script {:src "https://oss.maxcdn.com/respond/1.4.2/respond.min.js"}]
+    "<![endif]-->"]
+
+   [:body
+    [:div {:class "container"}
+     [:nav {:class "navbar navbar-default"}
+      [:div {:class "container-fluid"}
+       [:div {:class "navbar-header"}
+        [:button {:type "button" :class "navbar-toggle collapsed" :data-toggle "collapse" :data-target "#navbar" :aria-expanded "false" :aria-controls "navbar"}
+         [:span {:class "sr-only"} "Toggle navigation"]
+         [:span {:class "icon-bar"}]
+         [:span {:class "icon-bar"}]
+         [:span {:class "icon-bar"}]]
+        [:a {:class "navbar-brand" :href "/"} "Home"]]
+       [:div {:id "navbar" :class "navbar-collapse collapse"}
+        "<!--"
+        [:ul {:class "nav navbar-nav"}
+         [:li [:a {:href "ontie.html"} "ONTIE"]]
+         [:li [:a {:href "api.html"} "API"]]]
+        "-->"]]]
+     [:div {:id "content"} content]]
+
+    [:script {:src "/assets/jquery.min.js"}]
+    [:script {:src "/assets/bootstrap.min.js"}]
+    [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]]))
 
 (defn render-html
   "Given a request, try to find a matching term,

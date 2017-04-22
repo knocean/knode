@@ -1,18 +1,28 @@
 (ns knode.example-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as string]
+            [clojure.data.json :as json]
             [knode.state :refer [state]]
             [knode.core :as core]
             [knode.emit :as emit]
-            [knode.cli :as cli]))
+            [knode.cli :as cli]
+            [knode.server :as server]))
 
 (def example-iri "https://example.com/ontology/EXAMPLE_0000002")
 
+(def test-state
+  {:root-dir "test/example/"
+   :root-iri "https://example.com/"
+   :dev-key "NOT SECRET"
+   :project-name "example"
+   :term-iri-format "https://example.com/ontology/EXAMPLE_%07d"})
+
+; Setup
+(swap! state merge test-state)
+(cli/load-state! "test/example/ontology/" "example")
+
 (deftest test-example-ontology
   (testing "Load example ontology"
-    (knode.state/init-state!)
-    (knode.state/testing-state!)
-    (cli/load-state! "test/example/ontology/" "example")
     (is (= (:root-dir @state) "test/example/"))
     (is (= (->> (get-in @state [:terms example-iri :blocks])
                 (map core/minimal-statement))
@@ -32,3 +42,38 @@
            (string/trim (slurp "test/example/ontology/example.ttl"))))
     (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))
            (string/trim (slurp "test/example/ontology/example.kn"))))))
+
+(deftest test-add-term!
+  (testing "Unauthenticated"
+    (is (= (:status (server/add-term! nil))
+           401))
+    (is (= (:status
+            (server/add-term!
+             {"template" "example class"
+              "name" "Foo"}))
+           403))
+    (is (= (:status
+            (server/add-term!
+             {"api-key" "NOT THE RIGHT KEY"}))
+           403)))
+  (testing "Wrong template"
+    (is (= (:status
+            (server/add-term!
+             {"api-key" "NOT SECRET"
+              "template" "foo"}))
+           400)))
+  (testing "Missing required predicates"
+    (is (= (:status
+            (server/add-term!
+             {"api-key" "NOT SECRET"
+              "template" "example class"}))
+           400)))
+  (testing "Actually add a term"
+    (let [result (server/add-term!
+                  {"api-key" "NOT SECRET"
+                   "template" "example class"
+                   "name" "Foo"})
+          body (json/read-str (:body result))]
+      (is (= (:status result) 201))
+      (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
+      (is (= (get body "curie") "EXAMPLE:0000003")))))

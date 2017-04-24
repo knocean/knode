@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as string]
+   [clojure.data.json :as json]
 
    [org.httpkit.server :as server]
    [compojure.route :as route]
@@ -12,8 +13,9 @@
    [yaml.core :as yaml]
 
    [knode.state :refer [state]]
+   [knode.core :as core]
    [knode.emit :as emit])
-  (:use [compojure.core :only [defroutes GET]]))
+  (:use [compojure.core :only [defroutes GET POST]]))
 
 (defn stylesheet
   [name]
@@ -130,6 +132,103 @@
           (:title metadata)
           (md/md-to-html-string content)))))})
 
+(defn json-error
+  [status & messages]
+  {:status status
+   :content-type "application/json"
+   :body
+   (json/write-str
+    {:error (string/join " " messages)})})
+
+(defn get-next-iri
+  [iri-format iris]
+  (->> (range 1 10000000)
+       (map (partial format iri-format))
+       (remove (set iris))
+       first))
+
+(defn make-term
+  [template data]
+  (let [iri (get-next-iri
+             (:term-iri-format @state)
+             (keys (:terms @state)))
+        curie (core/get-curie (:env @state) iri)]
+    {:subject {:iri iri :curie curie}
+     :blocks
+     (->> (concat
+           [{:predicate {:label "template"}
+             :object {:iri (:iri template)}}]
+           (for [required (:required-predicates template)]
+             {:predicate {:label required}
+              :content (get data required)})
+           ; TODO: support more optional predicates
+           (for [synonym (get data "alternative term")]
+             {:predicate {:label "alternative term"}
+              :content synonym}))
+          (map (partial core/resolve-block (:env @state)))
+          (map (partial core/resolve-content (:env @state)))
+          (core/expand-templates (:env @state) (:templates @state)))}))
+
+(defn add-valid-term!
+  [template data]
+  (let [term (make-term template data)
+        iri (get-in term [:subject :iri])]
+    (swap! state assoc-in [:terms iri] term)
+    (spit
+     (str (:root-dir @state) "ontology/index.tsv")
+     (emit/emit-index (:env @state) (:terms @state)))
+    (spit
+     (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
+     (emit/emit-kn-terms (:env @state) nil (:terms @state)))
+    {:status 201
+     :content-type "application/json"
+     :body
+     (json/write-str
+      {:iri iri
+       :curie (get-in term [:subject :curie])})}))
+
+(defn add-term!
+  [data]
+  (let [dev-key (:dev-key @state)
+        api-key (get data "api-key")
+        template-label (get data "template")
+        template-iri (get-in @state [:env :labels template-label :iri])
+        template (get-in @state [:templates template-iri])]
+    (cond
+      (not (map? data))
+      (json-error 401 "Data must be submitted as a JSON object.")
+
+      (or (not (string? dev-key)) (string/blank? dev-key))
+      (json-error 403 "The developer API has not been configured.")
+
+      (nil? api-key)
+      (json-error 403 "A valid 'api-key' must be provided.")
+
+      (not= dev-key api-key)
+      (json-error 403 "The 'api-key' is not valid.")
+
+      (nil? template-label)
+      (json-error 400 "The 'template' key must be provided.")
+
+      (nil? template-label)
+      (json-error 400 "The 'template' key must be provided.")
+
+      (nil? template)
+      (json-error 400 (format "Unknown template '%s'" template-label))
+
+      (not (every? data (:required-predicates template)))
+      (json-error 400 "Required keys: " (:required-predicates template))
+
+      :else
+      (try
+        (add-valid-term! template data)
+        (catch Exception e
+          (json-error 400 (.getMessage e)))))))
+
+(defn add-term-json!
+  [req]
+  (add-term! (->> req :body slurp json/read-str)))
+
 (defroutes knode-routes
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
@@ -140,6 +239,9 @@
   (GET "/doc/:doc.html" [doc] (render-doc doc))
   (GET "/index.html" [] (render-doc "index"))
   (GET "/" [] (render-doc "index"))
+
+  ; Dev API
+  (POST "/dev/api/add-term" [] add-term-json!)
 
   ; static resources
   (route/resources "")

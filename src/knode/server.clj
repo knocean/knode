@@ -147,28 +147,39 @@
        (remove (set iris))
        first))
 
-; convert to JSON to blocks: template, required predicates, other keys sorted by context order
-; resolve the blocks (might fail)
 (defn make-term
   [template data]
-  (let [iri (get-next-iri (:term-iri-format @state) (keys (:terms @state)))
+  (let [iri (get-next-iri
+             (:term-iri-format @state)
+             (keys (:terms @state)))
         curie (core/get-curie (:env @state) iri)]
     {:subject {:iri iri :curie curie}
-     ; TODO: actually generate content
-     :blocks []}))
+     :blocks
+     (->> (concat
+           [{:predicate {:label "template"}
+             :object {:iri (:iri template)}}]
+           (for [required (:required-predicates template)]
+             {:predicate {:label required}
+              :content (get data required)})
+           ; TODO: support more optional predicates
+           (for [synonym (get data "alternative term")]
+             {:predicate {:label "alternative term"}
+              :content synonym}))
+          (map (partial core/resolve-block (:env @state)))
+          (map (partial core/resolve-content (:env @state)))
+          (core/expand-templates (:env @state) (:templates @state)))}))
 
 (defn add-valid-term!
   [template data]
   (let [term (make-term template data)
         iri (get-in term [:subject :iri])]
-    ; TODO: save changes
-    ;(swap! state assoc-in [:terms iri] term)
-    ;(spit
-    ; (str (:root-dir @state) "ontology/index.tsv")
-    ; (emit/emit-index (:env @state) (:terms @state)))
-    ;(spit
-    ; (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
-    ; (emit/emit-kn-terms (:env @state) nil (:terms @state)))
+    (swap! state assoc-in [:terms iri] term)
+    (spit
+     (str (:root-dir @state) "ontology/index.tsv")
+     (emit/emit-index (:env @state) (:terms @state)))
+    (spit
+     (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
+     (emit/emit-kn-terms (:env @state) nil (:terms @state)))
     {:status 201
      :content-type "application/json"
      :body
@@ -188,7 +199,7 @@
       (json-error 401 "Data must be submitted as a JSON object.")
 
       (or (not (string? dev-key)) (string/blank? dev-key))
-      (json-error 403 "The developet API has not been configured.")
+      (json-error 403 "The developer API has not been configured.")
 
       (nil? api-key)
       (json-error 403 "A valid 'api-key' must be provided.")

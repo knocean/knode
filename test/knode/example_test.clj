@@ -10,6 +10,19 @@
 
 (def example-iri "https://example.com/ontology/EXAMPLE_0000002")
 
+(def example-add-json
+  {"name" "Foo"
+   "alternative term" ["bar" "baz"]})
+
+(def example-add-kn
+  ": EXAMPLE:0000003
+template: example class
+name: Foo
+alternative term: bar
+alternative term: baz")
+
+;; ## Setup
+
 (def test-state
   {:root-dir "test/example/"
    :root-iri "https://example.com/"
@@ -17,11 +30,10 @@
    :project-name "example"
    :term-iri-format "https://example.com/ontology/EXAMPLE_%07d"})
 
-; Setup
-(swap! state merge test-state)
-(cli/load-state! "test/example/ontology/" "example")
-
 (deftest test-example-ontology
+  (swap! state merge test-state)
+  (cli/load-state! "test/example/ontology/" "example")
+
   (testing "Load example ontology"
     (is (= (:root-dir @state) "test/example/"))
     (is (= (->> (get-in @state [:terms example-iri :blocks])
@@ -41,9 +53,14 @@
     (is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
            (string/trim (slurp "test/example/ontology/example.ttl"))))
     (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))
-           (string/trim (slurp "test/example/ontology/example.kn"))))))
-
-(deftest test-add-term!
+           (string/trim (slurp "test/example/ontology/example.kn")))))
+  (testing "make example class"
+    (let [{:keys [subject blocks] as :term}
+          (server/make-term
+           example-add-json
+           (get-in @state [:templates "http://example.com/template-1"]))]
+      (is (= (emit/emit-kn-term (:env @state) nil subject blocks))
+          example-add-kn)))
   (testing "Unauthenticated"
     (is (= (:status (server/add-term! nil))
            401))
@@ -69,11 +86,13 @@
               "template" "example class"}))
            400)))
   (testing "Actually add a term"
-    (let [result (server/add-term!
-                  {"api-key" "NOT SECRET"
-                   "template" "example class"
-                   "name" "Foo"})
-          body (json/read-str (:body result))]
-      (is (= (:status result) 201))
-      (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
-      (is (= (get body "curie") "EXAMPLE:0000003")))))
+    (with-redefs [spit :no-op]
+      (let [result (server/add-term!
+                    {"api-key" "NOT SECRET"
+                     "template" "example class"
+                     "name" "Foo"})
+            body (json/read-str (:body result))]
+        (is (= (:status result) 201))
+        (is (nil? (:error result)))
+        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
+        (is (= (get body "curie") "EXAMPLE:0000003"))))))

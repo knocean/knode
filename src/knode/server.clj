@@ -135,10 +135,11 @@
 (defn json-error
   [status & messages]
   {:status status
-   :content-type "application/json"
+   :headers {"Content-Type" "application/json"}
    :body
    (json/write-str
-    {:error (string/join " " messages)})})
+    {:error (string/join " " messages)}
+    :escape-slash false)})
 
 (defn get-next-iri
   [iri-format iris]
@@ -181,11 +182,12 @@
      (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
      (emit/emit-kn-terms (:env @state) nil (:terms @state)))
     {:status 201
-     :content-type "application/json"
+     :headers {"Content-Type" "application/json"}
      :body
      (json/write-str
       {:iri iri
-       :curie (get-in term [:subject :curie])})}))
+       :curie (get-in term [:subject :curie])}
+      :escape-slash false)}))
 
 (defn add-term!
   [data]

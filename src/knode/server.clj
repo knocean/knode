@@ -153,7 +153,20 @@
   (let [iri (get-next-iri
              (:term-iri-format @state)
              (keys (:terms @state)))
-        curie (core/get-curie (:env @state) iri)]
+        curie (core/get-curie (:env @state) iri)
+        optional-predicates
+        (->> data
+             keys
+             (remove #{"api-key" "template"})
+             (remove (set (:required-predicates template))))
+        optional-pairs
+        (reduce
+         (fn [pairs pred]
+           (let [value (get data pred)
+                 values (if (sequential? value) value [value])]
+             (concat pairs (map (fn [v] [pred v]) values))))
+         []
+         optional-predicates)]
     {:subject {:iri iri :curie curie}
      :blocks
      (->> (concat
@@ -162,10 +175,9 @@
            (for [required (:required-predicates template)]
              {:predicate {:label required}
               :content (get data required)})
-           ; TODO: support more optional predicates
-           (for [synonym (get data "alternative term")]
-             {:predicate {:label "alternative term"}
-              :content synonym}))
+           (for [[predicate content] optional-pairs]
+             {:predicate {:label predicate}
+              :content content}))
           (map (partial core/resolve-block (:env @state)))
           (map (partial core/resolve-content (:env @state)))
           (core/expand-templates (:env @state) (:templates @state)))}))

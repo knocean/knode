@@ -19,7 +19,9 @@
 template: example class
 name: Foo
 alternative term: bar
-alternative term: baz")
+alternative term: baz
+type: owl:Class
+label: Example Foo")
 
 ;; ## Setup
 
@@ -57,10 +59,10 @@ alternative term: baz")
   (testing "make example class"
     (let [{:keys [subject blocks] as :term}
           (server/make-term
-           example-add-json
-           (get-in @state [:templates "http://example.com/template-1"]))]
-      (is (= (emit/emit-kn-term (:env @state) nil subject blocks))
-          example-add-kn)))
+           (get-in @state [:templates "http://example.com/template-1"])
+           example-add-json)]
+      (is (= (emit/emit-kn-term (:env @state) nil subject blocks)
+             example-add-kn))))
   (testing "Unauthenticated"
     (is (= (:status (server/add-term! nil))
            401))

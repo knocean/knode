@@ -6,7 +6,8 @@
 
    [knode.state :refer [state]]
    [knode.core :as core]
-   [knode.server :as server])
+   [knode.server :as server]
+   [knode.sparql :as sparql])
   (:gen-class))
 
 ; TODO: This is a big mess. The TSV code should be generalized.
@@ -49,6 +50,11 @@
     (doseq [{:keys [label iri]} (->> @state :templates vals)]
       (let [new-env (core/add-label (:env @state) label {:iri iri} nil)]
         (swap! state assoc :env new-env))))
+  (let [path (str dir "validation.edn")]
+    (when (.exists (io/file path))
+      (->> (slurp path)
+           clojure.edn/read-string
+           (swap! state assoc :validation-rules))))
   (with-open [reader (io/reader (str dir project-name ".kn"))]
     (->> (core/process-lines (:env @state) (line-seq reader))
          second
@@ -73,4 +79,14 @@
               (println "Loading data from" dir "...")
               (load-state! dir (:project-name @state))
               (server/serve))
+    "load" (do (sparql/init-dataset! state)
+               (sparql/load-taxa! @state "taxdmp.zip"))
+    "validate" (let [dir (str (:root-dir @state) "ontology/")]
+                 (println "Loading data from" dir "...")
+                 (load-state! dir (:project-name @state))
+                 (sparql/init-dataset! state)
+                 (sparql/load-terms! @state)
+                 (println "Running validation...")
+                 (let [results (sparql/validate @state)]
+                   (println results)))
     "test" (println "TODO")))

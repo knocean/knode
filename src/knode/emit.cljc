@@ -59,7 +59,7 @@
          vals
          (map
           (fn [{:keys [subject blocks] :as term}]
-            (emit-ttl-term env nil subject (remove :template blocks))))))))
+            (emit-ttl-term env nil subject blocks)))))))
 
 (defn emit-rdfa-statement
   "Given an environment and a block-map with :predicate and :object,

@@ -11,7 +11,9 @@
                  [markdown-clj "0.9.89"]
                  [io.forward/yaml "1.0.6"]
                  [http-kit "2.1.18"]
-                 [compojure "1.5.1"]]
+                 [compojure "1.5.1"]
+
+                 [com.blazegraph/bigdata-core "2.1.4"]]
 
   :main knode.cli
   :aot [knode.cli])

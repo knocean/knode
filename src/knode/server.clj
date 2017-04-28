@@ -71,6 +71,20 @@
     [:script {:src "/assets/bootstrap.min.js"}]
     [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]]))
 
+(defn render-status
+  [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body
+   (let [s @state
+         term-count (count (:terms s))]
+     (base-template
+      (cond (= 0 term-count) "Empty terms"
+            :else "All systems go")
+      [:ul
+       [:li [:b "Terms Count"] "-" term-count]
+       (map (fn [[k v]] [:li [:b k] "-" v]) (dissoc s :terms))]))})
+
 (defn render-html
   "Given a request, try to find a matching term,
    and return a response map for HTML."
@@ -244,6 +258,7 @@
 
   ; Dev API
   (POST "/dev/api/add-term" [] add-term-json!)
+  (GET "/dev/status" [] render-status)
 
   ; static resources
   (route/resources "")

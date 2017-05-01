@@ -99,7 +99,7 @@
 ;; ## Secondary Names
 
 (defn secondary-name?
-  "Given a value, return true only if it is a primary name-map."
+  "Given a value, return true only if it is a secondary name-map."
   [name-map]
   (boolean
    (and (map? name-map)
@@ -402,6 +402,30 @@
              (resolve-content env))]
     [(update-environment env block) block]))
 
+(defn partition-by-leading-whitespace [lines]
+  (partition-by
+   (let [ct (volatile! 0)]
+     #(do (when (not (or (string/blank? %) (re-find #"\s\s+" %)))
+            (vswap! ct inc))
+          @ct))
+   lines))
+
+(defn evenly-strip-whitespace [lines]
+  (when (not (empty? lines))
+    (if-let [ws (re-find #"\s\s+" (first lines))]
+      (map #(clojure.string/replace-first % ws "") lines)
+      lines)))
+
+(defn grouped-lines
+  "Given a sequence of lines, groups some by indentation and trims appropriate leading whitespace."
+  [lines]
+  (->> lines
+       partition-by-leading-whitespace
+       (map #(cons
+              (first %)
+              (evenly-strip-whitespace (rest %))))
+       (map #(string/join \newline %))))
+
 (defn process-lines
   "Given an environment and a sequence of lines,
    return the pair of an environment and a sequence of block-maps."
@@ -411,7 +435,7 @@
      (let [[env block] (process-line env line)]
        [env (conj blocks block)]))
    [env []]
-   lines))
+   (grouped-lines lines)))
 
 (defn minimal-statement
   "Given a statement block, return a block map with just IRIs and minimal object values."

@@ -62,6 +62,22 @@
     {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
      :datatype :link}}})
 
+(deftest test-grouped-lines
+  (testing "Is identity when given a seq of unindented lines"
+    (is (= ["Foo" "Bar" "Baz"]
+           (grouped-lines ["Foo" "Bar" "Baz"]))))
+  (testing "Groups a set of indented lines with the previous unindented one"
+    (is (= ["Foo" (clojure.string/join \newline ["Bar" "Baz" "Mumble"])]
+           (grouped-lines ["Foo" "Bar" "  Baz" "  Mumble"]))))
+  (testing "Handles different indentation levels"
+    (let [expected ["Foo" (clojure.string/join \newline ["Bar" "Baz" "Mumble"])]]
+      (is (= expected (grouped-lines ["Foo" "Bar" "    Baz" "    Mumble"])))
+      (is (= expected (grouped-lines ["Foo" "Bar" " 	Baz" " 	Mumble"])))
+      (is (= expected (grouped-lines ["Foo" "Bar" " 	   Baz" " 	   Mumble"])))))
+  (testing "Strips indentation based on the first indented line"
+    (is (= ["Foo" (clojure.string/join \newline ["Bar" "Baz" "  Mumble"])]
+           (grouped-lines ["Foo" "Bar" "  Baz" "    Mumble"])))))
+
 (deftest test-process-line
   (testing "Process some @prefix lines"
     (is (= (process-line {} "@prefix ex: <http://example.com/>")

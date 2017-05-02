@@ -81,9 +81,7 @@
      (base-template
       (cond (= 0 term-count) "Empty terms"
             :else "All systems go")
-      [:ul
-       [:li [:b "Terms Count"] "-" term-count]
-       (map (fn [[k v]] [:li [:b k] "-" v]) (dissoc s :terms))]))})
+      [:ul [:li [:b "Terms Count"] "-" term-count]]))})
 
 (defn render-html
   "Given a request, try to find a matching term,

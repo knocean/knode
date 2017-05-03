@@ -255,6 +255,12 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
+(defn check-term-status
+  [req]
+  {:status 200
+   :headers {"Content-Type" "text/plain"}
+   :body "Basics"})
+
 (defroutes knode-routes
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
@@ -268,6 +274,7 @@
 
   ; Dev API
   (POST "/dev/api/add-term" [] add-term-json!)
+  (POST "/dev/api/term-status" [] check-term-status)
   (GET "/dev/status" [] render-status)
 
   ; static resources

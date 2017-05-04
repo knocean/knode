@@ -112,4 +112,12 @@ label: Example Foo")
            (state/term-status "EXAMPLE:0000001"))))
   (testing "Returns :recognized false for URIs that are not recorded anywhere"
     (is (= {:CURIE "nonexistent:iri" :recognized false :obsolete :false :replacement nil}
-           (state/term-status "nonexistent:iri")))))
+           (state/term-status "nonexistent:iri"))))
+  (testing "Returns :obsolete true for URIs marked obsolete"
+    :TODO)
+  (testing "Returns a :replacement IRI for URIs marked obsolete AND replaced"
+    :TODO)
+  (testing "Checks blazegraph for IRIs not found in (:terms @state)"
+    :TODO)
+  (testing "Returns :recognized false for CURIEs whose prefixes are not found in the local environment"
+    :TODO))

@@ -1,7 +1,9 @@
 (ns knode.state
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
-            [environ.core :refer [env]]))
+            [environ.core :refer [env]]
+
+            [knode.core :as core]))
 
 (def configurators
   [["Root dir" (constantly "")]
@@ -62,15 +64,23 @@
   (println "TODO")
   nil)
 
+(defn expanded-iri-or-curie [iri-or-curie]
+  (or (if-let [parsed (core/parse-curie iri-or-curie)]
+        (try
+          (:iri (core/resolve-curie env parsed))
+          (catch Exception e nil)))
+      iri-or-curie))
+
 (defn term-status
   [iri-or-curie & {:keys [graph terms-table label]
-                   :or {terms-table (:terms @state)
+                   :or {env (:env @state)
+                        terms-table (:terms @state)
                         graph (:graph @state)
                         label :iri}}]
-  (let [term-iri iri-or-curie]
+  (let [expanded (expanded-iri-or-curie iri-or-curie)]
     (merge {label iri-or-curie :recognized true :obsolete false :replacement nil}
-           (if-let [term (or (get terms-table term-iri)
-                             (and graph (query-term-graph graph term-iri)))]
+           (if-let [term (or (get terms-table expanded)
+                             (and graph (query-term-graph graph expanded)))]
              (when (obsolete-term? term)
                {:obsolete true :replacement (replacement-for term)})
              {:recognized false}))))

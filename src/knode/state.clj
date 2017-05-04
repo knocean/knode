@@ -48,3 +48,29 @@
        (string/join "\n")))
 
 (def state (atom (init env)))
+
+(defn obsolete-term? [term]
+  (if-let [obs (first (filter #(= "obsolete" (get-in % [:predicate :label])) (:blocks term)))]
+    (= "true" (:content obs))
+    false))
+
+(defn replacement-for [term]
+  (if-let [rep (first (filter #(= "http://purl.obolibrary.org/obo/IAO_0000118" (get-in % [:predicate :iri])) (:blocks term)))]
+    (get-in rep [:object :iri])))
+
+(defn query-term-graph [graph term-iri]
+  (println "TODO")
+  nil)
+
+(defn term-status
+  [iri-or-curie & {:keys [graph terms-table label]
+                   :or {terms-table (:terms @state)
+                        graph (:graph @state)
+                        label :iri}}]
+  (let [term-iri iri-or-curie]
+    (merge {label iri-or-curie :recognized true :obsolete false :replacement nil}
+           (if-let [term (or (get terms-table term-iri)
+                             (and graph (query-term-graph graph term-iri)))]
+             (when (obsolete-term? term)
+               {:obsolete true :replacement (replacement-for term)})
+             {:recognized false}))))

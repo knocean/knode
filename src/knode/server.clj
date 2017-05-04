@@ -255,11 +255,34 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
+(defn seq->tsv-string
+  [seq & {:keys [headers show-header]
+          :or {headers (keys (first seq))
+               show-header identity}}]
+  (clojure.string/join
+   \newline
+   (map #(clojure.string/join \tab %)
+        (cons (map show-header headers)
+              (map (fn [row] (map #(get row %) headers)) seq)))))
+
 (defn check-term-status
   [req]
-  {:status 200
-   :headers {"Content-Type" "text/plain"}
-   :body "Basics"})
+  (let [[header & rest] (clojure.string/split-lines (slurp (:body req)))]
+    (cond
+      (not (contains? #{"IRI" "CURIE"} header))
+      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
+
+      (empty? rest)
+      (json-error 400 "Some terms must be submitted")
+
+      :else
+      (let [s @state
+            label (keyword header)]
+        {:status 200
+         :headers {"Content-Type" "text/tab-separated-values"}
+         :body (seq->tsv-string
+                (map #(term-status % :terms-table (:terms s) :graph (:graph s) :label label) rest)
+                :headers [label :recognized :obsolete :replacement] :show-header name)}))))
 
 (defroutes knode-routes
   ; ontology terms

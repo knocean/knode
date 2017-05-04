@@ -64,20 +64,20 @@
   (println "TODO")
   nil)
 
-(defn expanded-iri-or-curie [iri-or-curie]
+(defn expanded-iri-or-curie [environment iri-or-curie]
   (or (if-let [parsed (core/parse-curie iri-or-curie)]
         (try
-          (:iri (core/resolve-curie env parsed))
+          (:iri (core/resolve-curie environment parsed))
           (catch Exception e nil)))
       iri-or-curie))
 
 (defn term-status
-  [iri-or-curie & {:keys [graph terms-table label]
+  [iri-or-curie & {:keys [env graph terms-table label]
                    :or {env (:env @state)
                         terms-table (:terms @state)
                         graph (:graph @state)
                         label :iri}}]
-  (let [expanded (expanded-iri-or-curie iri-or-curie)]
+  (let [expanded (expanded-iri-or-curie env iri-or-curie)]
     (merge {label iri-or-curie :recognized true :obsolete false :replacement nil}
            (if-let [term (or (get terms-table expanded)
                              (and graph (query-term-graph graph expanded)))]

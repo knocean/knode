@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as string]
             [clojure.data.json :as json]
-            [knode.state :refer [state]]
+            [knode.state :as state :refer [state]]
             [knode.core :as core]
             [knode.emit :as emit]
             [knode.cli :as cli]
@@ -100,3 +100,16 @@ label: Example Foo")
         (is (nil? (:error result)))
         (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
         (is (= (get body "curie") "EXAMPLE:0000003"))))))
+
+(deftest test-term-status
+  (reset! state (knode.state/init test-state))
+  (cli/load-state! "test/example/ontology/" "example")
+  (sparql/init-dataset! state)
+  (sparql/load-terms! @state)
+
+  (testing "Returns the expected map for a present subject"
+    (is (= {:CURIE "EXAMPLE:0000001" :recognized true :obsolete false :replacement nil}
+           (state/term-status "EXAMPLE:0000001"))))
+  (testing "Returns :recognized false for URIs that are not recorded anywhere"
+    (is (= {:CURIE "nonexistent:iri" :recognized false :obsolete :false :replacement nil}
+           (state/term-status "nonexistent:iri")))))

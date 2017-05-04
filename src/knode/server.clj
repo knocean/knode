@@ -12,7 +12,7 @@
    [markdown.core :as md]
    [yaml.core :as yaml]
 
-   [knode.state :refer [state]]
+   [knode.state :as state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit])
   (:use [compojure.core :only [defroutes GET POST]]))
@@ -281,7 +281,7 @@
         {:status 200
          :headers {"Content-Type" "text/tab-separated-values"}
          :body (seq->tsv-string
-                (map #(term-status % :terms-table (:terms s) :graph (:graph s) :label label) rest)
+                (map #(state/term-status % :terms-table (:terms s) :graph (:graph s) :label label) rest)
                 :headers [label :recognized :obsolete :replacement] :show-header name)}))))
 
 (defroutes knode-routes

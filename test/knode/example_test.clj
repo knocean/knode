@@ -29,12 +29,10 @@ label: Example Foo")
 (def test-state
   {:root-dir "test/example/"
    :root-iri "https://example.com/"
-   :dev-key "NOT SECRET"
-   :project-name "example"
-   :term-iri-format "https://example.com/ontology/EXAMPLE_%07d"})
+   :dev-key "NOT SECRET"})
 
 (deftest test-example-ontology
-  (swap! state merge test-state)
+  (reset! state (knode.state/init test-state))
   (cli/load-state! "test/example/ontology/" "example")
   (sparql/init-dataset! state)
   (sparql/load-terms! @state)

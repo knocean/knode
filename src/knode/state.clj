@@ -3,39 +3,48 @@
             [clojure.string :as string]
             [environ.core :refer [env]]))
 
-(def default-state
-  {:port 3210
-   :root-dir ""
-   :root-iri nil
-   :dev-key nil})
+(def configurators
+  [["Root dir" (constantly "")]
+   ["Project name" #(->> (:root-dir %)
+                         io/file
+                         .getAbsolutePath
+                         io/file
+                         .getName
+                         string/lower-case)]
+   ["IDSPACE" #(string/upper-case (:project-name %))]
+   ["Port" (constantly "3210")]
+   ["Root IRI" #(str "http://localhost:" (:port %) "/")]
+   ["Project IRI" #(str (:root-iri %) "ontology/" (:idspace %))]
+   ["Term IRI format" #(str (:project-iri %) "_%07d")]])
 
-(def state (atom default-state))
+(defn label->keyword
+  [label]
+  (-> label
+      string/lower-case
+      (string/replace #"\W+" "-")
+      keyword))
 
-(defn default-term-iri-format
-  [{:keys [root-iri project-name]}]
-  (str root-iri "ontology/" (string/upper-case project-name) "_%07d"))
+(defn init
+  [base]
+  (reduce
+   (fn [state [label f]]
+     (let [k (label->keyword label)]
+       (if (find state k) state (assoc state k (f state)))))
+   (->> configurators
+        (map first)
+        (map label->keyword)
+        (concat [:dev-key])
+        (select-keys base))
+   configurators))
 
-(defn init-state!
-  []
-  (when (:knode-port env)
-    (swap! state assoc :port (read-string (:knode-port env))))
-  (when (:knode-root-dir env)
-    (swap! state assoc :root-dir (:knode-root-dir env)))
-  (when (:knode-root-iri env)
-    (swap! state assoc :root-iri (:knode-root-iri env)))
-  (when (:knode-dev-key env)
-    (swap! state assoc :dev-key (:knode-dev-key env)))
-  (if (:knode-project-name env)
-    (swap! state assoc :project-name (:knode-project-name env))
-    (let [path (.getAbsolutePath (io/file (:root-dir @state)))
-          name (string/lower-case (.getName (io/file path)))]
-      (swap! state assoc :project-name name)))
-  (swap!
-   state
-   assoc
-   :term-iri-format
-   (if (:knode-term-iri-format env)
-     (:knode-term-iri-format env)
-     (default-term-iri-format @state))))
+(defn report
+  [state]
+  (->> (concat
+        (->> configurators
+             (map first)
+             (map (juxt #(str % ":") #(get state (label->keyword %)))))
+        [["Dev key set?" (-> state :dev-key string/blank? not)]])
+       (map (fn [[k v]] (format "%-17s %s" k (str v))))
+       (string/join "\n")))
 
-(init-state!)
+(def state (atom (init env)))

@@ -75,6 +75,7 @@
 ;; TODO: test command
 (defn -main [task & args]
   (case task
+    "configuration" (println (knode.state/report @state))
     "serve" (let [dir (str (:root-dir @state) "ontology/")]
               (println "Loading data from" dir "...")
               (load-state! dir (:project-name @state))

@@ -72,22 +72,23 @@
          (into {})
          (swap! state assoc :terms))))
 
+(defn load!
+  []
+  (println "Loading from" (:ontology-dir @state) "...")
+  (load-state! (:ontology-dir @state) (:project-name @state)))
+
 ;; TODO: test command
 (defn -main [task & args]
   (case task
     "configuration" (println (knode.state/report @state))
-    "serve" (let [dir (str (:root-dir @state) "ontology/")]
-              (println "Loading data from" dir "...")
-              (load-state! dir (:project-name @state))
-              (server/serve))
-    "load" (do (sparql/init-dataset! state)
-               (sparql/load-taxa! @state "taxdmp.zip"))
-    "validate" (let [dir (str (:root-dir @state) "ontology/")]
-                 (println "Loading data from" dir "...")
-                 (load-state! dir (:project-name @state))
-                 (sparql/init-dataset! state)
-                 (sparql/load-terms! @state)
-                 (println "Running validation...")
-                 (let [results (sparql/validate @state)]
-                   (println results)))
+    "serve" (do (load!)
+                (server/serve))
+    "load-ncbi" (do (sparql/init-dataset! state)
+                    (sparql/load-taxa! @state "taxdmp.zip"))
+    "validate" (do (load!)
+                   (sparql/init-dataset! state)
+                   (sparql/load-terms! @state)
+                   (println "Running validation...")
+                   (let [results (sparql/validate @state)]
+                     (println results)))
     "test" (println "TODO")))

@@ -19,9 +19,18 @@
     (with-open [r (io/reader (io/resource "blazegraph.properties"))]
       (.load props r))
     (io/make-parents (.get props "com.bigdata.journal.AbstractJournal.file"))
-    (let [repo (BigdataSailRepository. (BigdataSail. props))]
-      (.initialize repo)
-      (swap! state assoc :blazegraph repo))))
+    ; suppress annoying Blazegraph banner
+    (with-open [null (java.io.PrintStream. "/dev/null")]
+      (let [out System/out, err System/err]
+        (System/setOut null)
+        (System/setErr null)
+        (try
+          (let [repo (BigdataSailRepository. (BigdataSail. props))]
+            (.initialize repo)
+            (swap! state assoc :blazegraph repo))
+          (finally
+            (System/setOut out)
+            (System/setErr err)))))))
 
 (defn literal
   [& args]
@@ -127,23 +136,23 @@
        (accept [_ dir name] (.endsWith name ".nt"))))))
 
 (defn load-terms!
-  [{:keys [env context terms blazegraph] :as state}]
-  (let [path "tmp/terms.ttl"]
-    (io/make-parents path)
-    (spit path (emit/emit-ttl-terms env context terms))
-    (with-open [conn (.getConnection blazegraph)]
+  [{:keys [env context terms blazegraph project-iri] :as state}]
+  (with-open [conn (.getConnection blazegraph)]
+    (let [path "tmp/terms.ttl"
+          contexts (->> project-iri
+                        (.createURI (.getValueFactory conn))
+                        vector
+                        (into-array))]
+      (io/make-parents path)
+      (spit path (emit/emit-ttl-terms env context terms))
       (try
         (doto conn
           (.begin)
-          (.add (io/file path)
-                "base:"
-                RDFFormat/TURTLE
-                (->> "http://example.com/example"
-                     (.createURI (.getValueFactory conn))
-                     vector
-                     (into-array)))
+          (.remove nil nil nil contexts)
+          (.add (io/file path) "base:" RDFFormat/TURTLE contexts)
           (.commit))
         (catch RepositoryException e
+          (println (.getMessage e))
           (.rollback conn))))))
 
 (defn get-value
@@ -181,6 +190,7 @@
        (map
         (fn [rule]
           (let [results (select state (:select rule))]
+            (println (:label rule) (count results))
             (if (first results)
               (assoc rule :results results)
               rule))))

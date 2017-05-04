@@ -33,7 +33,7 @@ label: Example Foo")
 
 (deftest test-example-ontology
   (reset! state (knode.state/init test-state))
-  (cli/load-state! "test/example/ontology/" "example")
+  (cli/load-state! (:ontology-dir @state) (:project-name @state))
   (sparql/init-dataset! state)
   (sparql/load-terms! @state)
   (is (= [] (sparql/validate @state)))

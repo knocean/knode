@@ -405,7 +405,7 @@
 (defn partition-by-leading-whitespace [lines]
   (partition-by
    (let [ct (volatile! 0)]
-     #(do (when (not (or (string/blank? %) (re-find #"\s\s+" %)))
+     #(do (when (not (or (string/blank? %) (re-find #"^\s\s+" %)))
             (vswap! ct inc))
           @ct))
    lines))
@@ -432,7 +432,13 @@
   [env lines]
   (reduce
    (fn [[env blocks] line]
-     (let [[env block] (process-line env line)]
+     (let [[env block]
+           (try
+             (process-line env line)
+             (catch Exception e
+               (println "ERRORED ON" line)
+               (println e)
+               (throw e)))]
        [env (conj blocks block)]))
    [env []]
    (grouped-lines lines)))

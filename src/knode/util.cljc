@@ -1,5 +1,9 @@
 (ns knode.util)
 
+(defn tap! [label value]
+  (println label " - " value)
+  value)
+
 (defn starts-with? [target prefix]
   (and (>= (count target) (count prefix))
        (every? identity (map = target prefix))))

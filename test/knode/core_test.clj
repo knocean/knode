@@ -76,7 +76,10 @@
       (is (= expected (grouped-lines ["Foo" "Bar" " 	   Baz" " 	   Mumble"])))))
   (testing "Strips indentation based on the first indented line"
     (is (= ["Foo" (clojure.string/join \newline ["Bar" "Baz" "  Mumble"])]
-           (grouped-lines ["Foo" "Bar" "  Baz" "    Mumble"])))))
+           (grouped-lines ["Foo" "Bar" "  Baz" "    Mumble"]))))
+  (testing "Only checks for spaces at the beginning of given lines"
+    (is (= ["Foo" "Bar   Baz" "Mumble"]
+           (grouped-lines ["Foo" "Bar   Baz" "Mumble"])))))
 
 (deftest test-process-line
   (testing "Process some @prefix lines"

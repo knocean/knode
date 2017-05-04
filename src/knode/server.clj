@@ -296,7 +296,11 @@
   "Load data and serve pages on a given port."
   []
   (println "Listening on" (:port @state) "...")
-  (reset! server (server/run-server knode-routes {:port (:port @state)})))
+  (reset!
+   server
+   (server/run-server
+    knode-routes
+    {:port (Integer. (:port @state))})))
 
 (defn stop
   []

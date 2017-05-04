@@ -15,25 +15,37 @@
 (defn load-state!
   "Given a directory, load data into the atoms."
   [dir project-name]
-  (with-open [reader (io/reader (str dir "context.kn"))]
-    (let [[env blocks] (core/process-lines {} (line-seq reader))]
-      (swap! state assoc :context blocks)
-      (swap! state assoc :env env)))
-  (with-open [reader (io/reader (str dir "external.tsv"))]
-    (->> reader
-         line-seq
-         rest
-         (map #(string/split % #"\t"))
-         (map (fn [[label target _]] (str "@label " label ": " target)))
-         (core/process-lines (:env @state))
-         first
-         (swap! state assoc :env)))
-  (with-open [reader (io/reader (str dir "index.tsv"))]
-    (doseq [line (->> reader line-seq rest)]
-      (let [[curie label _] (string/split line #"\t" 3)
-            target (core/resolve-name (:env @state) {:curie curie})
-            new-env (core/add-label (:env @state) label target nil)]
-        (swap! state assoc :env new-env))))
+  (let [path (str dir "context.kn")]
+    (when (.exists (io/file path))
+      (with-open [reader (io/reader path)]
+        (let [[env blocks] (core/process-lines {} (line-seq reader))]
+          (swap! state assoc :context blocks)
+          (swap! state assoc :env env)))))
+  (let [path (str dir "external.tsv")]
+    (when (.exists (io/file path))
+      (with-open [reader (io/reader path)]
+        (doseq [line (->> reader line-seq rest)]
+          (let [[label curie _] (string/split line #"\t" 3)
+                target (core/resolve-name (:env @state) {:curie curie})
+                new-env (core/add-label (:env @state) label target nil)]
+            (swap! state assoc :env new-env))))))
+  (let [path (str dir "index.tsv")]
+    (when (.exists (io/file path))
+      (with-open [reader (io/reader path)]
+        (doseq [line (->> reader line-seq rest)]
+          (let [[curie label _] (string/split line #"\t" 3)
+                target (core/resolve-name (:env @state) {:curie curie})
+                new-env (core/add-label (:env @state) label target nil)]
+            (swap! state assoc :env new-env))))))
+  (let [path (str dir "predicates.tsv")]
+    (when (.exists (io/file path))
+      (with-open [reader (io/reader path)]
+        (doseq [line (->> reader line-seq rest)]
+          (let [[label curie datatype] (string/split line #"\t")
+                target (core/resolve-name (:env @state) {:curie curie})
+                dt (core/resolve-datatype (:env @state) {:name datatype})
+                new-env (core/add-label (:env @state) label target dt)]
+            (swap! state assoc :env new-env))))))
   (let [path (str dir "templates.json")]
     (when (.exists (io/file path))
       (->> (json/read-str (slurp path) :key-fn keyword)

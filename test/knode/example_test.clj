@@ -31,11 +31,14 @@ label: Example Foo")
    :root-iri "https://example.com/"
    :dev-key "NOT SECRET"})
 
-(deftest test-example-ontology
+(defn reset-state! []
   (reset! state (knode.state/init test-state))
   (cli/load-state! "test/example/ontology/" "example")
   (sparql/init-dataset! state)
-  (sparql/load-terms! @state)
+  (sparql/load-terms! @state))
+
+(deftest test-example-ontology
+  (reset-state!)
   (is (= [] (sparql/validate @state)))
 
   (testing "Load example ontology"
@@ -102,22 +105,19 @@ label: Example Foo")
         (is (= (get body "curie") "EXAMPLE:0000003"))))))
 
 (deftest test-term-status
-  (reset! state (knode.state/init test-state))
-  (cli/load-state! "test/example/ontology/" "example")
-  (sparql/init-dataset! state)
-  (sparql/load-terms! @state)
+  (reset-state!)
 
   (testing "Returns the expected map for a present subject"
     (is (= {:CURIE "EXAMPLE:0000001" :recognized true :obsolete false :replacement nil}
-           (state/term-status "EXAMPLE:0000001"))))
+           (state/term-status "EXAMPLE:0000001" :label :CURIE))))
   (testing "Returns :recognized false for URIs that are not recorded anywhere"
-    (is (= {:CURIE "nonexistent:iri" :recognized false :obsolete :false :replacement nil}
-           (state/term-status "nonexistent:iri"))))
+    (is (= {:CURIE "nonexistent:iri" :recognized false :obsolete false :replacement nil}
+           (state/term-status "nonexistent:iri" :label :CURIE))))
   (testing "Returns :obsolete true for URIs marked obsolete"
-    :TODO)
+    (is (= {:CURIE "EXAMPLE:0000003" :recognized true :obsolete true :replacement nil}
+           (state/term-status "EXAMPLE:0000003" :label :CURIE))))
   (testing "Returns a :replacement IRI for URIs marked obsolete AND replaced"
-    :TODO)
+    (is (= {:CURIE "EXAMPLE:0000004" :recognized true :obsolete true :replacement "EXAMPLE:0000002"}
+           (state/term-status "EXAMPLE:0000004" :label :CURIE))))
   (testing "Checks blazegraph for IRIs not found in (:terms @state)"
-    :TODO)
-  (testing "Returns :recognized false for CURIEs whose prefixes are not found in the local environment"
     :TODO))

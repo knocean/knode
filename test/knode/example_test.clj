@@ -37,8 +37,9 @@ label: Example Foo")
   (sparql/init-dataset! state)
   (sparql/load-terms! @state))
 
+(reset-state!)
+
 (deftest test-example-ontology
-  (reset-state!)
   (is (= [] (sparql/validate @state)))
 
   (testing "Load example ontology"
@@ -105,7 +106,6 @@ label: Example Foo")
         (is (= (get body "curie") "EXAMPLE:0000003"))))))
 
 (deftest test-term-status
-  (reset-state!)
 
   (testing "Returns the expected map for a present subject"
     (is (= {:CURIE "EXAMPLE:0000001" :recognized true :obsolete false :replacement nil}

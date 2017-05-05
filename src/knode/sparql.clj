@@ -29,6 +29,8 @@
           (let [repo (BigdataSailRepository. (BigdataSail. props))]
             (.initialize repo)
             (swap! state assoc :blazegraph repo))
+          (catch Exception e
+            (throw e))
           (finally
             (System/setOut out)
             (System/setErr err)))))))
@@ -196,11 +198,17 @@
 
 (defn validate-rule
   [state rule limit]
-  (let [query (str (:select rule) (when limit (str "\nLIMIT " limit)))
-        results (select state query)]
-    (if (first results)
-      (assoc rule :results results)
-      rule)))
+  (try
+    (let [query (str (:select rule) (when limit (str "\nLIMIT " limit)))
+          results (select state query)]
+      (if (first results)
+        (assoc rule :results results)
+        rule))
+    (catch Exception e
+      (let [m (.getMessage e)]
+        (assoc rule
+               :results [{:error m :values [m]}]
+               :error m)))))
 
 (defn validation-failure
   [{:keys [validation-rules] :as state}]

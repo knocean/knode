@@ -16,7 +16,7 @@
    "alternative term" ["bar" "baz"]})
 
 (def example-add-kn
-  ": EXAMPLE:0000003
+  ": EXAMPLE:0000005
 template: example class
 name: Foo
 alternative term: bar
@@ -40,6 +40,7 @@ label: Example Foo")
 
   (testing "Load example ontology"
     (is (= (:root-dir @state) "test/example/"))
+
     (is (= (->> (get-in @state [:terms example-iri :blocks])
                 (map core/minimal-statement))
            [{:predicate {:iri "https://knotation.org/apply-template"}
@@ -52,10 +53,13 @@ label: Example Foo")
             {:template "http://example.com/template-1"
              :predicate {:iri "http://www.w3.org/2000/01/rdf-schema#label"}
              :object {:lexical "Example Two"}}]))
+
     (is (= (string/trim (emit/emit-index (:env @state) (:terms @state)))
-           (string/trim (slurp "test/example/ontology/index.tsv"))))
+           (string/trim (string/join \newline (take 9 (string/split-lines (slurp "test/example/ontology/index.tsv")))))))
+
     ;(is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
-    ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
+                                        ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
+
     (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))
            (string/trim (slurp "test/example/ontology/example.kn")))))
   (testing "make example class"
@@ -98,8 +102,8 @@ label: Example Foo")
             body (json/read-str (:body result))]
         (is (= (:status result) 201))
         (is (nil? (:error result)))
-        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
-        (is (= (get body "curie") "EXAMPLE:0000003"))))))
+        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000005"))
+        (is (= (get body "curie") "EXAMPLE:0000005"))))))
 
 (deftest test-term-status
   (reset! state (knode.state/init test-state))

@@ -128,7 +128,11 @@
              (when (keyword? datatype) (name datatype))))
     (and label target)
     (format "@label %s: %s" label (core/get-curie env (:iri target)))
-    ; TODO: non-default datatypes
+                                        ; TODO: non-default datatypes
+    (and predicate (:curie object))
+    (format "%s: %s"
+            (core/get-name env (:iri predicate))
+            (:curie object))
     (and predicate (:lexical object))
     (format "%s: %s"
             (core/get-name env (:iri predicate))

@@ -94,13 +94,24 @@
   (case task
     "configuration" (println (knode.state/report @state))
     "serve" (do (load!)
+                (sparql/init-dataset! state)
                 (server/serve))
     "load-ncbi" (do (sparql/init-dataset! state)
-                    (sparql/load-taxa! @state "taxdmp.zip"))
+                    (sparql/load-taxa! @state "tmp/taxdmp.zip"))
     "validate" (do (load!)
                    (sparql/init-dataset! state)
                    (sparql/load-terms! @state)
-                   (println "Running validation...")
-                   (let [results (sparql/validate @state)]
-                     (println results)))
+                   (let [rules (sparql/validate-each @state 1)]
+                     (when (->> rules (filter :results) first)
+                       (doseq [rule rules]
+                         (println
+                          (if (-> rule :results first) "FAIL" "PASS")
+                          (:label rule))
+                         (doseq [result (:results rule)]
+                           (->> result
+                                :values
+                                (string/join " | ")
+                                (println "    "))))
+                       (println "VALIDATION FAILED")
+                       (System/exit 1))))
     "test" (println "TODO")))

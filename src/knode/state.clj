@@ -58,10 +58,9 @@
     false))
 
 (defn replacement-for
-  ([term] (replacement-for term :iri))
-  ([term representation]
-   (if-let [rep (first (filter #(= "http://purl.obolibrary.org/obo/IAO_0100001" (get-in % [:predicate :iri])) (:blocks term)))]
-     (get-in rep [:object representation]))))
+  [term]
+  (if-let [rep (first (filter #(= "http://purl.obolibrary.org/obo/IAO_0100001" (get-in % [:predicate :iri])) (:blocks term)))]
+    (get-in rep [:object :lexical])))
 
 (defn query-term-graph [graph term-iri]
   (println "TODO")
@@ -85,5 +84,5 @@
            (if-let [term (or (get terms-table expanded)
                              (and graph (query-term-graph graph expanded)))]
              (when (obsolete-term? term)
-               {:obsolete true :replacement (replacement-for term (if (= label :CURIE) :curie :iri))})
+               {:obsolete true :replacement (replacement-for term)})
              {:recognized false}))))

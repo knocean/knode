@@ -14,7 +14,8 @@
 
    [knode.state :as state :refer [state]]
    [knode.core :as core]
-   [knode.emit :as emit])
+   [knode.emit :as emit]
+   [knode.sparql :as sparql])
   (:use [compojure.core :only [defroutes GET POST]]))
 
 (defn stylesheet
@@ -194,24 +195,41 @@
           (map (partial core/resolve-content (:env @state)))
           (core/expand-templates (:env @state) (:templates @state)))}))
 
-(defn add-valid-term!
-  [template data]
-  (let [term (make-term template data)
-        iri (get-in term [:subject :iri])]
+(defn add-term-to-state!
+  [term]
+  (let [iri (get-in term [:subject :iri])]
     (swap! state assoc-in [:terms iri] term)
     (spit
      (str (:root-dir @state) "ontology/index.tsv")
      (emit/emit-index (:env @state) (:terms @state)))
     (spit
      (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
-     (emit/emit-kn-terms (:env @state) nil (:terms @state)))
-    {:status 201
-     :headers {"Content-Type" "application/json"}
-     :body
-     (json/write-str
-      {:iri iri
-       :curie (get-in term [:subject :curie])}
-      :escape-slash false)}))
+     (emit/emit-kn-terms (:env @state) nil (:terms @state)))))
+
+(defn add-valid-term!
+  [template data]
+  (sparql/load-terms! @state)
+  (if-let [failure (sparql/validation-failure @state)]
+    (json-error
+     400
+     "Cannot add term because ontology is currently invalid:"
+     (:label failure))
+    (let [term (make-term template data)
+          iri (get-in term [:subject :iri])
+          test-state (assoc-in @state [:terms iri] term)
+          _ (sparql/load-terms! test-state)
+          failure (sparql/validation-failure test-state)]
+      (if failure
+        (json-error 400 "Validation failed:" (:label failure))
+        (do
+          (add-term-to-state! term)
+          {:status 201
+           :headers {"Content-Type" "application/json"}
+           :body
+           (json/write-str
+            {:iri iri
+             :curie (get-in term [:subject :curie])}
+            :escape-slash false)})))))
 
 (defn add-term!
   [data]
@@ -319,7 +337,11 @@
   "Load data and serve pages on a given port."
   []
   (println "Listening on" (:port @state) "...")
-  (reset! server (server/run-server knode-routes {:port (:port @state)})))
+  (reset!
+   server
+   (server/run-server
+    knode-routes
+    {:port (Integer. (:port @state))})))
 
 (defn stop
   []

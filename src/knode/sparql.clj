@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [knode.state :refer [state]]
+            [knode.core :as core]
             [knode.emit :as emit])
   (:import [org.openrdf.model BNode URI Literal]
            [org.openrdf.query QueryLanguage]
@@ -19,9 +20,20 @@
     (with-open [r (io/reader (io/resource "blazegraph.properties"))]
       (.load props r))
     (io/make-parents (.get props "com.bigdata.journal.AbstractJournal.file"))
-    (let [repo (BigdataSailRepository. (BigdataSail. props))]
-      (.initialize repo)
-      (swap! state assoc :blazegraph repo))))
+    ; suppress annoying Blazegraph banner
+    (with-open [null (java.io.PrintStream. "/dev/null")]
+      (let [out System/out, err System/err]
+        (System/setOut null)
+        (System/setErr null)
+        (try
+          (let [repo (BigdataSailRepository. (BigdataSail. props))]
+            (.initialize repo)
+            (swap! state assoc :blazegraph repo))
+          (catch Exception e
+            (throw e))
+          (finally
+            (System/setOut out)
+            (System/setErr err)))))))
 
 (defn literal
   [& args]
@@ -39,7 +51,7 @@
 (def has-rank "<http://purl.obolibrary.org/obo/ncbitaxon_has_rank>")
 (def rdf-type "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>")
 (def rdfs-label "<http://www.w3.org/2000/01/rdf-schema#label>")
-(def subclass-of "<http://www.w3.org/2000/01/rdf-schema#subClassOf")
+(def subclass-of "<http://www.w3.org/2000/01/rdf-schema#subClassOf>")
 (def owl-class "<http://www.w3.org/2002/07/owl#Class>")
 (def owl-deprecated "<http://www.w3.org/2002/07/owl#deprecated>")
 (def xsd-true "\"true\"^^<http://www.w3.org/2001/XMLSchema#boolean>")
@@ -127,26 +139,26 @@
        (accept [_ dir name] (.endsWith name ".nt"))))))
 
 (defn load-terms!
-  [{:keys [env context terms blazegraph] :as state}]
-  (let [path "tmp/terms.ttl"]
-    (io/make-parents path)
-    (spit path (emit/emit-ttl-terms env context terms))
-    (with-open [conn (.getConnection blazegraph)]
+  [{:keys [env context terms blazegraph project-iri] :as state}]
+  (with-open [conn (.getConnection blazegraph)]
+    (let [path "tmp/terms.ttl"
+          contexts (->> project-iri
+                        (.createURI (.getValueFactory conn))
+                        vector
+                        (into-array))]
+      (io/make-parents path)
+      (spit path (emit/emit-ttl-terms env context terms))
       (try
         (doto conn
           (.begin)
-          (.add (io/file path)
-                "base:"
-                RDFFormat/TURTLE
-                (->> "http://example.com/example"
-                     (.createURI (.getValueFactory conn))
-                     vector
-                     (into-array)))
+          (.remove nil nil nil contexts)
+          (.add (io/file path) "base:" RDFFormat/TURTLE contexts)
           (.commit))
         (catch RepositoryException e
+          (println (.getMessage e))
           (.rollback conn))))))
 
-(defn get-value
+(defn get-value-map
   [v]
   (cond
     (instance? URI v) {:iri (str v)}
@@ -157,32 +169,60 @@
       (.getDatatype v) {:lexical (.getLabel v) :datatype (str (.getDatatype v))}
       :else {:lexical (.getLabel v)})))
 
+(defn get-value-string
+  [env v]
+  (cond
+    (instance? URI v) (core/get-curie env (str v))
+    (instance? Literal v) (.getLabel v)
+    :else (str v)))
+
 (defn select
   [{:keys [blazegraph] :as state} query]
   (with-open [conn (.getConnection blazegraph)]
     (let [tq (.prepareTupleQuery conn QueryLanguage/SPARQL query)
           results (atom [])]
-      (.setMaxQueryTime tq 2)
+      (.setMaxQueryTime tq 10)
       (with-open [tr (.evaluate tq)]
-        (let [vs (.getBindingNames tr)]
+        (let [variables (.getBindingNames tr)]
           (while (.hasNext tr)
-            (let [bindings (.next tr)]
-              (swap!
-               results
-               conj
-               (->> vs
-                    (map (juxt identity #(get-value (.getValue bindings %))))
-                    (into {})))))))
+            (let [bindings (.next tr)
+                  values (map #(.getValue bindings %) variables)
+                  strings (map (partial get-value-string (:env state))
+                               values)]
+              (->> values
+                   (map get-value-map)
+                   (zipmap variables)
+                   (into {:values strings})
+                   (swap! results conj))))))
       @results)))
 
-(defn validate
+(defn validate-rule
+  [state rule limit]
+  (try
+    (let [query (str (:select rule) (when limit (str "\nLIMIT " limit)))
+          results (select state query)]
+      (if (first results)
+        (assoc rule :results results)
+        rule))
+    (catch Exception e
+      (let [m (.getMessage e)]
+        (assoc rule
+               :results [{:error m :values [m]}]
+               :error m)))))
+
+(defn validation-failure
   [{:keys [validation-rules] :as state}]
-  (->> validation-rules
-       (map
-        (fn [rule]
-          (let [results (select state (:select rule))]
-            (if (first results)
-              (assoc rule :results results)
-              rule))))
+  (->> (for [rule validation-rules]
+         (validate-rule state rule 1))
        (filter :results)
-       doall))
+       first))
+
+(defn validate-each
+  [{:keys [validation-rules] :as state} limit]
+  (doall
+   (for [rule validation-rules]
+     (validate-rule state rule limit))))
+
+(defn validate
+  [state]
+  (filter :results (validate-each state nil)))

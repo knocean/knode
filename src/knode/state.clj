@@ -7,6 +7,7 @@
 
 (def configurators
   [["Root dir" (constantly "")]
+   ["Ontology dir" #(str (:root-dir %) "ontology/")]
    ["Project name" #(->> (:root-dir %)
                          io/file
                          .getAbsolutePath

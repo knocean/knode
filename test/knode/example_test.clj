@@ -33,10 +33,13 @@ label: Example Foo")
 
 (deftest test-example-ontology
   (reset! state (knode.state/init test-state))
-  (cli/load-state! "test/example/ontology/" "example")
+  (cli/load-state! (:ontology-dir @state) (:project-name @state))
+  (clojure.java.io/delete-file "tmp/blazegraph.jnl" true)
   (sparql/init-dataset! state)
   (sparql/load-terms! @state)
-  (is (= [] (sparql/validate @state)))
+
+  (testing "Run validation"
+    (is (= [] (sparql/validate @state))))
 
   (testing "Load example ontology"
     (is (= (:root-dir @state) "test/example/"))
@@ -69,32 +72,39 @@ label: Example Foo")
            example-add-json)]
       (is (= (emit/emit-kn-term (:env @state) nil subject blocks)
              example-add-kn))))
-  (testing "Unauthenticated"
-    (is (= (:status (server/add-term! nil))
-           401))
-    (is (= (:status
-            (server/add-term!
-             {"template" "example class"
-              "name" "Foo"}))
-           403))
-    (is (= (:status
-            (server/add-term!
-             {"api-key" "NOT THE RIGHT KEY"}))
-           403)))
-  (testing "Wrong template"
-    (is (= (:status
-            (server/add-term!
-             {"api-key" "NOT SECRET"
-              "template" "foo"}))
-           400)))
-  (testing "Missing required predicates"
-    (is (= (:status
-            (server/add-term!
-             {"api-key" "NOT SECRET"
-              "template" "example class"}))
-           400)))
-  (testing "Actually add a term"
-    (with-redefs [spit :no-op]
+  (with-redefs [server/add-term-to-state! :no-op]
+    (testing "Unauthenticated"
+      (is (= (:status (server/add-term! nil))
+             401))
+      (is (= (:status
+              (server/add-term!
+               {"template" "example class"
+                "name" "Foo"}))
+             403))
+      (is (= (:status
+              (server/add-term!
+               {"api-key" "NOT THE RIGHT KEY"}))
+             403)))
+    (testing "Wrong template"
+      (is (= (:status
+              (server/add-term!
+               {"api-key" "NOT SECRET"
+                "template" "foo"}))
+             400)))
+    (testing "Missing required predicates"
+      (is (= (:status
+              (server/add-term!
+               {"api-key" "NOT SECRET"
+                "template" "example class"}))
+             400)))
+    (testing "Duplicate label"
+      (is (= (:status
+              (server/add-term!
+               {"api-key" "NOT SECRET"
+                "template" "example class"
+                "name" "One"}))
+             400)))
+    (testing "Actually add a term"
       (let [result (server/add-term!
                     {"api-key" "NOT SECRET"
                      "template" "example class"

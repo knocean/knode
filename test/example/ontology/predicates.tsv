@@ -1,0 +1,8 @@
+label	CURIE	datatype
+label	rdfs:label	plain
+type	rdf:type	link
+subclass of	rdfs:subClassOf	link
+obsolete	owl:deprecated	xsd:boolean
+alternative term	obo:IAO_0000118	plain
+template	kn:apply-template	link
+name	EXAMPLE:name	plain

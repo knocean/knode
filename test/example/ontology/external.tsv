@@ -1,6 +1,6 @@
 label	CURIE	type
 label	rdfs:label	owl:AnnotationProperty
-replacement	obo:IAO_0100001 > link	owl:AnnotationProperty\
+replacement	obo:IAO_0100001 > link	owl:AnnotationProperty
 type	rdf:type > link	rdf:Property
 subclass of	rdfs:subClassOf > link	rdf:Property
 obsolete	owl:deprecated > xsd:boolean	owl:DatatypeProperty

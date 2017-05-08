@@ -1,3 +1,5 @@
 CURIE	label	type	obsolete	replacement
 EXAMPLE:0000001	Example One	owl:Class	false	
 EXAMPLE:0000002	Example Two	owl:Class	false	
+EXAMPLE:0000003	Example Three	owl:Class	true	
+EXAMPLE:0000004	Example Four	owl:Class	true	https://example.com/ontology/EXAMPLE_0000002

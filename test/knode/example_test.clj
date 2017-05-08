@@ -9,14 +9,15 @@
             [knode.server :as server]
             [knode.sparql :as sparql]))
 
-(def example-iri "https://example.com/ontology/EXAMPLE_0000002")
+(defn ex [x] (str "https://example.com/ontology/EXAMPLE_" x))
+(def example-iri (ex "0000002"))
 
 (def example-add-json
   {"name" "Foo"
    "alternative term" ["bar" "baz"]})
 
 (def example-add-kn
-  ": EXAMPLE:0000003
+  ": EXAMPLE:0000005
 template: example class
 name: Foo
 alternative term: bar
@@ -43,6 +44,7 @@ label: Example Foo")
 
   (testing "Load example ontology"
     (is (= (:root-dir @state) "test/example/"))
+
     (is (= (->> (get-in @state [:terms example-iri :blocks])
                 (map core/minimal-statement))
            [{:predicate {:iri "https://knotation.org/apply-template"}
@@ -55,10 +57,17 @@ label: Example Foo")
             {:template "http://example.com/template-1"
              :predicate {:iri "http://www.w3.org/2000/01/rdf-schema#label"}
              :object {:lexical "Example Two"}}]))
+
     (is (= (string/trim (emit/emit-index (:env @state) (:terms @state)))
-           (string/trim (slurp "test/example/ontology/index.tsv"))))
+           (->> "test/example/ontology/index.tsv"
+                slurp
+                string/split-lines
+                (string/join \newline)
+                (string/trim))))
+
     ;(is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
-    ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
+                                        ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
+
     (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))
            (string/trim (slurp "test/example/ontology/example.kn")))))
   (testing "make example class"
@@ -108,5 +117,39 @@ label: Example Foo")
             body (json/read-str (:body result))]
         (is (= (:status result) 201))
         (is (nil? (:error result)))
-        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000003"))
-        (is (= (get body "curie") "EXAMPLE:0000003"))))))
+        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000005"))
+        (is (= (get body "curie") "EXAMPLE:0000005"))))))
+
+(deftest test-term-status
+  (reset! state (knode.state/init test-state))
+  (cli/load-state! (:ontology-dir @state) (:project-name @state))
+  (clojure.java.io/delete-file "tmp/blazegraph.jnl" true)
+  (sparql/init-dataset! state)
+  (sparql/load-terms! @state)
+
+  (testing "Returns the expected map for a present subject"
+    (is (= (sparql/term-status @state (ex "0000001"))
+           {:iri (ex "0000001")
+            :recognized true
+            :obsolete false
+            :replacement nil})))
+  (testing "Returns :recognized false for URIs that are not recorded anywhere"
+    (is (= (sparql/term-status @state "nonexistent:iri")
+           {:iri "nonexistent:iri"
+            :recognized false
+            :obsolete false
+            :replacement nil})))
+  (testing "Returns :obsolete true for URIs marked obsolete"
+    (is (= (sparql/term-status @state (ex "0000003"))
+           {:iri (ex "0000003")
+            :recognized true
+            :obsolete true
+            :replacement nil})))
+  (testing "Returns a :replacement IRI for URIs marked obsolete AND replaced"
+    (is (= (sparql/term-status @state (ex "0000004"))
+           {:iri (ex "0000004")
+            :recognized true
+            :obsolete true
+            :replacement (ex "0000002")})))
+  (testing "Checks blazegraph for IRIs not found in (:terms @state)"
+    :TODO))

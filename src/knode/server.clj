@@ -4,7 +4,7 @@
    [clojure.string :as string]
    [clojure.data.json :as json]
 
-   [org.httpkit.server :as server]
+   [org.httpkit.server :as httpkit]
    [compojure.route :as route]
 
    [hiccup.core :as hiccup]
@@ -273,13 +273,47 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
-(defn check-term-status
+(defn seq->tsv-string
+  [headers maps]
+  (->> maps
+       (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
+       (concat [headers])
+       (map #(string/join \tab %))
+       (clojure.string/join \newline)))
+
+(defn get-term-status
   [req]
-  {:status 200
-   :headers {"Content-Type" "text/plain"}
-   :body "Basics"})
+  (let [[header & ids] (-> req :body slurp string/split-lines)
+        label (keyword (string/lower-case header))
+        iris (if (= "CURIE" header)
+               (->> ids
+                    (map (fn [x] {:curie x}))
+                    (map #(try (core/resolve-curie (:env state) %)
+                               (catch Exception e)))
+                    (map :iri))
+               ids)]
+    (cond
+      (not (contains? #{"IRI" "CURIE"} header))
+      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
+
+      (empty? ids)
+      (json-error 400 "Some terms must be submitted")
+
+      :else
+      {:status 200
+       :headers {"Content-Type" "text/tab-separated-values"}
+       :body
+       (->> iris
+            (map (partial sparql/term-status @state))
+            (map vector ids)
+            (map #(if (= "CURIE" header)
+                    (assoc (second %) :curie (first %))
+                    (second %)))
+            (seq->tsv-string
+             [header "recognized" "obsolete" "replacement"]))})))
 
 (defroutes knode-routes
+  ; ## Public Pages
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
   (GET "/ontology/:id.ttl" [id] render-ttl)
@@ -290,10 +324,14 @@
   (GET "/index.html" [] (render-doc "index"))
   (GET "/" [] (render-doc "index"))
 
-  ; Dev API
-  (POST "/dev/api/add-term" [] add-term-json!)
-  (POST "/dev/api/term-status" [] check-term-status)
+  ; ## Public API
+  (POST "/api/get-term-status" [] get-term-status)
+
+  ; ## Dev Pages
   (GET "/dev/status" [] render-status)
+
+  ; ## Dev API
+  (POST "/dev/api/add-term" [] add-term-json!)
 
   ; static resources
   (route/resources "")
@@ -316,7 +354,7 @@
   (println "Listening on" (:port @state) "...")
   (reset!
    server
-   (server/run-server
+   (httpkit/run-server
     knode-routes
     {:port (Integer. (:port @state))})))
 

@@ -7,3 +7,14 @@ subclass of: owl:Thing
 : EXAMPLE:0000002
 template: example class
 name: Two
+
+: EXAMPLE:0000003
+template: example class
+name: Three
+obsolete: true
+
+: EXAMPLE:0000004
+template: example class
+name: Four
+obsolete: true
+replacement: EXAMPLE:0000002

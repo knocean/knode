@@ -1,7 +1,9 @@
 (ns knode.state
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
-            [environ.core :refer [env]]))
+            [environ.core :refer [env]]
+
+            [knode.core :as core]))
 
 (def configurators
   [["Root dir" (constantly "")]

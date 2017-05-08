@@ -196,6 +196,26 @@
                    (swap! results conj))))))
       @results)))
 
+(def term-status-query "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+
+SELECT ?subject ?obsolete ?replacement
+WHERE {
+  VALUES ?subject { <%s> }
+  ?subject rdfs:label ?label .
+  OPTIONAL { ?subject owl:deprecated ?obsolete . }
+  OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
+}")
+
+(defn term-status
+  [state iri]
+  (let [result (when iri (first (select state (format term-status-query iri))))]
+    {:iri iri
+     :recognized (not (nil? result))
+     :obsolete (if (= "true" (get-in result ["obsolete" :lexical])) true false)
+     :replacement (get-in result ["replacement" :iri])}))
+
 (defn validate-rule
   [state rule limit]
   (try

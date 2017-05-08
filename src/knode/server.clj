@@ -12,7 +12,7 @@
    [markdown.core :as md]
    [yaml.core :as yaml]
 
-   [knode.state :as state :refer [state]]
+   [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
    [knode.sparql :as sparql])
@@ -273,19 +273,35 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
-(defn seq->tsv-string
-  [seq & {:keys [headers show-header]
-          :or {headers (keys (first seq))
-               show-header identity}}]
-  (clojure.string/join
-   \newline
-   (map #(clojure.string/join \tab %)
-        (cons (map show-header headers)
-              (map (fn [row] (map #(get row %) headers)) seq)))))
+(defn term-status
+  [{:keys [terms] :as state} iri]
+  (let [term (get terms iri) ; TODO: get term from graph
+        coll (core/collect-values (:blocks term))]
+    {:iri iri
+     :curie (core/get-curie (:env state) iri)
+     :recognized (if term true false)
+     :obsolete (if (= "true" (get-in coll [emit/owl:deprecated 0 :lexical]))
+                 true false)
+     :replacement (get-in coll [emit/iao:replacement 0 :iri])}))
 
-(defn check-term-status
+(defn seq->tsv-string
+  [headers maps]
+  (->> maps
+       (map (fn [row] (map #(get row (string/lower-case (name %))) headers)))
+       (concat [headers])
+       (map #(string/join \tab %))
+       (clojure.string/join \newline)))
+
+(defn get-term-status
   [req]
-  (let [[header & rest] (clojure.string/split-lines (slurp (:body req)))]
+  (let [[header & ids] (-> req :body slurp string/split-lines)
+        label (keyword (string/lower-case header))
+        iris (if (= "CURIE" header)
+               (->> ids
+                    (map (fn [x] {:curie x}))
+                    (map (partial core/resolve-curie (:env @state)))
+                    (map :iri))
+               ids)]
     (cond
       (not (contains? #{"IRI" "CURIE"} header))
       (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
@@ -294,15 +310,16 @@
       (json-error 400 "Some terms must be submitted")
 
       :else
-      (let [s @state
-            label (keyword header)]
-        {:status 200
-         :headers {"Content-Type" "text/tab-separated-values"}
-         :body (seq->tsv-string
-                (map #(state/term-status % :terms-table (:terms s) :graph (:graph s) :label label) rest)
-                :headers [label :recognized :obsolete :replacement] :show-header name)}))))
+      {:status 200
+       :headers {"Content-Type" "text/tab-separated-values"}
+       :body
+       (->> iris
+            (map (partial term-status @state))
+            (seq->tsv-string
+             [header "recognized" "obsolete" "replacement"]))})))
 
 (defroutes knode-routes
+  ; ## Public Pages
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
   (GET "/ontology/:id.ttl" [id] render-ttl)
@@ -313,10 +330,14 @@
   (GET "/index.html" [] (render-doc "index"))
   (GET "/" [] (render-doc "index"))
 
-  ; Dev API
-  (POST "/dev/api/add-term" [] add-term-json!)
-  (POST "/dev/api/term-status" [] check-term-status)
+  ; ## Public API
+  (POST "/api/get-term-status" [] get-term-status)
+
+  ; ## Dev Pages
   (GET "/dev/status" [] render-status)
+
+  ; ## Dev API
+  (POST "/dev/api/add-term" [] add-term-json!)
 
   ; static resources
   (route/resources "")

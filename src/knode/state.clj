@@ -51,38 +51,3 @@
        (string/join "\n")))
 
 (def state (atom (init env)))
-
-(defn obsolete-term? [term]
-  (if-let [obs (first (filter #(= "obsolete" (get-in % [:predicate :label])) (:blocks term)))]
-    (= "true" (:content obs))
-    false))
-
-(defn replacement-for
-  [term]
-  (if-let [rep (first (filter #(= "http://purl.obolibrary.org/obo/IAO_0100001" (get-in % [:predicate :iri])) (:blocks term)))]
-    (get-in rep [:object :lexical])))
-
-(defn query-term-graph [graph term-iri]
-  (println "TODO")
-  nil)
-
-(defn expanded-iri-or-curie [environment iri-or-curie]
-  (or (if-let [parsed (core/parse-curie iri-or-curie)]
-        (try
-          (:iri (core/resolve-curie environment parsed))
-          (catch Exception e nil)))
-      iri-or-curie))
-
-(defn term-status
-  [iri-or-curie & {:keys [env graph terms-table label]
-                   :or {env (:env @state)
-                        terms-table (:terms @state)
-                        graph (:graph @state)
-                        label :IRI}}]
-  (let [expanded (expanded-iri-or-curie env iri-or-curie)]
-    (merge {label iri-or-curie :recognized true :obsolete false :replacement nil}
-           (if-let [term (or (get terms-table expanded)
-                             (and graph (query-term-graph graph expanded)))]
-             (when (obsolete-term? term)
-               {:obsolete true :replacement (replacement-for term)})
-             {:recognized false}))))

@@ -3,6 +3,7 @@ label	rdfs:label	plain
 type	rdf:type	link
 subclass of	rdfs:subClassOf	link
 obsolete	owl:deprecated	xsd:boolean
+replacement	obo:IAO_0100001	link
 alternative term	obo:IAO_0000118	plain
 template	kn:apply-template	link
 name	EXAMPLE:name	plain

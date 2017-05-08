@@ -189,7 +189,7 @@
              (get-in values [rdfs:label 0 :lexical])
              (core/get-curie env (get-in values [rdf:type 0 :iri]))
              (get-in values [owl:deprecated 0 :lexical] "false")
-             (get-in values [iao:replacement 0 :lexical])])))
+             (get-in values [iao:replacement 0 :iri])])))
        (concat [["CURIE" "label" "type" "obsolete" "replacement"]])
        (map (partial string/join "\t"))
        (string/join "\n")))

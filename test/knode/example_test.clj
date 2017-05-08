@@ -2,14 +2,15 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as string]
             [clojure.data.json :as json]
-            [knode.state :as state :refer [state]]
+            [knode.state :refer [state]]
             [knode.core :as core]
             [knode.emit :as emit]
             [knode.cli :as cli]
             [knode.server :as server]
             [knode.sparql :as sparql]))
 
-(def example-iri "https://example.com/ontology/EXAMPLE_0000002")
+(defn ex [x] (str "https://example.com/ontology/EXAMPLE_" x))
+(def example-iri (ex "0000002"))
 
 (def example-add-json
   {"name" "Foo"
@@ -58,7 +59,11 @@ label: Example Foo")
              :object {:lexical "Example Two"}}]))
 
     (is (= (string/trim (emit/emit-index (:env @state) (:terms @state)))
-           (string/trim (string/join \newline (take 9 (string/split-lines (slurp "test/example/ontology/index.tsv")))))))
+           (->> "test/example/ontology/index.tsv"
+                slurp
+                string/split-lines
+                (string/join \newline)
+                (string/trim))))
 
     ;(is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
                                         ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
@@ -120,16 +125,32 @@ label: Example Foo")
   (cli/load-state! "test/example/ontology/" "example")
 
   (testing "Returns the expected map for a present subject"
-    (is (= {:CURIE "EXAMPLE:0000001" :recognized true :obsolete false :replacement nil}
-           (state/term-status "EXAMPLE:0000001" :label :CURIE))))
+    (is (= (server/term-status @state (ex "0000001"))
+           {:iri (ex "0000001")
+            :curie "EXAMPLE:0000001"
+            :recognized true
+            :obsolete false
+            :replacement nil})))
   (testing "Returns :recognized false for URIs that are not recorded anywhere"
-    (is (= {:CURIE "nonexistent:iri" :recognized false :obsolete false :replacement nil}
-           (state/term-status "nonexistent:iri" :label :CURIE))))
+    (is (= (server/term-status @state "nonexistent:iri")
+           {:iri "nonexistent:iri"
+            :curie nil
+            :recognized false
+            :obsolete false
+            :replacement nil})))
   (testing "Returns :obsolete true for URIs marked obsolete"
-    (is (= {:CURIE "EXAMPLE:0000003" :recognized true :obsolete true :replacement nil}
-           (state/term-status "EXAMPLE:0000003" :label :CURIE))))
+    (is (= (server/term-status @state (ex "0000003"))
+           {:iri (ex "0000003")
+            :curie "EXAMPLE:0000003"
+            :recognized true
+            :obsolete true
+            :replacement nil})))
   (testing "Returns a :replacement IRI for URIs marked obsolete AND replaced"
-    (is (= {:CURIE "EXAMPLE:0000004" :recognized true :obsolete true :replacement "EXAMPLE:0000002"}
-           (state/term-status "EXAMPLE:0000004" :label :CURIE))))
+    (is (= (server/term-status @state (ex "0000004"))
+           {:iri (ex "0000004")
+            :curie "EXAMPLE:0000004"
+            :recognized true
+            :obsolete true
+            :replacement (ex "0000002")})))
   (testing "Checks blazegraph for IRIs not found in (:terms @state)"
     :TODO))

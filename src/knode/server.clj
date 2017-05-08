@@ -4,7 +4,7 @@
    [clojure.string :as string]
    [clojure.data.json :as json]
 
-   [org.httpkit.server :as server]
+   [org.httpkit.server :as httpkit]
    [compojure.route :as route]
 
    [hiccup.core :as hiccup]
@@ -273,21 +273,10 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
-(defn term-status
-  [{:keys [terms] :as state} iri]
-  (let [term (get terms iri) ; TODO: get term from graph
-        coll (core/collect-values (:blocks term))]
-    {:iri iri
-     :curie (core/get-curie (:env state) iri)
-     :recognized (if term true false)
-     :obsolete (if (= "true" (get-in coll [emit/owl:deprecated 0 :lexical]))
-                 true false)
-     :replacement (get-in coll [emit/iao:replacement 0 :iri])}))
-
 (defn seq->tsv-string
   [headers maps]
   (->> maps
-       (map (fn [row] (map #(get row (string/lower-case (name %))) headers)))
+       (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
        (concat [headers])
        (map #(string/join \tab %))
        (clojure.string/join \newline)))
@@ -299,14 +288,15 @@
         iris (if (= "CURIE" header)
                (->> ids
                     (map (fn [x] {:curie x}))
-                    (map (partial core/resolve-curie (:env @state)))
+                    (map #(try (core/resolve-curie (:env state) %)
+                               (catch Exception e)))
                     (map :iri))
                ids)]
     (cond
       (not (contains? #{"IRI" "CURIE"} header))
       (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
 
-      (empty? rest)
+      (empty? ids)
       (json-error 400 "Some terms must be submitted")
 
       :else
@@ -314,7 +304,11 @@
        :headers {"Content-Type" "text/tab-separated-values"}
        :body
        (->> iris
-            (map (partial term-status @state))
+            (map (partial sparql/term-status @state))
+            (map vector ids)
+            (map #(if (= "CURIE" header)
+                    (assoc (second %) :curie (first %))
+                    (second %)))
             (seq->tsv-string
              [header "recognized" "obsolete" "replacement"]))})))
 
@@ -360,7 +354,7 @@
   (println "Listening on" (:port @state) "...")
   (reset!
    server
-   (server/run-server
+   (httpkit/run-server
     knode-routes
     {:port (Integer. (:port @state))})))
 

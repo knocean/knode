@@ -122,33 +122,32 @@ label: Example Foo")
 
 (deftest test-term-status
   (reset! state (knode.state/init test-state))
-  (cli/load-state! "test/example/ontology/" "example")
+  (cli/load-state! (:ontology-dir @state) (:project-name @state))
+  (clojure.java.io/delete-file "tmp/blazegraph.jnl" true)
+  (sparql/init-dataset! state)
+  (sparql/load-terms! @state)
 
   (testing "Returns the expected map for a present subject"
-    (is (= (server/term-status @state (ex "0000001"))
+    (is (= (sparql/term-status @state (ex "0000001"))
            {:iri (ex "0000001")
-            :curie "EXAMPLE:0000001"
             :recognized true
             :obsolete false
             :replacement nil})))
   (testing "Returns :recognized false for URIs that are not recorded anywhere"
-    (is (= (server/term-status @state "nonexistent:iri")
+    (is (= (sparql/term-status @state "nonexistent:iri")
            {:iri "nonexistent:iri"
-            :curie nil
             :recognized false
             :obsolete false
             :replacement nil})))
   (testing "Returns :obsolete true for URIs marked obsolete"
-    (is (= (server/term-status @state (ex "0000003"))
+    (is (= (sparql/term-status @state (ex "0000003"))
            {:iri (ex "0000003")
-            :curie "EXAMPLE:0000003"
             :recognized true
             :obsolete true
             :replacement nil})))
   (testing "Returns a :replacement IRI for URIs marked obsolete AND replaced"
-    (is (= (server/term-status @state (ex "0000004"))
+    (is (= (sparql/term-status @state (ex "0000004"))
            {:iri (ex "0000004")
-            :curie "EXAMPLE:0000004"
             :recognized true
             :obsolete true
             :replacement (ex "0000002")})))

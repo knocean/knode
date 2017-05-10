@@ -1,6 +1,7 @@
 (ns knode.sparql
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
+            [clojure.pprint :as pprint]
             [knode.state :refer [state]]
             [knode.core :as core]
             [knode.emit :as emit])
@@ -215,6 +216,25 @@ WHERE {
      :recognized (not (nil? result))
      :obsolete (if (= "true" (get-in result ["obsolete" :lexical])) true false)
      :replacement (get-in result ["replacement" :iri])}))
+
+(def full-term-query "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+
+SELECT ?subject ?obsolete ?replacement
+WHERE {
+  VALUES ?subject { <~a> }
+  ?subject rdfs:label ?label .
+~{  OPTIONAL { ?subject ~a ?label . }~^
+~}
+  OPTIONAL { ?subject owl:deprecated ?obsolete . }
+  OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
+}")
+
+(defn full-term
+  [state iri predicates]
+  (let [result (when iri (select state (pprint/cl-format nil full-term-query iri predicates)))]
+    result))
 
 (defn validate-rule
   [state rule limit]

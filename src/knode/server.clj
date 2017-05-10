@@ -312,6 +312,13 @@
             (seq->tsv-string
              [header "recognized" "obsolete" "replacement"]))})))
 
+(defn get-terms
+  [req]
+  (println "GETTING TERMS" req)
+  {:status 200
+   :headers {"Content-Type" "application/json"}
+   :body "{\"ack\": \"well ok then\"}"})
+
 (defroutes knode-routes
   ; ## Public Pages
   ; ontology terms
@@ -326,6 +333,7 @@
 
   ; ## Public API
   (POST "/api/get-term-status" [] get-term-status)
+  (POST "/api/get-terms" [] get-terms)
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)

@@ -516,6 +516,13 @@
     "Log Out"
     [:p "You have logged out."])})
 
+(defn get-terms
+  [req]
+  (println "GETTING TERMS" req)
+  {:status 200
+   :headers {"Content-Type" "application/json"}
+   :body "{\"ack\": \"well ok then\"}"})
+
 (defroutes knode-routes
   ; ## Authentication
   (GET "/login" [] login)

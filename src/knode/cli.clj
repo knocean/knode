@@ -6,6 +6,7 @@
 
    [knode.state :refer [state]]
    [knode.core :as core]
+   [knode.emit :as emit]
    [knode.server :as server]
    [knode.sparql :as sparql])
   (:gen-class))
@@ -98,6 +99,10 @@
     "serve" (do (load!)
                 (sparql/init-dataset! state)
                 (server/serve))
+    "reindex" (do (load!)
+                  (spit
+                   (str (:root-dir @state) "ontology/index.tsv")
+                   (emit/emit-index (:env @state) (:terms @state))))
     "load-ncbi" (do (sparql/init-dataset! state)
                     (sparql/load-taxa! @state "tmp/taxdmp.zip"))
     "validate" (do (load!)

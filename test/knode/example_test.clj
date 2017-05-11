@@ -137,7 +137,7 @@ label: Example Foo")
     (is (= (sparql/term-status @state "nonexistent:iri")
            {:iri "nonexistent:iri"
             :recognized false
-            :obsolete false
+            :obsolete nil
             :replacement nil})))
   (testing "Returns :obsolete true for URIs marked obsolete"
     (is (= (sparql/term-status @state (ex "0000003"))

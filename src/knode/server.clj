@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.data.json :as json]
+   [clojure.data.csv :as csv]
 
    [org.httpkit.server :as httpkit]
    [compojure.route :as route]
@@ -275,11 +276,13 @@
 
 (defn seq->tsv-string
   [headers maps]
-  (->> maps
-       (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
-       (concat [headers])
-       (map #(string/join \tab %))
-       (clojure.string/join \newline)))
+  (with-out-str
+    (csv/write-csv
+     *out*
+     (->> maps
+          (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
+          (concat [headers]))
+     :separator \tab)))
 
 (defn get-term-status
   [req]

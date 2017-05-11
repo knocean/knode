@@ -23,6 +23,17 @@
    [knode.util :as util])
   (:use [compojure.core :only [defroutes GET POST]]))
 
+(defn login?
+  [req]
+  (let [host (get-in req [:headers "host"])
+        google-id (:google-client-id @state)
+        google-secret (:google-client-secret @state)]
+    (and (string? host)
+         (string? google-id)
+         (not (string/blank? google-id))
+         (string? google-secret)
+         (not (string/blank? google-secret)))))
+
 (defn stylesheet
   [name]
   [:link {:href (str "/assets/" name) :rel "stylesheet"}])
@@ -66,10 +77,11 @@
          [:span {:class "icon-bar"}]]
         [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
-        [:ul {:class "nav navbar-nav navbar-right"}
-         (if-let [name (get-in req [:session :name])]
-           [:li [:a {:href "/logout"} name  " (Log out)"]]
-           [:li [:a {:href "/login-google"} "Log in"]])]]]]
+        (if (login? req)
+          [:ul {:class "nav navbar-nav navbar-right"}
+           (if-let [name (get-in req [:session :name])]
+             [:li [:a {:href "/logout"} name  " (Log out)"]]
+             [:li [:a {:href "/login-google"} "Log in"]])])]]]
      [:div {:id "content"} content]]
 
     [:script {:src "/assets/jquery.min.js"}]
@@ -379,11 +391,7 @@
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body
-     (if (and (string? host)
-              (string? google-id)
-              (not (string/blank? google-id))
-              (string? google-secret)
-              (not (string/blank? google-secret)))
+     (if (login? req)
        (base-template
         req
         "Log In"

@@ -288,7 +288,7 @@
         iris (if (= "CURIE" header)
                (->> ids
                     (map (fn [x] {:curie x}))
-                    (map #(try (core/resolve-curie (:env state) %)
+                    (map #(try (core/resolve-curie (:env @state) %)
                                (catch Exception e)))
                     (map :iri))
                ids)]
@@ -306,9 +306,16 @@
        (->> iris
             (map (partial sparql/term-status @state))
             (map vector ids)
-            (map #(if (= "CURIE" header)
-                    (assoc (second %) :curie (first %))
-                    (second %)))
+            (map #(let [id (first %)
+                        coll (second %)
+                        rep (:replacement coll)]
+                    (if (= "CURIE" header)
+                      (assoc
+                       coll
+                       :curie id
+                       :replacement
+                       (or (core/get-curie (:env @state) rep) rep))
+                      coll)))
             (seq->tsv-string
              [header "recognized" "obsolete" "replacement"]))})))
 

@@ -221,20 +221,31 @@ WHERE {
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX obo: <http://purl.obolibrary.org/obo/>
 
-SELECT ?subject ?obsolete ?replacement
+SELECT ~{?~a~^ ~}
 WHERE {
   VALUES ?subject { <~a> }
   ?subject rdfs:label ?label .
-~{  OPTIONAL { ?subject ~a ?label . }~^
+~{  OPTIONAL { ?subject <~a> ?label . }~^
 ~}
   OPTIONAL { ?subject owl:deprecated ?obsolete . }
   OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
 }")
 
+(defn results->sets [results]
+  (when (not (every? empty? results))
+    (cons (set (map first results))
+          (lazy-seq (results->sets (map rest results))))))
+
 (defn full-term
-  [state iri predicates]
-  (let [result (when iri (select state (pprint/cl-format nil full-term-query iri predicates)))]
-    result))
+  [state iri predicate-labels]
+  (let [query (pprint/cl-format
+                  nil full-term-query
+                  predicate-labels iri
+                  (map #(:iri (core/resolve-name (:env state) {:label %}))
+                       predicate-labels))
+        result (when (and iri (not (empty? predicate-labels)))
+                 (select state query))]
+    (into {} (map #(vec (list %1 %2)) predicate-labels (results->sets (map :values result))))))
 
 (defn validate-rule
   [state rule limit]

@@ -6,11 +6,14 @@
 
    [org.httpkit.server :as httpkit]
    [compojure.route :as route]
+   [ring.util.response :refer [redirect]]
+   [ring.middleware.session :refer [wrap-session]]
 
    [hiccup.core :as hiccup]
    [hiccup.page :as pg]
    [markdown.core :as md]
    [yaml.core :as yaml]
+   [oauth.google :as google]
 
    [knode.state :refer [state]]
    [knode.core :as core]
@@ -23,7 +26,7 @@
   [:link {:href (str "/assets/" name) :rel "stylesheet"}])
 
 (defn base-template
-  [title content]
+  [req title content]
   (pg/html5
    [:head
     [:meta {:charset "utf-8"}]
@@ -59,13 +62,12 @@
          [:span {:class "icon-bar"}]
          [:span {:class "icon-bar"}]
          [:span {:class "icon-bar"}]]
-        [:a {:class "navbar-brand" :href "/"} "Home"]]
+        [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
-        "<!--"
-        [:ul {:class "nav navbar-nav"}
-         [:li [:a {:href "ontie.html"} "ONTIE"]]
-         [:li [:a {:href "api.html"} "API"]]]
-        "-->"]]]
+        [:ul {:class "nav navbar-nav navbar-right"}
+         (if-let [name (get-in req [:session :name])]
+           [:li [:a {:href "/logout"} name  " (Log out)"]]
+           [:li [:a {:href "/login-google"} "Log in"]])]]]]
      [:div {:id "content"} content]]
 
     [:script {:src "/assets/jquery.min.js"}]
@@ -80,6 +82,7 @@
    (let [s @state
          term-count (count (:terms s))]
      (base-template
+      req
       (cond (= 0 term-count) "Empty terms"
             :else "All systems go")
       [:ul [:li [:b "Terms Count"] "-" term-count]]))})
@@ -98,6 +101,7 @@
        :headers {"Content-Type" "text/html"}
        :body
        (base-template
+        req
         label
         [:div
          [:h2 (:curie subject) " " label]
@@ -132,7 +136,7 @@
         (:blocks term))})))
 
 (defn render-doc
-  [doc]
+  [req doc]
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body
@@ -142,6 +146,7 @@
        (let [[_ _ header content] (re-find #"(?s)(---(.*?)---)(.*)" (slurp file))
              metadata (yaml/parse-string header)]
          (base-template
+          req
           (:title metadata)
           (md/md-to-html-string content)))))})
 
@@ -319,7 +324,90 @@
             (seq->tsv-string
              [header "recognized" "obsolete" "replacement"]))})))
 
+(defn login
+  [req]
+  (let [host (get-in req [:headers "host"])
+        google-id (:google-client-id @state)
+        google-secret (:google-client-secret @state)]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body
+     (if (and (string? host)
+              (string? google-id)
+              (not (string/blank? google-id))
+              (string? google-secret)
+              (not (string/blank? google-secret)))
+       (base-template
+        req
+        "Log In"
+        [:a
+         {:href (str "https://" host "/login-google")}
+         "Log in with your Google account."])
+       (base-template
+        req
+        "Cannot Log In"
+        [:p "No login options have been configured for this project."]))}))
+
+(defn login-google
+  [req]
+  (let [host (get-in req [:headers "host"])
+        google-id (:google-client-id @state)
+        google-secret (:google-client-secret @state)]
+    (cond
+      (or (not (string? host)) (string/blank? host))
+      (json-error 403 "The hosst could not be determined.")
+
+      (or (not (string? google-id)) (string/blank? google-id))
+      (json-error 403 "The Google Client ID has not been configured.")
+
+      (or (not (string? google-secret)) (string/blank? google-secret))
+      (json-error 403 "The Google Client Secret has not been configured.")
+
+      :else
+      (redirect
+       (google/oauth-authorization-url
+        google-id
+        (str "https://" host "/oauth2-callback-google"))))))
+
+(defn oauth2-callback-google
+  [req]
+  (let [session
+        (->> (get-in req [:headers "host"])
+             (format "https://%s/oauth2-callback-google")
+             (google/oauth-access-token
+              (:google-client-id @state)
+              (:google-client-secret @state)
+              (string/replace (:query-string req) #"^code=" ""))
+             :access-token
+             google/oauth-client
+             google/user-info)]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :session session
+     :body
+     (base-template
+      (assoc req :session session)
+      "Logged In"
+      [:p "You have logged in."])}))
+
+(defn logout
+  [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :session {}
+   :body
+   (base-template
+    (dissoc req :session)
+    "Log Out"
+    [:p "You have logged out."])})
+
 (defroutes knode-routes
+  ; ## Authentication
+  (GET "/login" [] login)
+  (GET "/login-google" [] login-google)
+  (GET "/logout" [] logout)
+  (GET "/oauth2-callback-google" [] oauth2-callback-google)
+
   ; ## Public Pages
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
@@ -327,9 +415,9 @@
   (GET "/ontology/:id" [id] render-html)
 
   ; doc directory
-  (GET "/doc/:doc.html" [doc] (render-doc doc))
-  (GET "/index.html" [] (render-doc "index"))
-  (GET "/" [] (render-doc "index"))
+  (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))
+  (GET "/index.html" req (render-doc req "index"))
+  (GET "/" req (render-doc req "index"))
 
   ; ## Public API
   (POST "/api/get-term-status" [] get-term-status)
@@ -345,12 +433,13 @@
 
   ; not found
   (route/not-found
-   (base-template
-    "Not Found"
-    [:div
-     [:h1 "Not Found"]
-     [:p "Sorry, the page you requested was not found."]
-     [:p [:a {:href "/"} "Return to home page."]]])))
+   #(base-template
+     (:session %)
+     "Not Found"
+     [:div
+      [:h1 "Not Found"]
+      [:p "Sorry, the page you requested was not found."]
+      [:p [:a {:href "/"} "Return to home page."]]])))
 
 ; Start/Restart http://www.http-kit.org/server.html#stop-server
 (defonce server (atom nil))
@@ -362,7 +451,8 @@
   (reset!
    server
    (httpkit/run-server
-    knode-routes
+    (->> knode-routes
+         wrap-session)
     {:port (Integer. (:port @state))})))
 
 (defn stop

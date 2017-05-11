@@ -18,7 +18,8 @@
    ["Port" (constantly "3210")]
    ["Root IRI" #(str "http://localhost:" (:port %) "/")]
    ["Project IRI" #(str (:root-iri %) "ontology/" (:idspace %))]
-   ["Term IRI format" #(str (:project-iri %) "_%07d")]])
+   ["Term IRI format" #(str (:project-iri %) "_%07d")]
+   ["Google Client ID" #(:google-client-id %)]])
 
 (defn label->keyword
   [label]
@@ -36,7 +37,7 @@
    (->> configurators
         (map first)
         (map label->keyword)
-        (concat [:dev-key])
+        (concat [:dev-key :google-client-secret])
         (select-keys base))
    configurators))
 
@@ -46,7 +47,9 @@
         (->> configurators
              (map first)
              (map (juxt #(str % ":") #(get state (label->keyword %)))))
-        [["Dev key set?" (-> state :dev-key string/blank? not)]])
+        [["Dev key set?" (-> state :dev-key string/blank? not)]
+         ["Google secret set?"
+          (-> state :google-client-secret string/blank? not)]])
        (map (fn [[k v]] (format "%-17s %s" k (str v))))
        (string/join "\n")))
 

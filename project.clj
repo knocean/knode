@@ -12,6 +12,7 @@
                  [io.forward/yaml "1.0.6"]
                  [http-kit "2.1.18"]
                  [compojure "1.5.1"]
+                 [oauth-clj "0.1.15"]
 
                  [com.blazegraph/bigdata-core "2.1.4"]]
 

@@ -210,10 +210,15 @@ WHERE {
 
 (defn term-status
   [state iri]
-  (let [result (when iri (first (select state (format term-status-query iri))))]
+  (let [result (when iri (first (select state (format term-status-query iri))))
+        recognized (not (nil? result))]
     {:iri iri
-     :recognized (not (nil? result))
-     :obsolete (if (= "true" (get-in result ["obsolete" :lexical])) true false)
+     :recognized recognized
+     :obsolete
+     (cond
+       (not recognized) nil
+       (= "true" (get-in result ["obsolete" :lexical])) true
+       :else false)
      :replacement (get-in result ["replacement" :iri])}))
 
 (defn validate-rule

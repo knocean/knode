@@ -94,7 +94,8 @@
              :labels
              {"type"
               {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-               :datatype :link}}
+               :datatype :link
+               :cardinality "zero or more"}}
              :iri-labels {"http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "type"}}
             {:label "type"
              :target

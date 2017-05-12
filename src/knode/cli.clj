@@ -28,7 +28,7 @@
         (doseq [line (->> reader line-seq rest)]
           (let [[label curie _] (string/split line #"\t" 3)
                 target (core/resolve-name (:env @state) {:curie curie})
-                new-env (core/add-label (:env @state) label target nil)]
+                new-env (core/add-label (:env @state) label target)]
             (swap! state assoc :env new-env))))))
   (let [path (str dir "index.tsv")]
     (when (.exists (io/file path))
@@ -36,17 +36,18 @@
         (doseq [line (->> reader line-seq rest)]
           (let [[curie label _] (string/split line #"\t" 3)
                 target (core/resolve-name (:env @state) {:curie curie})
-                new-env (core/add-label (:env @state) label target nil)]
+                new-env (core/add-label (:env @state) label target)]
             (swap! state assoc :env new-env))))))
   (let [path (str dir "predicates.tsv")]
     (when (.exists (io/file path))
       (with-open [reader (io/reader path)]
         (doseq [line (->> reader line-seq rest)]
-          (let [[label curie datatype] (string/split line #"\t")
-                target (core/resolve-name (:env @state) {:curie curie})
-                dt (core/resolve-datatype (:env @state) {:name datatype})
-                new-env (core/add-label (:env @state) label target dt)]
-            (swap! state assoc :env new-env))))))
+          (let [env (:env @state)
+                [label curie datatype cardinality] (string/split line #"\t")
+                target (core/resolve-name env {:curie curie})
+                dt (core/resolve-datatype env {:name datatype})
+                env (core/add-predicate env label target dt cardinality)]
+            (swap! state assoc :env env))))))
   (let [path (str dir "templates.json")]
     (when (.exists (io/file path))
       (->> (json/read-str (slurp path) :key-fn keyword)
@@ -61,7 +62,7 @@
            (into {})
            (swap! state assoc :templates)))
     (doseq [{:keys [label iri]} (->> @state :templates vals)]
-      (let [new-env (core/add-label (:env @state) label {:iri iri} nil)]
+      (let [new-env (core/add-label (:env @state) label {:iri iri})]
         (swap! state assoc :env new-env))))
   (let [path (str dir "validation.edn")]
     (when (.exists (io/file path))

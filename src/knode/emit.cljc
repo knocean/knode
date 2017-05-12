@@ -129,9 +129,15 @@
   (reduce
    (fn [coll {:keys [predicate object] :as block}]
      (let [piri (:iri predicate)
-           plabel (core/get-name env piri)]
+           plabel (core/get-name env piri)
+           cardinality (get-in env [:labels plabel :cardinality])
+           obj (emit-jsonld-object env object)
+           objs (if (and (string? cardinality)
+                         (re-matches #".*or more$" cardinality))
+                  (concat (get-in coll [plabel]) [obj])
+                  obj)]
        (-> coll
-           (assoc plabel (emit-jsonld-object env object))
+           (assoc plabel objs)
            (assoc-in ["@context" plabel]
                      {"@id" (or (core/get-curie env piri) piri)
                       "iri" piri}))))

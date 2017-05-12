@@ -76,21 +76,39 @@
 
 (defn add-label
   "Add a label to the environment."
-  [env label target datatype]
+  [env label target]
   (-> env
-      (assoc-in [:labels label] {:iri (:iri target) :datatype datatype})
+      (assoc-in [:labels label] {:iri (:iri target)})
+      (assoc-in [:iri-labels (:iri target)] label)))
+
+(defn add-predicate
+  "Add a predicate to the environment."
+  [env label target datatype cardinality]
+  (-> env
+      (assoc-in [:labels label]
+                {:iri (:iri target)
+                 :datatype datatype
+                 :cardinality (or cardinality "zero or more")})
       (assoc-in [:iri-labels (:iri target)] label)))
 
 (defn update-environment
   "Given an environment and a block-map,
    add any prefixes or labels,
    and return the updated environment."
-  [env {:keys [prefix iri label target datatype subject] :as block-map}]
+  [env
+   {:keys [prefix iri label target datatype cardinality subject]
+    :as block-map}]
   (cond
     (and prefix iri)
     (assoc-in env [:prefixes prefix] iri)
+    (and label target datatype cardinality)
+    (add-predicate env label target datatype cardinality)
+    (and label target cardinality)
+    (add-predicate env label target nil cardinality)
+    (and label target datatype)
+    (add-predicate env label target datatype nil)
     (and label target)
-    (add-label env label target datatype)
+    (add-label env label target)
     subject
     (assoc env :subject subject)
     :else

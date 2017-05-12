@@ -541,6 +541,15 @@
       (empty? labels)
       (json-error 400 "Some labels must be submitted")
 
+      (not
+       (util/all?
+        (map #(:iri
+               (try
+                 (core/resolve-name (:env @state) {:label %})
+                 (catch Exception e nil)))
+             labels)))
+      (json-error 400 "Some given labels are not resolvable")
+
       :else  (let [result (->> iris
                                (map #(sparql/full-term @state % labels))
                                (map #(into {} (map (fn [[k v]] [k (string/join " | " v)]) %))))]

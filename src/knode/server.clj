@@ -75,6 +75,8 @@
          [:span {:class "icon-bar"}]]
         [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
+        [:ul {:class "nav navbar-nav"}
+         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]
         (if (login? req)
           [:ul {:class "nav navbar-nav navbar-right"}
            (if-let [name (get-in req [:session :name])]
@@ -103,12 +105,34 @@
   "Given a request, try to find a matching term,
    and return a response map for HTML."
   [req]
-  (let [id (get-in req [:route-params :id])
+  (let [host (str "https://" (get-in req [:headers "host"]) "/")
+        root (:root-iri @state)
+        id (get-in req [:route-params :id])
         iri (str (:root-iri @state) "ontology/" id)
         term (get-in @state [:terms iri])
         subject (:subject term)
         label (get-in @state [:env :iri-labels (:iri subject)])]
-    (when term
+    (cond
+      (= id (:idspace @state))
+      {:status 200
+       :headers {"Content-Type" "text/html"}
+       :body
+       (base-template
+        req
+        (:idspace @state)
+        [:ul
+         (for [term (->> @state :terms (sort-by first) vals)]
+           (let [subject (:subject term)
+                 iri (:iri subject)
+                 values (core/collect-values (:blocks term))]
+             [:li
+              [:a
+               {:href (string/replace iri root host)}
+               (core/get-curie (:env @state) iri)
+               " "
+               (get-in values [emit/rdfs:label 0 :lexical])]]))])}
+
+      term
       {:status 200
        :headers {"Content-Type" "text/html"}
        :body
@@ -133,7 +157,10 @@
           [:a
            {:href (str (string/replace id #".html^" "") ".json")}
            "JSON-LD (json)"]
-          "."]])})))
+          "."]])}
+
+      :else
+      nil)))
 
 (defn render-ttl
   "Given a request, try to find a matching term,

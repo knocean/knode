@@ -315,12 +315,39 @@
             (seq->tsv-string
              [header "recognized" "obsolete" "replacement"]))})))
 
+(defn parsed-params [uri-param-string]
+  (into {} (map vec (partition 2 1 (map #(java.net.URLDecoder/decode %) (string/split uri-param-string #"[&=]"))))))
+
 (defn get-terms
   [req]
-  (println "GETTING TERMS" req)
-  {:status 200
-   :headers {"Content-Type" "application/json"}
-   :body "{\"ack\": \"well ok then\"}"})
+  (let [labels (string/split (get (parsed-params (:query-string req)) "select") #",")
+        [header & ids] (-> req :body slurp string/split-lines)
+        iris (if (= "CURIE" header)
+               (->> ids
+                    (map (fn [x] {:curie x}))
+                    (map #(try (core/resolve-curie (:env state) %)
+                               (catch Exception e)))
+                    (map :iri))
+               ids)]
+
+    (cond
+      (not (contains? #{"IRI" "CURIE"} header))
+      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
+
+      (empty? ids)
+      (json-error 400 "Some terms must be submitted")
+
+      (empty? labels)
+      (json-error 400 "Some labels must be submitted")
+
+      :else  (let [result (->> iris
+                               (map #(sparql/full-term @state % labels))
+                               (map #(into {} (map (fn [[k v]] [k (string/join " | " v)]) %))))]
+               {:status 200
+                :headers {"Content-Type" "application/json"}
+                :body (seq->tsv-string
+                       (vec (cons header labels))
+                       result)}))))
 
 (defroutes knode-routes
   ; ## Public Pages

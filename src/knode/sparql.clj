@@ -231,20 +231,6 @@ WHERE {
   OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
 }")
 
-(def q "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-PREFIX obo: <http://purl.obolibrary.org/obo/>
-
-SELECT ?subject ?obsolete ?replacement
-WHERE {
-  VALUES ?obsolete { true }
-  ?subject rdfs:label ?label .
-~{  OPTIONAL { ?subject <~a> ?label . }~^
-~}
-  OPTIONAL { ?subject owl:deprecated ?obsolete . }
-  OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
-}")
-
 (defn results->sets [results]
   (when (not (every? empty? results))
     (cons (set (map first results))

@@ -19,6 +19,7 @@
    ["Root IRI" #(str "http://localhost:" (:port %) "/")]
    ["Project IRI" #(str (:root-iri %) "ontology/" (:idspace %))]
    ["Term IRI format" #(str (:project-iri %) "_%07d")]
+   ["Developers" (constantly "")]
    ["Google Client ID" #(:google-client-id %)]])
 
 (defn label->keyword
@@ -50,7 +51,7 @@
         [["Dev key set?" (-> state :dev-key string/blank? not)]
          ["Google secret set?"
           (-> state :google-client-secret string/blank? not)]])
-       (map (fn [[k v]] (format "%-17s %s" k (str v))))
+       (map (fn [[k v]] (format "%-18s %s" k (str v))))
        (string/join "\n")))
 
 (def state (atom (init env)))

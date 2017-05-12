@@ -34,6 +34,14 @@
          (string? google-secret)
          (not (string/blank? google-secret)))))
 
+(defn developer?
+  [req]
+  (and (get-in req [:session :email])
+       (not (string/blank? (:developers @state)))
+       (contains?
+        (set (string/split (:developers @state) #"\s+"))
+        (get-in req [:session :email]))))
+
 (defn stylesheet
   [name]
   [:link {:href (str "/assets/" name) :rel "stylesheet"}])

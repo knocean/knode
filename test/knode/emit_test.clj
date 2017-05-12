@@ -1,5 +1,6 @@
 (ns knode.emit-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.data.json :as json]
             [knode.core :as core]
             [knode.emit :refer :all]))
 
@@ -63,6 +64,23 @@ ex:foo
     ": "
     [:span {:property "ex:obsolete" :datatype "ex:boolean"} "true"]]])
 
+(def example-jsonld
+  {"@context"
+   {"ex" "http://ex.com/"
+    "type" {"@id" "ex:type" "iri" "http://ex.com/type"}
+    "label" {"@id" "ex:label" "iri" "http://ex.com/label"}
+    "obsolete" {"@id" "ex:obsolete" "iri" "http://ex.com/obsolete"}
+    "boolean" {"@id" "ex:boolean" "iri" "http://ex.com/boolean"}
+    "Bar" {"@id" "ex:bar" "iri" "http://ex.com/bar"}
+    "French" {"@id" "ex:french" "iri" "http://ex.com/french"}}
+   "@id" "ex:foo"
+   "iri" "http://ex.com/foo"
+   "curie" "ex:foo"
+   "type" {"@id" "ex:bar" "iri" "http://ex.com/bar" "label" "Bar"}
+   "label" {"@value" "Foo"}
+   "French" {"@value" "Fou" "@language" "fr"}
+   "obsolete" {"@value" "true" "@type" "ex:boolean"}})
+
 (def example-kn "@prefix ex: <http://ex.com/>
 @label type: ex:type > link
 @label label: ex:label
@@ -84,6 +102,9 @@ obsolete: true")
   (testing "Emit HTML+RDFa"
     (is (= (emit-rdfa-term environment context-blocks subject blocks)
            example-rdfa)))
+  (testing "Emit JSON-LD"
+    (is (= (emit-jsonld-term environment context-blocks subject blocks)
+           example-jsonld)))
   (testing "Emit Knotation"
     (is (= (emit-kn-term environment context-blocks subject blocks)
            example-kn))))

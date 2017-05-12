@@ -1,5 +1,6 @@
 (ns knode.emit
   (:require [clojure.string :as string]
+            [clojure.data.json :as json]
             [knode.core :as core]))
 
 (defn emit-ttl-statement
@@ -108,6 +109,50 @@
         (filter :predicate)
         (map (partial emit-rdfa-statement env))
         vec)))
+
+(defn emit-jsonld-object
+  [env {:keys [iri lexical language datatype] :as object}]
+  (cond
+    iri
+    {"@id" (or (core/get-curie env iri) iri)
+     "iri" iri
+     "label" (core/get-name env iri)}
+    (and lexical language)
+    {"@value" lexical "@language" (string/replace language "@" "")}
+    (and lexical datatype)
+    {"@value" lexical "@type" (core/get-curie env (:iri datatype))}
+    lexical
+    {"@value" lexical}))
+
+(defn emit-jsonld-term
+  [env context-blocks subject blocks]
+  (reduce
+   (fn [coll {:keys [predicate object] :as block}]
+     (let [piri (:iri predicate)
+           plabel (core/get-name env piri)]
+       (-> coll
+           (assoc plabel (emit-jsonld-object env object))
+           (assoc-in ["@context" plabel]
+                     {"@id" (or (core/get-curie env piri) piri)
+                      "iri" piri}))))
+   (let [curie (core/get-curie env (:iri subject))]
+     {"@context"
+      (merge
+       (->> context-blocks
+            (filter :prefix)
+            (map (juxt :prefix :iri))
+            (into {}))
+       (->> context-blocks
+            (filter :label)
+            (map (fn [{:keys [label target] :as block}]
+                   (let [iri (:iri target)
+                         curie (or (core/get-curie env iri) iri)]
+                     [label {"@id" curie "iri" iri}])))
+            (into {})))
+      "@id" curie
+      "iri" (:iri subject)
+      "curie" curie})
+   (filter :predicate blocks)))
 
 (defn emit-kn-statement
   "Given a block-map, return a Knotation string."

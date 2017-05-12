@@ -129,6 +129,10 @@
           [:a
            {:href (str (string/replace id #".html^" "") ".ttl")}
            "Turtle (ttl)"]
+          ", "
+          [:a
+           {:href (str (string/replace id #".html^" "") ".json")}
+           "JSON-LD (json)"]
           "."]])})))
 
 (defn render-ttl
@@ -146,6 +150,24 @@
         (:context @state)
         (:subject term)
         (:blocks term))})))
+
+(defn render-jsonld
+  "Given a request, try to find a matching term,
+   and return a response map for JSON-LD."
+  [req]
+  (let [iri (str (:root-iri @state) "ontology/" (get-in req [:route-params :id]))
+        term (get-in @state [:terms iri])]
+    (when term
+      {:status 200
+       :headers {"Content-Type" "application/json"}
+       :body
+       (json/write-str
+        (emit/emit-jsonld-term
+         (:env @state)
+         (:context @state)
+         (:subject term)
+         (:blocks term))
+        :escape-slash false)})))
 
 (defn render-doc
   [req doc]
@@ -244,8 +266,11 @@
            :headers {"Content-Type" "application/json"}
            :body
            (json/write-str
-            {:iri iri
-             :curie (get-in term [:subject :curie])}
+            (emit/emit-jsonld-term
+             (:env @state)
+             (:context @state)
+             (:subject term)
+             (:blocks term))
             :escape-slash false)})))))
 
 (defn add-term!
@@ -420,6 +445,7 @@
   ; ontology terms
   (GET "/ontology/:id.html" [id] render-html)
   (GET "/ontology/:id.ttl" [id] render-ttl)
+  (GET "/ontology/:id.json" [id] render-jsonld)
   (GET "/ontology/:id" [id] render-html)
 
   ; doc directory

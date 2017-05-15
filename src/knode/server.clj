@@ -483,7 +483,7 @@
         iris (if (= "CURIE" header)
                (->> ids
                     (map (fn [x] {:curie x}))
-                    (map #(try (core/resolve-curie (:env state) %)
+                    (map #(try (core/resolve-curie (:env @state) %)
                                (catch Exception e)))
                     (map :iri))
                ids)]

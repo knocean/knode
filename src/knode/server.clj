@@ -511,10 +511,11 @@
                                (map #(sparql/full-term @state % labels))
                                (map #(into {} (map (fn [[k v]] [k (string/join " | " v)]) %))))]
                {:status 200
-                :headers {"Content-Type" "application/json"}
+                :headers {"Content-Type" "text/tab-separated-values"}
                 :body (seq->tsv-string
                        (vec (cons header labels))
-                       result)}))))
+                       (map (fn [a b] (assoc b (keyword (string/lower-case header)) a))
+                            ids result))}))))
 
 (defroutes knode-routes
   ; ## Authentication

@@ -4,7 +4,8 @@
             [clojure.pprint :as pprint]
             [knode.state :refer [state]]
             [knode.core :as core]
-            [knode.emit :as emit])
+            [knode.emit :as emit]
+            [knode.util :as util])
   (:import [org.openrdf.model BNode URI Literal]
            [org.openrdf.query QueryLanguage]
            [org.openrdf.rio RDFFormat]
@@ -230,10 +231,8 @@ SELECT ~{?~a~^ ~}
 WHERE {
   VALUES ?subject { <~a> }
   ?subject rdfs:label ?label .
-~{  OPTIONAL { ?subject <~a> ?label . }~^
+~{  ~a~^
 ~}
-  OPTIONAL { ?subject owl:deprecated ?obsolete . }
-  OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
 }")
 
 (defn results->sets [results]
@@ -241,13 +240,18 @@ WHERE {
     (cons (set (map first results))
           (lazy-seq (results->sets (map rest results))))))
 
+(defn format-full-term-query
+  [state iri predicate-labels]
+  (pprint/cl-format
+   nil full-term-query
+   predicate-labels iri
+   (map #(let [iri (:iri (core/resolve-name (:env state) {:label %}))]
+           (str "OPTIONAL { ?subject <" iri "> ?" % ". }"))
+        predicate-labels)))
+
 (defn full-term
   [state iri predicate-labels]
-  (let [query (pprint/cl-format
-                  nil full-term-query
-                  predicate-labels iri
-                  (map #(:iri (core/resolve-name (:env state) {:label %}))
-                       predicate-labels))
+  (let [query (format-full-term-query state iri predicate-labels) 
         result (when (and iri (not (empty? predicate-labels)))
                  (select state query))]
     (into {} (map #(vec (list (keyword (string/lower-case %1)) %2)) predicate-labels (results->sets (map :values result))))))

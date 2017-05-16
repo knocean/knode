@@ -1,9 +1,11 @@
 (ns knode.sparql
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
+            [clojure.pprint :as pprint]
             [knode.state :refer [state]]
             [knode.core :as core]
-            [knode.emit :as emit])
+            [knode.emit :as emit]
+            [knode.util :as util])
   (:import [org.openrdf.model BNode URI Literal]
            [org.openrdf.query QueryLanguage]
            [org.openrdf.rio RDFFormat]
@@ -220,6 +222,39 @@ WHERE {
        (= "true" (get-in result ["obsolete" :lexical])) true
        :else false)
      :replacement (get-in result ["replacement" :iri])}))
+
+(def full-term-query "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+
+SELECT ~{?~a~^ ~}
+WHERE {
+  VALUES ?subject { <~a> }
+  ?subject rdfs:label ?label .
+~{  ~a~^
+~}
+}")
+
+(defn results->sets [results]
+  (when (not (every? empty? results))
+    (cons (set (map first results))
+          (lazy-seq (results->sets (map rest results))))))
+
+(defn format-full-term-query
+  [state iri predicate-labels]
+  (pprint/cl-format
+   nil full-term-query
+   predicate-labels iri
+   (map #(let [iri (:iri (core/resolve-name (:env state) {:label %}))]
+           (str "OPTIONAL { ?subject <" iri "> ?" % ". }"))
+        predicate-labels)))
+
+(defn full-term
+  [state iri predicate-labels]
+  (let [query (format-full-term-query state iri predicate-labels) 
+        result (when (and iri (not (empty? predicate-labels)))
+                 (select state query))]
+    (into {} (map #(vec (list (keyword (string/lower-case %1)) %2)) predicate-labels (results->sets (map :values result))))))
 
 (defn validate-rule
   [state rule limit]

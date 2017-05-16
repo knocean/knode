@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.data.json :as json]
+   [clojure.data.csv :as csv]
 
    [org.httpkit.server :as httpkit]
    [compojure.route :as route]
@@ -18,7 +19,8 @@
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
-   [knode.sparql :as sparql])
+   [knode.sparql :as sparql]
+   [knode.util :as util])
   (:use [compojure.core :only [defroutes GET POST]]))
 
 (defn login?
@@ -352,11 +354,13 @@
 
 (defn seq->tsv-string
   [headers maps]
-  (->> maps
-       (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
-       (concat [headers])
-       (map #(string/join \tab %))
-       (clojure.string/join \newline)))
+  (with-out-str
+    (csv/write-csv
+     *out*
+     (->> maps
+          (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
+          (concat [headers]))
+     :separator \tab)))
 
 (defn get-term-status
   [req]
@@ -469,6 +473,50 @@
     "Log Out"
     [:p "You have logged out."])})
 
+(defn parsed-params [uri-param-string]
+  (into {} (map vec (partition 2 1 (map #(java.net.URLDecoder/decode %) (string/split uri-param-string #"[&=]"))))))
+
+(defn get-terms
+  [req]
+  (let [labels (string/split (get (parsed-params (:query-string req)) "select") #",")
+        [header & ids] (-> req :body slurp string/split-lines)
+        iris (if (= "CURIE" header)
+               (->> ids
+                    (map (fn [x] {:curie x}))
+                    (map #(try (core/resolve-curie (:env @state) %)
+                               (catch Exception e)))
+                    (map :iri))
+               ids)]
+
+    (cond
+      (not (contains? #{"IRI" "CURIE"} header))
+      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
+
+      (empty? ids)
+      (json-error 400 "Some terms must be submitted")
+
+      (empty? labels)
+      (json-error 400 "Some labels must be submitted")
+
+      (not
+       (util/all?
+        (map #(:iri
+               (try
+                 (core/resolve-name (:env @state) {:label %})
+                 (catch Exception e nil)))
+             labels)))
+      (json-error 400 "Some given labels are not resolvable")
+
+      :else  (let [result (->> iris
+                               (map #(sparql/full-term @state % labels))
+                               (map #(into {} (map (fn [[k v]] [k (string/join " | " v)]) %))))]
+               {:status 200
+                :headers {"Content-Type" "text/tab-separated-values"}
+                :body (seq->tsv-string
+                       (vec (cons header labels))
+                       (map (fn [a b] (assoc b (keyword (string/lower-case header)) a))
+                            ids result))}))))
+
 (defroutes knode-routes
   ; ## Authentication
   (GET "/login" [] login)
@@ -490,6 +538,7 @@
 
   ; ## Public API
   (POST "/api/get-term-status" [] get-term-status)
+  (POST "/api/get-terms" [] get-terms)
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)

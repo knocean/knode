@@ -91,6 +91,8 @@
   (println "Loading from" (:ontology-dir @state) "...")
   (load-state! (:ontology-dir @state) (:project-name @state)))
 
+;; (swap! state #(assoc % :root-dir "/home/inaimathi/projects/ONTIE/" :ontology-dir "/home/inaimathi/projects/ONTIE/ontology/" :project-name "ontie"))
+
 ;; TODO: test command
 (defn -main [task & args]
   (case task

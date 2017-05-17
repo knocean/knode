@@ -222,35 +222,51 @@ WHERE {
        :else false)
      :replacement (get-in result ["replacement" :iri])}))
 
-(def full-term-query "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-PREFIX obo: <http://purl.obolibrary.org/obo/>
-
-SELECT ~{?~a~^ ~}
+(def predicate-query "SELECT ?subject ?value
 WHERE {
-  VALUES ?subject { <~a> }
-  ?subject rdfs:label ?label .
-~{  OPTIONAL { ?subject <~a> ?label . }~^
-~}
-  OPTIONAL { ?subject owl:deprecated ?obsolete . }
-  OPTIONAL { ?subject obo:IAO_0100001 ?replacement . }
+  VALUES ?subject { %s }
+  ?subject <%s> ?value .
 }")
 
-(defn results->sets [results]
-  (when (not (every? empty? results))
-    (cons (set (map first results))
-          (lazy-seq (results->sets (map rest results))))))
+(defn query-predicate
+  [state compact subject-iris predicate-iri]
+  (case predicate-iri
+    "IRI" (map (fn [x] [{:iri x} {:iri x}]) subject-iris)
+    "CURIE" (map (fn [x]
+                   [{:iri x}
+                    {:curie (or (core/get-curie (:env state) x) x)}])
+                 subject-iris)
+    (->> (format
+          predicate-query
+          (->> subject-iris
+               (filter string?)
+               (map #(str "<" % ">"))
+               (string/join " "))
+          predicate-iri)
+         (select state)
+         (map (juxt #(get % "subject")
+                    #(if (and compact (get-in % ["value" :iri]))
+                       {:curie (core/get-curie (:env state)
+                                               (get-in % ["value" :iri]))}
+                       (get % "value")))))))
 
-(defn full-term
-  [state iri predicate-labels]
-  (let [query (pprint/cl-format
-                  nil full-term-query
-                  predicate-labels iri
-                  (map #(:iri (core/resolve-name (:env state) {:label %}))
-                       predicate-labels))
-        result (when (and iri (not (empty? predicate-labels)))
-                 (select state query))]
-    (into {} (map #(vec (list (keyword (string/lower-case %1)) %2)) predicate-labels (results->sets (map :values result))))))
+(defn query-predicates
+  [state compact subject-iris predicate-iris]
+  (let [predicate-values
+        (map #(query-predicate state compact subject-iris %) predicate-iris)]
+    (for [subject-iri subject-iris]
+      (for [values predicate-values]
+        (->> values
+             (filter #(= subject-iri (:iri (first %))))
+             (map second))))))
+
+(defn query-predicates-tabular
+  [state compact subject-iris predicate-iris]
+  (for [row (query-predicates state compact subject-iris predicate-iris)]
+    (for [values row]
+      (->> values
+           (map #(or (:curie %) (:iri %) (:lexical %)))
+           (string/join "|")))))
 
 (defn validate-rule
   [state rule limit]

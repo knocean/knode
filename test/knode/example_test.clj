@@ -120,7 +120,7 @@ label: Example Foo")
         (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000005"))
         (is (= (get body "curie") "EXAMPLE:0000005"))))))
 
-(deftest test-term-status
+(deftest test-term-query
   (reset! state (knode.state/init test-state))
   (cli/load-state! (:ontology-dir @state) (:project-name @state))
   (clojure.java.io/delete-file "tmp/blazegraph.jnl" true)
@@ -151,5 +151,32 @@ label: Example Foo")
             :recognized true
             :obsolete true
             :replacement (ex "0000002")})))
-  (testing "Checks blazegraph for IRIs not found in (:terms @state)"
-    :TODO))
+
+  (testing "More general queries"
+    (is (= (sparql/query-predicates
+            @state
+            true
+            [(ex "0000001")
+             "FOO:BAR"]
+            ["CURIE"
+             "IRI"
+             emit/rdfs:label
+             "http://purl.obolibrary.org/obo/IAO_0000118"])
+           [[[{:curie "EXAMPLE:0000001"}]
+             [{:iri (ex "0000001")}]
+             [{:lexical "Example One"}]
+             [{:lexical "ex 1"} {:lexical "ex one"}]]
+            [[{:curie "FOO:BAR"}] [{:iri "FOO:BAR"}] [] []]])))
+
+  (testing "More general queries as table"
+    (is (= (sparql/query-predicates-tabular
+            @state
+            true
+            [(ex "0000001")
+             "FOO:BAR"]
+            ["CURIE"
+             "IRI"
+             emit/rdfs:label
+             "http://purl.obolibrary.org/obo/IAO_0000118"])
+           [["EXAMPLE:0000001" (ex "0000001") "Example One" "ex 1|ex one"]
+            ["FOO:BAR" "FOO:BAR" "" ""]]))))

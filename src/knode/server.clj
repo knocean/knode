@@ -23,6 +23,23 @@
    [knode.util :as util])
   (:use [compojure.core :only [defroutes GET POST]]))
 
+(defn json-error
+  [status & messages]
+  {:status status
+   :headers {"Content-Type" "application/json"}
+   :body
+   (json/write-str
+    {:error (string/join " " messages)}
+    :escape-slash false)})
+
+(defn parsed-params
+  [uri-param-string]
+  (->> (string/split (str uri-param-string) #"[&=]")
+       (map #(java.net.URLDecoder/decode %))
+       (partition 2)
+       (map vec)
+       (into {})))
+
 (defn login?
   [req]
   (let [host (get-in req [:headers "host"])
@@ -114,34 +131,15 @@
 (defn render-html
   "Given a request, try to find a matching term,
    and return a response map for HTML."
-  [req]
+  [req iris]
   (let [host (str "https://" (get-in req [:headers "host"]) "/")
         root (:root-iri @state)
-        id (get-in req [:route-params :id])
-        iri (str (:root-iri @state) "ontology/" id)
-        term (get-in @state [:terms iri])
+        path (get-in req [:route-params :*])
+        iri (when (= 1 (count iris)) (first iris))
+        term (when iri (get-in @state [:terms iri]))
         subject (:subject term)
         label (get-in @state [:env :iri-labels (:iri subject)])]
     (cond
-      (= id (:idspace @state))
-      {:status 200
-       :headers {"Content-Type" "text/html"}
-       :body
-       (base-template
-        req
-        (:idspace @state)
-        [:ul
-         (for [term (->> @state :terms (sort-by first) vals)]
-           (let [subject (:subject term)
-                 iri (:iri subject)
-                 values (core/collect-values (:blocks term))]
-             [:li
-              [:a
-               {:href (string/replace iri root host)}
-               (core/get-curie (:env @state) iri)
-               " "
-               (get-in values [emit/rdfs:label 0 :lexical])]]))])}
-
       term
       {:status 200
        :headers {"Content-Type" "text/html"}
@@ -161,13 +159,33 @@
          [:p
           "Other formats: "
           [:a
-           {:href (str (string/replace id #".html^" "") ".ttl")}
+           {:href (str (string/replace path #".html^" "") ".ttl")}
            "Turtle (ttl)"]
           ", "
           [:a
-           {:href (str (string/replace id #".html^" "") ".json")}
+           {:href (str (string/replace path #".html^" "") ".json")}
            "JSON-LD (json)"]
           "."]])}
+
+      iris
+      {:status 200
+       :headers {"Content-Type" "text/html"}
+       :body
+       (base-template
+        req
+        (:idspace @state)
+        [:ul
+         (for [iri iris]
+           (let [term (get-in @state [:terms iri])
+                 subject (:subject term)
+                 iri (:iri subject)
+                 values (core/collect-values (:blocks term))]
+             [:li
+              [:a
+               {:href (string/replace iri root host)}
+               (core/get-curie (:env @state) iri)
+               " "
+               (get-in values [emit/rdfs:label 0 :lexical])]]))])}
 
       :else
       nil)))
@@ -175,10 +193,10 @@
 (defn render-ttl
   "Given a request, try to find a matching term,
    and return a response map for Turtle."
-  [req]
-  (let [iri (str (:root-iri @state) "ontology/" (get-in req [:route-params :id]))
-        term (get-in @state [:terms iri])]
-    (when term
+  [req iris]
+  (cond
+    (= 1 (count iris))
+    (let [term (get-in @state [:terms (first iris)])]
       {:status 200
        :headers {"Content-Type" "text/turtle"}
        :body
@@ -186,15 +204,28 @@
         (:env @state)
         (:context @state)
         (:subject term)
-        (:blocks term))})))
+        (:blocks term))})
+
+    iris
+    {:status 200
+     :headers {"Content-Type" "text/turtle"}
+     :body
+     (emit/emit-ttl-terms
+      (:env @state)
+      (:context @state)
+      (for [iri iris]
+        (get-in @state [:terms iri])))}
+
+    :else
+    nil))
 
 (defn render-jsonld
   "Given a request, try to find a matching term,
    and return a response map for JSON-LD."
-  [req]
-  (let [iri (str (:root-iri @state) "ontology/" (get-in req [:route-params :id]))
-        term (get-in @state [:terms iri])]
-    (when term
+  [req iris]
+  (cond
+    (= 1 (count iris))
+    (let [term (get-in @state [:terms (first iris)])]
       {:status 200
        :headers {"Content-Type" "application/json"}
        :body
@@ -204,7 +235,52 @@
          (:context @state)
          (:subject term)
          (:blocks term))
-        :escape-slash false)})))
+        :escape-slash false)})
+
+    ; TODO: multiple terms
+
+    :else
+    nil))
+
+(defn seq->tsv-string
+  [headers rows]
+  (with-out-str
+    (csv/write-csv
+     *out*
+     (concat [headers] rows)
+     :separator \tab)))
+
+(defn render-tsv
+  [req iris]
+  (let [params (parsed-params (:query-string req))
+        compact (= "true" (get params "compact"))
+        select (get params "select" "CURIE,label,obsolete,replacement")
+        predicate-labels (string/split select  #",")
+        predicate-iris
+        (map #(if (contains? #{"IRI" "CURIE"} %)
+                %
+                (try
+                  (:iri (core/resolve-name (:env @state) {:label %}))
+                  (catch Exception e nil)))
+             predicate-labels)]
+    (cond
+      (empty? predicate-labels)
+      (json-error 400 "Some predicates must be selected")
+
+      (empty? iris)
+      (json-error 400 "Some terms must be submitted")
+
+      (not (util/all? predicate-iris))
+      (json-error 400 "Some predicate labels cannot be resolved")
+
+      :else
+      {:status 200
+       :headers {"Content-Type" "text/tab-separated-values"}
+       :body
+       (seq->tsv-string
+        predicate-labels
+        (sparql/query-predicates-tabular
+         @state compact iris predicate-iris))})))
 
 (defn render-doc
   [req doc]
@@ -220,15 +296,6 @@
           req
           (:title metadata)
           (md/md-to-html-string content)))))})
-
-(defn json-error
-  [status & messages]
-  {:status status
-   :headers {"Content-Type" "application/json"}
-   :body
-   (json/write-str
-    {:error (string/join " " messages)}
-    :escape-slash false)})
 
 (defn get-next-iri
   [iri-format iris]
@@ -352,54 +419,6 @@
   [req]
   (add-term! (->> req :body slurp json/read-str)))
 
-(defn seq->tsv-string
-  [headers maps]
-  (with-out-str
-    (csv/write-csv
-     *out*
-     (->> maps
-          (map (fn [row] (map #(get row (keyword (string/lower-case %))) headers)))
-          (concat [headers]))
-     :separator \tab)))
-
-(defn get-term-status
-  [req]
-  (let [[header & ids] (-> req :body slurp string/split-lines)
-        label (keyword (string/lower-case header))
-        iris (if (= "CURIE" header)
-               (->> ids
-                    (map (fn [x] {:curie x}))
-                    (map #(try (core/resolve-curie (:env @state) %)
-                               (catch Exception e)))
-                    (map :iri))
-               ids)]
-    (cond
-      (not (contains? #{"IRI" "CURIE"} header))
-      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
-
-      (empty? ids)
-      (json-error 400 "Some terms must be submitted")
-
-      :else
-      {:status 200
-       :headers {"Content-Type" "text/tab-separated-values"}
-       :body
-       (->> iris
-            (map (partial sparql/term-status @state))
-            (map vector ids)
-            (map #(let [id (first %)
-                        coll (second %)
-                        rep (:replacement coll)]
-                    (if (= "CURIE" header)
-                      (assoc
-                       coll
-                       :curie id
-                       :replacement
-                       (or (core/get-curie (:env @state) rep) rep))
-                      coll)))
-            (seq->tsv-string
-             [header "recognized" "obsolete" "replacement"]))})))
-
 (defn login
   [req]
   (let [host (get-in req [:headers "host"])
@@ -473,78 +492,132 @@
     "Log Out"
     [:p "You have logged out."])})
 
-(defn parsed-params [uri-param-string]
-  (into {} (map vec (partition 2 1 (map #(java.net.URLDecoder/decode %) (string/split uri-param-string #"[&=]"))))))
+(defn parse-ontology-request
+  "Given a state and a request map,
+   return a map with :format and :iris keys."
+  [state req]
+  (let [params (parsed-params (:query-string req))
+        body (cond
+               (nil? (:body req)) nil
+               (string? (:body req)) (:body req)
+               :else (-> req :body slurp))]
+    {:format
+     (or
+      (when (find params "format")
+        (string/lower-case (get params "format")))
+      (when-let [[_ extension]
+                 (re-matches
+                  #"^.*\.(html|ttl|json|tsv)$"
+                  (string/lower-case
+                   (get-in req [:route-params :*] "")))]
+        extension))
 
-(defn get-terms
+     ; TODO: limit, offset
+     :iris
+     (or
+      (when-let [[_ id] (re-matches
+                         #"(\w+_\d+).*$"
+                         (get-in req [:route-params :*] ""))]
+        [(str (:root-iri state) "ontology/" id)])
+      (when (find params "iris")
+        (string/split (get params "iris") #"\s+"))
+      (when (find params "curies")
+        (->> (string/split (get params "curies") #"\s+")
+             (map #(try (core/resolve-curie (:env state) {:curie %})
+                        (catch Exception e {:iri %})))
+             (map :iri)))
+      (when body
+        (let [[header & rows] (string/split-lines body)]
+          (cond
+            (= header "CURIE")
+            (->> rows
+                 (map #(try (core/resolve-curie (:env state) {:curie %})
+                            (catch Exception e {:iri %})))
+                 (map :iri))
+            (= header "IRI")
+            rows
+            :else
+            nil)))
+      (when (= (:idspace state) (get-in req [:route-params :*]))
+        (->> state :terms keys sort)))}))
+
+(defn ontology-get
   [req]
-  (let [labels (string/split (get (parsed-params (:query-string req)) "select") #",")
-        [header & ids] (-> req :body slurp string/split-lines)
-        iris (if (= "CURIE" header)
-               (->> ids
-                    (map (fn [x] {:curie x}))
-                    (map #(try (core/resolve-curie (:env @state) %)
-                               (catch Exception e)))
-                    (map :iri))
-               ids)]
-
+  (let [{:keys [format iris]} (parse-ontology-request @state req)]
     (cond
-      (not (contains? #{"IRI" "CURIE"} header))
-      (json-error 400 "The header row must be either 'IRI' or 'CURIE'")
+      (nil? iris)
+      nil
 
-      (empty? ids)
-      (json-error 400 "Some terms must be submitted")
+      (nil? format)
+      (render-html req iris)
 
-      (empty? labels)
-      (json-error 400 "Some labels must be submitted")
+      (not (contains? #{"html" "ttl" "json" "tsv"} format))
+      nil
 
-      (not
-       (util/all?
-        (map #(:iri
-               (try
-                 (core/resolve-name (:env @state) {:label %})
-                 (catch Exception e nil)))
-             labels)))
-      (json-error 400 "Some given labels are not resolvable")
+      (= format "html")
+      (render-html req iris)
 
-      :else  (let [result (->> iris
-                               (map #(sparql/full-term @state % labels))
-                               (map #(into {} (map (fn [[k v]] [k (string/join " | " v)]) %))))]
-               {:status 200
-                :headers {"Content-Type" "text/tab-separated-values"}
-                :body (seq->tsv-string
-                       (vec (cons header labels))
-                       (map (fn [a b] (assoc b (keyword (string/lower-case header)) a))
-                            ids result))}))))
+      (= format "ttl")
+      (render-ttl req iris)
+
+      (= format "json")
+      (render-jsonld req iris)
+
+      (= format "tsv")
+      (render-tsv req iris)
+
+      :else
+      nil)))
+
+(defn ontology-post
+  [req]
+  (let [{:keys [format iris]} (parse-ontology-request @state req)]
+    (cond
+      ; default operation is to add a term
+      (not= "get" (get (parsed-params (:query-string req)) "method"))
+      (add-term-json! req)
+
+      (nil? format)
+      (render-html req iris)
+
+      (not (contains? #{"html" "ttl" "json" "tsv"} format))
+      (str "Unrecognized format: " format)
+
+      (= format "html")
+      (render-html req iris)
+
+      (= format "ttl")
+      (render-ttl req iris)
+
+      (= format "json")
+      (render-jsonld req iris)
+
+      (= format "tsv")
+      (render-tsv req iris)
+
+      :else
+      nil)))
 
 (defroutes knode-routes
   ; ## Authentication
   (GET "/login" [] login)
   (GET "/login-google" [] login-google)
-  (GET "/logout" [] logout)
   (GET "/oauth2-callback-google" [] oauth2-callback-google)
+  (GET "/logout" [] logout)
 
   ; ## Public Pages
   ; ontology terms
-  (GET "/ontology/:id.html" [id] render-html)
-  (GET "/ontology/:id.ttl" [id] render-ttl)
-  (GET "/ontology/:id.json" [id] render-jsonld)
-  (GET "/ontology/:id" [id] render-html)
+  (GET "/ontology/*" [:as request] (ontology-get request))
+  (POST "/ontology/*" [:as request] (ontology-post request))
+  ; TODO: PUT terms
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))
   (GET "/index.html" req (render-doc req "index"))
   (GET "/" req (render-doc req "index"))
 
-  ; ## Public API
-  (POST "/api/get-term-status" [] get-term-status)
-  (POST "/api/get-terms" [] get-terms)
-
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)
-
-  ; ## Dev API
-  (POST "/dev/api/add-term" [] add-term-json!)
 
   ; static resources
   (route/resources "")

@@ -4,6 +4,9 @@
   (println label " - " value)
   value)
 
+(defn all? [seq]
+  (every? identity seq))
+
 (defn starts-with? [target prefix]
   (and (>= (count target) (count prefix))
        (every? identity (map = target prefix))))

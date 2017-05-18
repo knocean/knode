@@ -2,6 +2,7 @@
 type: owl:Class
 label: Example One
 alternative term: ex 1
+alternative term: ex one
 subclass of: owl:Thing
 
 : EXAMPLE:0000002

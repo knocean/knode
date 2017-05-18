@@ -138,17 +138,22 @@
     (when (and prefix suffix)
       {:curie string})))
 
+(defn resolve-curie-string
+  [{:keys [prefixes] :as env} curie]
+  (let [[_ prefix suffix] (re-find match-curie curie)
+        iri (get prefixes prefix)]
+    (when iri (str iri suffix))))
+
 (defn resolve-curie
   "Given an environment with :prefixes and a name-map with a :curie,
    return a name-map with an :iri."
   [{:keys [prefixes] :as env} {:keys [curie] :as name-map}]
-  (let [[_ prefix suffix] (re-find match-curie curie)
-        iri (get prefixes prefix)]
+  (let [iri (resolve-curie-string env curie)]
     (if iri
-      (assoc name-map :iri (str iri suffix))
+      (assoc name-map :iri iri)
       (util/throw-exception
-       "Could not find prefix:"
-       prefix))))
+       "Could not find prefix for "
+       curie))))
 
 (defn find-prefix
   [env iri]

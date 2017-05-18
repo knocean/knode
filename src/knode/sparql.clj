@@ -1,6 +1,7 @@
 (ns knode.sparql
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
+            [clojure.pprint :as pprint]
             [knode.state :refer [state]]
             [knode.core :as core]
             [knode.emit :as emit])
@@ -220,6 +221,64 @@ WHERE {
        (= "true" (get-in result ["obsolete" :lexical])) true
        :else false)
      :replacement (get-in result ["replacement" :iri])}))
+
+(def predicate-query "SELECT DISTINCT ?subject ?value
+WHERE {
+  VALUES ?subject { %s }
+  ?subject %s ?value .
+}")
+
+(defn query-predicate
+  [state compact subject-iris predicate-iri]
+  (case predicate-iri
+    "IRI" (map (fn [x] [{:iri x} {:iri x}]) subject-iris)
+    "CURIE" (map (fn [x]
+                   [{:iri x}
+                    {:curie (or (core/get-curie (:env state) x) x)}])
+                 subject-iris)
+    "recognized"
+    (let [results
+          (->> "?predicate"
+               (query-predicate state compact subject-iris)
+               (into {}))]
+      (for [subject-iri subject-iris]
+        [{:iri subject-iri}
+         {:lexical (str (not (nil? (find results {:iri subject-iri}))))
+          :datatype {:iri "http://www.w3.org/2001/XMLSchema#boolean"}}]))
+    ; else
+    (->> (format
+          predicate-query
+          (->> subject-iris
+               (filter string?)
+               (map #(str "<" % ">"))
+               (string/join " "))
+          (if (re-find #"^\?" predicate-iri)
+            predicate-iri
+            (str "<" predicate-iri ">")))
+         (select state)
+         (map (juxt #(get % "subject")
+                    #(if (and compact (get-in % ["value" :iri]))
+                       {:curie (core/get-curie (:env state)
+                                               (get-in % ["value" :iri]))}
+                       (get % "value")))))))
+
+(defn query-predicates
+  [state compact subject-iris predicate-iris]
+  (let [predicate-values
+        (map #(query-predicate state compact subject-iris %) predicate-iris)]
+    (for [subject-iri subject-iris]
+      (for [values predicate-values]
+        (->> values
+             (filter #(= subject-iri (:iri (first %))))
+             (map second))))))
+
+(defn query-predicates-tabular
+  [state compact subject-iris predicate-iris]
+  (for [row (query-predicates state compact subject-iris predicate-iris)]
+    (for [values row]
+      (->> values
+           (map #(or (:curie %) (:iri %) (:lexical %)))
+           (string/join "|")))))
 
 (defn validate-rule
   [state rule limit]

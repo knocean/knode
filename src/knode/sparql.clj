@@ -222,10 +222,10 @@ WHERE {
        :else false)
      :replacement (get-in result ["replacement" :iri])}))
 
-(def predicate-query "SELECT ?subject ?value
+(def predicate-query "SELECT DISTINCT ?subject ?value
 WHERE {
   VALUES ?subject { %s }
-  ?subject <%s> ?value .
+  ?subject %s ?value .
 }")
 
 (defn query-predicate
@@ -236,13 +236,25 @@ WHERE {
                    [{:iri x}
                     {:curie (or (core/get-curie (:env state) x) x)}])
                  subject-iris)
+    "recognized"
+    (let [results
+          (->> "?predicate"
+               (query-predicate state compact subject-iris)
+               (into {}))]
+      (for [subject-iri subject-iris]
+        [{:iri subject-iri}
+         {:lexical (str (not (nil? (find results {:iri subject-iri}))))
+          :datatype {:iri "http://www.w3.org/2001/XMLSchema#boolean"}}]))
+    ; else
     (->> (format
           predicate-query
           (->> subject-iris
                (filter string?)
                (map #(str "<" % ">"))
                (string/join " "))
-          predicate-iri)
+          (if (re-find #"^\?" predicate-iri)
+            predicate-iri
+            (str "<" predicate-iri ">")))
          (select state)
          (map (juxt #(get % "subject")
                     #(if (and compact (get-in % ["value" :iri]))

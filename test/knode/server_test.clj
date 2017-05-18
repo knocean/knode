@@ -15,40 +15,68 @@
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* "EXAMPLE_0000001"}})
-         {:iris [(ex "0000001")]
-          :format nil}))
+         {:style "IRI"
+          :iri (ex "0000001")}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* "EXAMPLE_0000001.tsv"}})
-         {:iris [(ex "0000001")]
-          :format "tsv"}))
+         {:format "tsv"
+          :style "IRI"
+          :iri (ex "0000001")}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* "EXAMPLE_0000001"}
            :query-string "format=tsv"})
-         {:iris [(ex "0000001")]
-          :format "tsv"}))
+         {:format "tsv"
+          :style "IRI"
+          :iri (ex "0000001")}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* ""}
-           :query-string (str "iris=" (ex "0000001") "&format=tsv")})
-         {:iris [(ex "0000001")]
-          :format "tsv"}))
+           :query-string (str "IRI=eq." (ex "0000001") "&format=tsv")})
+         {:format "tsv"
+          :style "IRI"
+          :iri (ex "0000001")}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* ""}
-           :query-string "curies=EXAMPLE:0000001&format=tsv"})
-         {:iris [(ex "0000001")]
-          :format "tsv"}))
+           :query-string (str "IRI=in." (ex "0000001") "&format=tsv")})
+         {:format "tsv"
+          :style "IRI"
+          :iris [(ex "0000001")]}))
+  (is (= (parse-ontology-request
+          test-state
+          {:route-params {:* ""}
+           :query-string "CURIE=EXAMPLE:0000001"})
+         {:error "CURIE query should start with 'eq.' or 'in.', not: CURIE=EXAMPLE:0000001"}))
+  (is (= (parse-ontology-request
+          test-state
+          {:route-params {:* ""}
+           :query-string "CURIE=eq.FOO:BAR"})
+         {:style "CURIE"
+          :iri "FOO:BAR"}))
+  (is (= (parse-ontology-request
+          test-state
+          {:route-params {:* ""}
+           :query-string "CURIE=in.EXAMPLE:0000001&format=tsv"})
+         {:format "tsv"
+          :style "CURIE"
+          :iris [(ex "0000001")]}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* ""}
            :query-string "format=tsv"
            :body "CURIE\nEXAMPLE:0000001"})
-         {:iris [(ex "0000001")]
-          :format "tsv"}))
+         {:format "tsv"
+          :style "CURIE"
+          :iris [(ex "0000001")]}))
   (is (= (parse-ontology-request
           test-state
           {:route-params {:* "EXAMPLE"}})
-         {:iris [(ex "0000001")]
-          :format nil})))
+         {:style "IRI"
+          :iris [(ex "0000001")]}))
+  (is (= (parse-ontology-request
+          test-state
+          {:route-params {:* ""}})
+         {:style "IRI"
+          :iris [(ex "0000001")]})))

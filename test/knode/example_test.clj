@@ -177,6 +177,7 @@ label: Example Foo")
             ["CURIE"
              "IRI"
              emit/rdfs:label
+             "recognized"
              "http://purl.obolibrary.org/obo/IAO_0000118"])
-           [["EXAMPLE:0000001" (ex "0000001") "Example One" "ex 1|ex one"]
-            ["FOO:BAR" "FOO:BAR" "" ""]]))))
+           [["EXAMPLE:0000001" (ex "0000001") "Example One" "true" "ex 1|ex one"]
+            ["FOO:BAR" "FOO:BAR" "" "false" ""]]))))

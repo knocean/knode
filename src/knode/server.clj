@@ -172,25 +172,70 @@
    and return a response map for HTML."
   [req iris]
   (let [host (str "https://" (get-in req [:headers "host"]) "/")
-        root (:root-iri @state)]
+        root (:root-iri @state)
+        term (:term req)]
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body
      (base-template
       req
       (:idspace @state)
-      [:ul
-       (for [iri iris]
-         (let [term (get-in @state [:terms iri])
-               subject (:subject term)
-               iri (:iri subject)
-               values (core/collect-values (:blocks term))]
-           [:li
-            [:a
-             {:href (string/replace iri root host)}
-             (core/get-curie (:env @state) iri)
-             " "
-             (get-in values [emit/rdfs:label 0 :lexical])]]))])}))
+      [:div
+       (when (developer? req)
+         [:div
+          (when (:message req)
+            [:p (:message req)])
+          (when term
+            [:form
+             {:method "POST"}
+             [:input {:type "hidden" :name "format" :value "kn"}]
+             [:input {:type "hidden" :name "term" :value (:term-string req)}]
+             (doall
+              (emit/emit-rdfa-term
+               (:env @state)
+               (:context @state)
+               nil
+               (:blocks term)))
+             [:p
+              [:input
+               {:class "btn btn-primary"
+                :type "submit"
+                :name "add"
+                :value "Add Term"}]]])
+          [:form
+           {:method "POST"}
+           [:input {:type "hidden" :name "format" :value "kn"}]
+           [:p
+            [:textarea
+             {:name "term" :cols 80 :rows 6}
+             (or
+              (:term-string req)
+              (let [template (-> @state :templates vals first)]
+                (->> template
+                     :required-predicates
+                     (map #(str % ": REQUIRED"))
+                     (concat
+                      [(str "template: " (:label template))])
+                     (string/join "\n"))))]]
+           [:p
+            [:input
+             {:class "btn btn-primary"
+              :type "submit"
+              :name "validate"
+              :value "Validate Term"}]]]])
+       [:p (:idspace @state) " terms: " (count (:terms @state))]
+       [:ul
+        (for [iri iris]
+          (let [term (get-in @state [:terms iri])
+                subject (:subject term)
+                iri (:iri subject)
+                values (core/collect-values (:blocks term))]
+            [:li
+             [:a
+              {:href (string/replace iri root host)}
+              (core/get-curie (:env @state) iri)
+              " "
+              (get-in values [emit/rdfs:label 0 :lexical])]]))]])}))
 
 (defn render-ttl-term
   [req iri]
@@ -305,13 +350,9 @@
        (remove (set iris))
        first))
 
-(defn make-term
+(defn json->blocks
   [template data]
-  (let [iri (get-next-iri
-             (:term-iri-format @state)
-             (keys (:terms @state)))
-        curie (core/get-curie (:env @state) iri)
-        optional-predicates
+  (let [optional-predicates
         (->> data
              keys
              (remove #{"api-key" "template"})
@@ -324,19 +365,27 @@
              (concat pairs (map (fn [v] [pred v]) values))))
          []
          optional-predicates)]
+    (->> (concat
+          [{:predicate {:label "template"}
+            :object {:iri (:iri template)}}]
+          (for [required (:required-predicates template)]
+            {:predicate {:label required}
+             :content (get data required)})
+          (for [[predicate content] optional-pairs]
+            {:predicate {:label predicate}
+             :content content}))
+         (map (partial core/resolve-block (:env @state)))
+         (map (partial core/resolve-content (:env @state))))))
+
+(defn make-term
+  [template data]
+  (let [iri (get-next-iri
+             (:term-iri-format @state)
+             (keys (:terms @state)))
+        curie (core/get-curie (:env @state) iri)]
     {:subject {:iri iri :curie curie}
      :blocks
-     (->> (concat
-           [{:predicate {:label "template"}
-             :object {:iri (:iri template)}}]
-           (for [required (:required-predicates template)]
-             {:predicate {:label required}
-              :content (get data required)})
-           (for [[predicate content] optional-pairs]
-             {:predicate {:label predicate}
-              :content content}))
-          (map (partial core/resolve-block (:env @state)))
-          (map (partial core/resolve-content (:env @state)))
+     (->> (json->blocks template data)
           (core/expand-templates (:env @state) (:templates @state)))}))
 
 (defn add-term-to-state!
@@ -348,7 +397,8 @@
      (emit/emit-index (:env @state) (:terms @state)))
     (spit
      (str (:root-dir @state) "ontology/" (:project-name @state) ".kn")
-     (emit/emit-kn-terms (:env @state) nil (:terms @state)))))
+     (emit/emit-kn-terms (:env @state) nil (:terms @state))))
+  term)
 
 (defn add-valid-term!
   [template data]
@@ -364,7 +414,9 @@
           _ (sparql/load-terms! test-state)
           failure (sparql/validation-failure test-state)]
       (if failure
-        (json-error 400 "Validation failed:" (:label failure))
+        (do
+          (sparql/load-terms! @state)
+          (json-error 400 "Validation failed:" (:label failure)))
         (do
           (add-term-to-state! term)
           {:status 201
@@ -378,7 +430,7 @@
              (:blocks term))
             :escape-slash false)})))))
 
-(defn add-term!
+(defn add-json-term!
   [data]
   (let [dev-key (:dev-key @state)
         api-key (get data "api-key")
@@ -401,9 +453,6 @@
       (nil? template-label)
       (json-error 400 "The 'template' key must be provided.")
 
-      (nil? template-label)
-      (json-error 400 "The 'template' key must be provided.")
-
       (nil? template)
       (json-error 400 (format "Unknown template '%s'" template-label))
 
@@ -416,9 +465,64 @@
         (catch Exception e
           (json-error 400 (.getMessage e)))))))
 
-(defn add-term-json!
-  [req]
-  (add-term! (->> req :body slurp json/read-str)))
+(defn validate-term-3
+  [term]
+  (let [iri (get-in term [:subject :iri])
+        test-state (assoc-in @state [:terms iri] term)
+        _ (sparql/load-terms! test-state)
+        failure (sparql/validation-failure test-state)]
+    (sparql/load-terms! @state)
+    (if failure
+      (str "Validation failed:" (:label failure))
+      term)))
+
+(defn validate-term-2
+  [blocks]
+  (let [values (core/collect-values blocks)
+        iri (get-next-iri
+             (:term-iri-format @state)
+             (keys (:terms @state)))
+        curie (core/get-curie (:env @state) iri)]
+    (or
+     (when-not (find values "https://knotation.org/apply-template")
+       (str
+        "Error: Term must use a template. Valid templates: "
+        (->> @state :templates vals (map :label) (string/join ", "))))
+
+     (validate-term-3
+      {:subject {:iri iri :curie curie}
+       :blocks
+       (->> blocks
+            (core/expand-templates (:env @state) (:templates @state)))}))))
+
+(defn validate-term
+  [format data]
+  (case format
+    "kn"
+    (try
+      (->> data
+           string/split-lines
+           (core/process-lines (:env @state))
+           second
+           validate-term-2)
+      (catch Exception e
+        (.getMessage e)))
+    ;else
+    (str "Unknown format: " format)))
+
+(defn add-kn-term!
+  [req data]
+  (let [term (validate-term "kn" data)
+        host (str "https://" (get-in req [:headers "host"]) "/")
+        root (:root-iri @state)]
+    (if (map? term)
+      (do (add-term-to-state! term)
+          (sparql/load-terms! @state)
+          (-> term
+              (get-in [:subject :iri])
+              (string/replace root host)
+              redirect))
+      (json-error 400 term))))
 
 (defn login
   [req]
@@ -494,10 +598,10 @@
     [:p "You have logged out."])})
 
 (defn parse-request-format
-  [{:keys [parsed-params route-params] :as req}]
+  [{:keys [query-params route-params] :as req}]
   (or
-   (when (find parsed-params "format")
-     (string/lower-case (get parsed-params "format")))
+   (when (find query-params "format")
+     (string/lower-case (get query-params "format")))
    (when-let [[_ extension]
               (re-matches
                #"^.*\.(html|ttl|json|tsv)$"
@@ -505,39 +609,39 @@
      extension)))
 
 (defn parse-request-iri
-  [state {:keys [parsed-params route-params] :as req}]
+  [state {:keys [query-params route-params] :as req}]
   (or
    (when-let [[_ id] (re-matches #"(\w+_\d+).*$" (get route-params :* ""))]
      ["IRI" (str (:root-iri state) "ontology/" id)])
-   (when (and (find parsed-params "IRI")
-              (re-find #"^eq\." (get parsed-params "IRI")))
-     ["IRI" (string/replace (get parsed-params "IRI") #"^eq\." "")])
-   (when (and (find parsed-params "CURIE")
-              (re-find #"^eq\." (get parsed-params "CURIE")))
-     (let [curie (string/replace (get parsed-params "CURIE") #"^eq\." "")]
+   (when (and (find query-params "IRI")
+              (re-find #"^eq\." (get query-params "IRI")))
+     ["IRI" (string/replace (get query-params "IRI") #"^eq\." "")])
+   (when (and (find query-params "CURIE")
+              (re-find #"^eq\." (get query-params "CURIE")))
+     (let [curie (string/replace (get query-params "CURIE") #"^eq\." "")]
        ["CURIE"
         (or (core/resolve-curie-string (:env state) curie)
             curie)]))))
 
 (defn parse-request-iris
-  [state {:keys [parsed-params route-params body] :as req}]
+  [state {:keys [query-params route-params body] :as req}]
   (let [body (cond
                (nil? body) nil
                (string? body) body
                :else (slurp body))]
     (or
-     (when (and (find parsed-params "IRI")
-                (re-matches #"^in\..*" (get parsed-params "IRI")))
+     (when (and (find query-params "IRI")
+                (re-matches #"^in\..*" (get query-params "IRI")))
        ["IRI"
-        (-> (get parsed-params "IRI")
+        (-> (get query-params "IRI")
             (string/replace #"^in\." "")
             (string/split #"\s+"))])
-     (when (and (find parsed-params "CURIE")
-                (re-matches #"^in\..*" (get parsed-params "CURIE")))
+     (when (and (find query-params "CURIE")
+                (re-matches #"^in\..*" (get query-params "CURIE")))
        ["CURIE"
         (map
          #(core/resolve-curie-string (:env state) %)
-         (-> (get parsed-params "CURIE")
+         (-> (get query-params "CURIE")
              (string/replace #"^in\." "")
              (string/split #"\s+")))])
      (when body
@@ -550,32 +654,32 @@
            :else
            nil)))
      (when (= (:idspace state) (get-in req [:route-params :*]))
-       [(if (= "true" (get parsed-params "compact")) "CURIE" "IRI")
+       [(if (= "true" (get query-params "compact")) "CURIE" "IRI")
         (->> state :terms keys sort)])
      ; TODO: include external resources
      (when (= "" (get-in req [:route-params :*]))
-       [(if (= "true" (get parsed-params "compact")) "CURIE" "IRI")
+       [(if (= "true" (get query-params "compact")) "CURIE" "IRI")
         (->> state :terms keys sort)]))))
 
 (defn parse-ontology-request
   "Given a state and a request map,
    return a map with :format and :iris keys."
   [state req]
-  (let [parsed-params (parsed-params (:query-string req))
-        req (assoc req :parsed-params parsed-params)]
+  (let [query-params (parsed-params (:query-string req))
+        req (assoc req :query-params query-params)]
     (cond
-      (and (find parsed-params "IRI")
-           (not (re-find #"^(eq|in)\." (get parsed-params "IRI"))))
+      (and (find query-params "IRI")
+           (not (re-find #"^(eq|in)\." (get query-params "IRI"))))
       {:error
        (str
         "IRI query should start with 'eq.' or 'in.', not: IRI="
-        (get parsed-params "IRI"))}
-      (and (find parsed-params "CURIE")
-           (not (re-find #"^(eq|in)\." (get parsed-params "CURIE"))))
+        (get query-params "IRI"))}
+      (and (find query-params "CURIE")
+           (not (re-find #"^(eq|in)\." (get query-params "CURIE"))))
       {:error
        (str
         "CURIE query should start with 'eq.' or 'in.', not: CURIE="
-        (get parsed-params "CURIE"))}
+        (get query-params "CURIE"))}
       :else
       (merge
        (when-let [format (parse-request-format req)]
@@ -609,20 +713,35 @@
 
 (defn ontology-post
   [{:keys [route-params] :as req}]
-  (cond
-    (-> req
-        :query-string
-        parsed-params
-        (get "method" "")
-        string/lower-case
-        (= "get"))
-    (ontology-get req)
+  (let [query-params (parsed-params (:query-string req))
+        body (-> req :body slurp)
+        form (when (= "application/x-www-form-urlencoded"
+                      (get-in req [:headers "content-type"]))
+               (parsed-params body))]
+    (cond
+      (= "get" (string/lower-case (get query-params "method" "")))
+      (ontology-get req)
 
-    (= (:idspace @state) (get route-params :*))
-    (add-term-json! req)
+      (find form "validate")
+      (if (developer? req)
+        (let [result (validate-term (get form "format") (get form "term"))
+              message (if (string? result) result "Term is valid")
+              term (when (map? result) result)]
+          (ontology-get
+           (assoc
+            req
+            :message message
+            :term-string (get form "term")
+            :term term)))
+        (json-error 403 "Only authenticated developers can validate terms"))
 
-    :else
-    nil))
+      (= (:idspace @state) (get route-params :*))
+      (if (and (developer? req) form)
+        (add-kn-term! req (get form "term"))
+        (add-json-term! (json/read-str body)))
+
+      :else
+      nil)))
 
 (defroutes knode-routes
   ; ## Authentication

@@ -254,7 +254,7 @@
         (map #(if (contains? #{"IRI" "CURIE" "recognized"} %)
                 [% %]
                 (try
-                  [% (:iri (core/resolve-name (:env @state) {:label %}))]
+                  [% (:iri (core/resolve-name (:env @state) {:name %}))]
                   (catch Exception e [% nil])))
              predicate-labels)
         predicate-iris (map second predicates)]

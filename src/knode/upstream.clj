@@ -19,8 +19,7 @@
                     clojure.java.io/output-stream
                     java.util.zip.GZIPOutputStream.
                     clojure.java.io/writer)]
-    (binding [*out* s]
-      (println content))))
+    (binding [*out* s] (println content))))
 
 (defn slurp-gzipped [path]
   (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]
@@ -33,5 +32,6 @@
      (if (= status 200)
        (let [version-iri (xml-string->version-iri body)
              fname (io/as-relative-path (str "tmp/" (.getPath (java.net.URL. version-iri))))]
-         (spit-gzipped fname body))
+         (println "FETCHED!" version-iri fname)
+         (spit-gzipped! fname body))
        [:TODO "Log this somewhere" status error]))))

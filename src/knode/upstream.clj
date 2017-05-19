@@ -1,5 +1,7 @@
 (ns knode.upstream
   (:require
+   [clojure.java.io :as io]
+
    [org.httpkit.client :as http]
    [clojure.data.xml :as xml]))
 
@@ -11,8 +13,18 @@
        :content first :content (filter #(= :versionIRI (:tag %)))
        first :attrs :rdf/resource))
 
-(defn path-join [strings]
-  (string/join "/" strings))
+(defn spit-gzipped! [path content]
+  (io/make-parents path)
+  (with-open [s (-> path
+                    clojure.java.io/output-stream
+                    java.util.zip.GZIPOutputStream.
+                    clojure.java.io/writer)]
+    (binding [*out* s]
+      (println content))))
+
+(defn slurp-gzipped [path]
+  (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]
+    (slurp in)))
 
 (defn fetch-upstream [iri]
   (http/get
@@ -20,7 +32,6 @@
    (fn [{:keys [status headers body error]}]
      (if (= status 200)
        (let [version-iri (xml-string->version-iri body)
-             fname (path-join (cons "tmp" (drop 3 (string/split version-iri #"/"))))]
-         (with-open [*out* (java.util.zip.GZIPInputStream. (clojure.java.io/input-stream fname))]
-           (println body)))
+             fname (io/as-relative-path (str "tmp/" (.getPath (java.net.URL. version-iri))))]
+         (spit-gzipped fname body))
        [:TODO "Log this somewhere" status error]))))

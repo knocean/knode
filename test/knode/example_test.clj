@@ -79,38 +79,38 @@ label: Example Foo")
              example-add-kn))))
   (with-redefs [server/add-term-to-state! :no-op]
     (testing "Unauthenticated"
-      (is (= (:status (server/add-term! nil))
+      (is (= (:status (server/add-json-term! nil))
              401))
       (is (= (:status
-              (server/add-term!
+              (server/add-json-term!
                {"template" "example class"
                 "name" "Foo"}))
              403))
       (is (= (:status
-              (server/add-term!
+              (server/add-json-term!
                {"api-key" "NOT THE RIGHT KEY"}))
              403)))
     (testing "Wrong template"
       (is (= (:status
-              (server/add-term!
+              (server/add-json-term!
                {"api-key" "NOT SECRET"
                 "template" "foo"}))
              400)))
     (testing "Missing required predicates"
       (is (= (:status
-              (server/add-term!
+              (server/add-json-term!
                {"api-key" "NOT SECRET"
                 "template" "example class"}))
              400)))
     (testing "Duplicate label"
       (is (= (:status
-              (server/add-term!
+              (server/add-json-term!
                {"api-key" "NOT SECRET"
                 "template" "example class"
                 "name" "One"}))
              400)))
     (testing "Actually add a term"
-      (let [result (server/add-term!
+      (let [result (server/add-json-term!
                     {"api-key" "NOT SECRET"
                      "template" "example class"
                      "name" "Foo"})

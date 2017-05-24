@@ -8,6 +8,7 @@
                  [org.clojure/data.csv "0.1.3"]
                  [org.clojure/data.xml "0.0.8"]
 
+                 [tempfile "0.2.0"]
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]
                  [markdown-clj "0.9.89"]

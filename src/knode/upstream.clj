@@ -32,6 +32,5 @@
      (if (= status 200)
        (let [version-iri (xml-string->version-iri body)
              fname (io/as-relative-path (str "tmp/" (.getPath (java.net.URL. version-iri))))]
-         (println "FETCHED!" version-iri fname)
          (spit-gzipped! fname body))
        [:TODO "Log this somewhere" status error]))))

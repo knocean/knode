@@ -34,7 +34,7 @@
                     clojure.java.io/output-stream
                     java.util.zip.GZIPOutputStream.
                     clojure.java.io/writer)]
-    (binding [*out* s] (println content))))
+    (binding [*out* s] (print content))))
 
 (defn slurp-gzipped [path]
   (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]

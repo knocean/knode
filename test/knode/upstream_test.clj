@@ -14,7 +14,6 @@
                   gzipped (tempfile)]
     (spit-gzipped! gzipped lorem)
     (testing "slurp-gzipped on a gzipped file returns the original input to spit-gzipped!"
-      (is (= (string/trim (slurp raw))
-             (string/trim (slurp-gzipped gzipped)))))
+      (is (= (slurp raw) (slurp-gzipped gzipped))))
     (testing "The zipped file is smaller than the normal one"
       (is (> (.length raw) (.length gzipped))))))

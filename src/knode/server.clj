@@ -325,7 +325,7 @@
                [:input {:type "hidden" :name "input-format" :value "kn"}]
                [:p
                 [:textarea
-                 {:name "term-string" :cols 80 :rows 6}
+                 {:name "term-string" :rows 6 :style "width: 100%"}
                  (or (get params "term-string")
                      (doall
                       (emit/emit-kn-term
@@ -383,7 +383,7 @@
            [:input {:type "hidden" :name "input-format" :value "kn"}]
            [:p
             [:textarea
-             {:name "term-string" :cols 80 :rows 6}
+             {:name "term-string" :rows 6 :style "width: 100%"}
              (or
               (get params "term-string")
               (let [template (-> state :templates vals first)]

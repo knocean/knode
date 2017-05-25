@@ -220,6 +220,39 @@
 
 ;; ### HTML
 
+(defn render-html-predicate
+  [state req label {:keys [iri datatype cardinality]}]
+  [:li
+   [:a {:href (re-root state req iri)} label]
+   " ("
+   cardinality
+   ", "
+   (or (:curie datatype)
+       (when (= datatype :link) "link")
+       (when (= datatype :plain) "plain string"))
+   ")"])
+
+(defn render-html-cheatsheet
+  [state req]
+  [:div.cheatsheet.col-md-6
+   [:div.templates
+    "Templates (required predicates):"
+    [:ul
+     (for [template (-> state :templates vals)]
+       [:li (:label template)
+        " ("
+        (string/join ", " (:required-predicates template))
+        ")"])]]
+   [:div.predicates
+    "Predicates (cardinality, datatype):"
+    [:ul
+     (->> state
+          :env
+          :labels
+          (filter #(:cardinality (second %)))
+          (sort-by first)
+          (map (partial apply render-html-predicate state req)))]]])
+
 (defn render-html-term
   [state
    {:keys [params uri iri] :as req}
@@ -260,51 +293,53 @@
           "TSV (tsv)"]
          "."]
         (when (developer? req)
-          [:div
+          [:div.devlopment.container-fluid
            [:h3 "Edit Term"]
-           (when message [:p message])
-           (when error [:p error])
-           (when (and new-term (get params "term-string"))
-             [:form
-              {:method "POST"}
-              [:input {:type "hidden" :name "method" :value "PUT"}]
-              [:input {:type "hidden" :name "input-format" :value "kn"}]
-              [:input {:type "hidden"
-                       :name "term-string"
-                       :value (get params "term-string")}]
-              (doall
-               (emit/emit-rdfa-term
-                (:env state)
-                (:context state)
-                (:subject new-term)
-                (:blocks new-term)))
-              [:p
-               [:input
-                {:class "btn btn-primary"
-                 :type "submit"
-                 :name "add"
-                 :value "Update Term"}]]])
-           (when (:iri req)
-             [:form
-              {:method "POST"}
-              [:input {:type "hidden" :name "method" :value "PUT"}]
-              [:input {:type "hidden" :name "input-format" :value "kn"}]
-              [:p
-               [:textarea
-                {:name "term-string" :cols 80 :rows 6}
-                (or (get params "term-string")
-                    (doall
-                     (emit/emit-kn-term
-                      (:env state)
-                      nil
-                      (:subject old-term)
-                      (->> old-term :blocks (remove :template)))))]]
-              [:p
-               [:input
-                {:class "btn btn-primary"
-                 :type "submit"
-                 :name "validate"
-                 :value "Validate Term"}]]])])]})}))
+           [:div.edit.col-md-6
+            (when message [:p message])
+            (when error [:p error])
+            (when (and new-term (get params "term-string"))
+              [:form
+               {:method "POST"}
+               [:input {:type "hidden" :name "method" :value "PUT"}]
+               [:input {:type "hidden" :name "input-format" :value "kn"}]
+               [:input {:type "hidden"
+                        :name "term-string"
+                        :value (get params "term-string")}]
+               (doall
+                (emit/emit-rdfa-term
+                 (:env state)
+                 (:context state)
+                 (:subject new-term)
+                 (:blocks new-term)))
+               [:p
+                [:input
+                 {:class "btn btn-primary"
+                  :type "submit"
+                  :name "add"
+                  :value "Update Term"}]]])
+            (when (:iri req)
+              [:form
+               {:method "POST"}
+               [:input {:type "hidden" :name "method" :value "PUT"}]
+               [:input {:type "hidden" :name "input-format" :value "kn"}]
+               [:p
+                [:textarea
+                 {:name "term-string" :cols 80 :rows 6}
+                 (or (get params "term-string")
+                     (doall
+                      (emit/emit-kn-term
+                       (:env state)
+                       nil
+                       (:subject old-term)
+                       (->> old-term :blocks (remove :template)))))]]
+               [:p
+                [:input
+                 {:class "btn btn-primary"
+                  :type "submit"
+                  :name "validate"
+                  :value "Validate Term"}]]])]
+           (render-html-cheatsheet state req)])]})}))
 
 (defn render-html-terms
   [state
@@ -319,50 +354,52 @@
      :content
      [:div
       (when (developer? req)
-        [:div
+        [:div.development.container-fluid
          [:h3 "Add Term"]
-         (when message [:p message])
-         (when error [:p error])
-         (when term
-           [:form
-            {:method "POST"}
-            [:input {:type "hidden" :name "input-format" :value "kn"}]
-            [:input {:type "hidden"
-                     :name "term-string"
-                     :value (get params "term-string")}]
-            (doall
-             (emit/emit-rdfa-term
-              (:env state)
-              (:context state)
-              nil
-              (:blocks term)))
-            [:p
-             [:input
-              {:class "btn btn-primary"
-               :type "submit"
-               :name "add"
-               :value "Add Term"}]]])
-         [:form
-          {:method "POST"}
-          [:input {:type "hidden" :name "input-format" :value "kn"}]
-          [:p
-           [:textarea
-            {:name "term-string" :cols 80 :rows 6}
-            (or
-             (get params "term-string")
-             (let [template (-> state :templates vals first)]
-               (->> template
-                    :required-predicates
-                    (map #(str % ": REQUIRED"))
-                    (concat
-                     [(str "template: " (:label template))])
-                    (string/join "\n"))))]]
-          [:p
-           [:input
-            {:class "btn btn-primary"
-             :type "submit"
-             :name "validate"
-             :value "Validate Term"}]]]])
+         [:div.edit.col-md-6
+          (when message [:p message])
+          (when error [:p error])
+          (when term
+            [:form
+             {:method "POST"}
+             [:input {:type "hidden" :name "input-format" :value "kn"}]
+             [:input {:type "hidden"
+                      :name "term-string"
+                      :value (get params "term-string")}]
+             (doall
+              (emit/emit-rdfa-term
+               (:env state)
+               (:context state)
+               nil
+               (:blocks term)))
+             [:p
+              [:input
+               {:class "btn btn-primary"
+                :type "submit"
+                :name "add"
+                :value "Add Term"}]]])
+          [:form
+           {:method "POST"}
+           [:input {:type "hidden" :name "input-format" :value "kn"}]
+           [:p
+            [:textarea
+             {:name "term-string" :cols 80 :rows 6}
+             (or
+              (get params "term-string")
+              (let [template (-> state :templates vals first)]
+                (->> template
+                     :required-predicates
+                     (map #(str % ": REQUIRED"))
+                     (concat
+                      [(str "template: " (:label template))])
+                     (string/join "\n"))))]]
+           [:p
+            [:input
+             {:class "btn btn-primary"
+              :type "submit"
+              :name "validate"
+              :value "Validate Term"}]]]]
+         (render-html-cheatsheet state req)])
       [:h3 "Term List"]
       [:p
        "Other formats: "

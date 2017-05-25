@@ -12,6 +12,7 @@
                  [markdown-clj "0.9.89"]
                  [io.forward/yaml "1.0.6"]
                  [http-kit "2.1.18"]
+                 [ring/ring-mock "0.3.0"]
                  [compojure "1.5.1"]
                  [oauth-clj "0.1.15"]
 

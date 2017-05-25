@@ -56,8 +56,7 @@
           (map #(str "@prefix " (:prefix %) ": <" (:iri %) "> ."))
           (string/join "\n"))]
     (->> terms
-         (into (sorted-map))
-         vals
+         (sort-by #(-> % :subject :iri))
          (map
           (fn [{:keys [subject blocks] :as term}]
             (emit-ttl-term env nil subject blocks)))))))
@@ -214,8 +213,7 @@
   [env context-blocks terms]
   ; TODO: context-blocks is currently ignored.
   (->> terms
-       (into (sorted-map))
-       vals
+       (sort-by #(-> % :subject :iri))
        (map
         (fn [{:keys [subject blocks] :as term}]
           (emit-kn-term env nil subject (remove :template blocks))))
@@ -231,8 +229,7 @@
    return a tab-separated index table for the terms."
   [env terms]
   (->> terms
-       (into (sorted-map))
-       vals
+       (sort-by #(-> % :subject :iri))
        (map
         (fn [{:keys [subject blocks] :as term}]
           (let [values (core/collect-values blocks)]

@@ -146,9 +146,13 @@
           contexts (->> project-iri
                         (.createURI (.getValueFactory conn))
                         vector
-                        (into-array))]
+                        (into-array))
+          ttl (emit/emit-ttl-terms
+               env
+               context
+               (->> terms vals (sort-by #(->> % :subject :iri))))]
       (io/make-parents path)
-      (spit path (emit/emit-ttl-terms env context terms))
+      (spit path ttl)
       (try
         (doto conn
           (.begin)
@@ -176,6 +180,15 @@
     (instance? URI v) (core/get-curie env (str v))
     (instance? Literal v) (.getLabel v)
     :else (str v)))
+
+(defn compact-value
+  [env value-map]
+  (if-let [iri (:iri value-map)]
+    (let [curie (core/get-curie env iri)]
+      (merge
+       (when curie {:curie curie})
+       {:iri iri}))
+    value-map))
 
 (defn select
   [{:keys [blazegraph] :as state} query]
@@ -231,20 +244,31 @@ WHERE {
 (defn query-predicate
   [state compact subject-iris predicate-iri]
   (case predicate-iri
-    "IRI" (map (fn [x] [{:iri x} {:iri x}]) subject-iris)
-    "CURIE" (map (fn [x]
-                   [{:iri x}
-                    {:curie (or (core/get-curie (:env state) x) x)}])
-                 subject-iris)
+    "IRI" (reduce
+           (fn [coll iri] (assoc coll iri [{:iri iri}]))
+           {}
+           subject-iris)
+    "CURIE" (reduce
+             (fn [coll iri]
+               (let [curie (core/get-curie (:env state) iri)]
+                 (assoc coll iri [{:iri iri
+                                   :curie (or curie iri)}])))
+             {}
+             subject-iris)
     "recognized"
     (let [results
           (->> "?predicate"
                (query-predicate state compact subject-iris)
                (into {}))]
-      (for [subject-iri subject-iris]
-        [{:iri subject-iri}
-         {:lexical (str (not (nil? (find results {:iri subject-iri}))))
-          :datatype {:iri "http://www.w3.org/2001/XMLSchema#boolean"}}]))
+      (reduce
+       (fn [coll iri]
+         (assoc
+          coll
+          iri
+          [{:lexical (str (not (nil? (find results iri))))
+            :datatype {:iri "http://www.w3.org/2001/XMLSchema#boolean"}}]))
+       {}
+       subject-iris))
     ; else
     (->> (format
           predicate-query
@@ -256,29 +280,34 @@ WHERE {
             predicate-iri
             (str "<" predicate-iri ">")))
          (select state)
-         (map (juxt #(get % "subject")
-                    #(if (and compact (get-in % ["value" :iri]))
-                       {:curie (core/get-curie (:env state)
-                                               (get-in % ["value" :iri]))}
-                       (get % "value")))))))
+         (reduce
+          (fn [coll match]
+            (let [value (get match "value")
+                  value (if compact (compact-value (:env state) value) value)
+                  subject (get-in match ["subject" :iri])]
+              (update-in coll [subject] (fnil conj []) value)))
+          {}))))
 
 (defn query-predicates
   [state compact subject-iris predicate-iris]
-  (let [predicate-values
+  (let [predicate-value-maps
         (map #(query-predicate state compact subject-iris %) predicate-iris)]
     (for [subject-iri subject-iris]
-      (for [values predicate-values]
-        (->> values
-             (filter #(= subject-iri (:iri (first %))))
-             (map second))))))
+      (for [predicate-value-map predicate-value-maps]
+        (sort-by :lexical (get predicate-value-map subject-iri))))))
 
-(defn query-predicates-tabular
-  [state compact subject-iris predicate-iris]
-  (for [row (query-predicates state compact subject-iris predicate-iris)]
+(defn table-seqs->strings
+  [table]
+  (for [row table]
     (for [values row]
       (->> values
            (map #(or (:curie %) (:iri %) (:lexical %)))
            (string/join "|")))))
+
+(defn query-predicates-tabular
+  [state compact subject-iris predicate-iris]
+  (table-seqs->strings
+   (query-predicates state compact subject-iris predicate-iris)))
 
 (defn validate-rule
   [state rule limit]

@@ -99,6 +99,7 @@
     "configuration" (println (knode.state/report @state))
     "serve" (do (load!)
                 (sparql/init-dataset! state)
+                (sparql/load-terms! @state)
                 (server/serve))
     "reindex" (do (load!)
                   (spit

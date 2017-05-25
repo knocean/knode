@@ -2,8 +2,17 @@
   (:require
    [clojure.java.io :as io]
 
+   digest
+   [tempfile.core :as tmp]
    [org.httpkit.client :as http]
    [clojure.data.xml :as xml]))
+
+"http://purl.obolibrary.org/obo/chebi.owl"
+"ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.owl"
+"http://purl.obolibrary.org/obo/mro.owl"
+"https://raw.githubusercontent.com/IEDB/MRO/v2016-12-15/mro.owl"
+
+(def head-results (atom {}))
 
 (defn xml->version-iri [stream]
   (->> stream
@@ -29,12 +38,7 @@
           (recur (.readLine content)))))))
 
 (defmethod spit-gzipped! java.lang.String [path content]
-  (io/make-parents path)
-  (with-open [s (-> path
-                    clojure.java.io/output-stream
-                    java.util.zip.GZIPOutputStream.
-                    clojure.java.io/writer)]
-    (binding [*out* s] (print content))))
+  (spit-gzipped! path (java.io.BufferedReader. (java.io.StringReader. content))))
 
 (defn slurp-gzipped [path]
   (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]
@@ -43,12 +47,40 @@
 (defn iri->upstream-path [iri]
   (io/as-relative-path (str "tmp/" (.getPath (java.net.URL. iri)))))
 
+(defn ftp-iri? [iri]
+  (re-find #"^ftp" iri))
+
+(defn curl-get
+  ([iri] (java.io.BufferedReader. (java.io.InputStreamReader. (.openStream (java.net.URL. iri)))))
+  ([iri callback] (callback (curl-get iri))))
+
+(defn upstream-changed? [iri]
+  (if (ftp-iri? iri)
+
+    (let [rdr (curl-get iri)
+          version-iri (xml->version-iri rdr)
+          path (iri->upstream-path version-iri)]
+      (or (not (.exists (io/as-file path)))
+          (tmp/with-tempfile [new (tmp/tempfile)]
+            (spit-gzipped! new rdr)
+            (not (= (digest/sha-256 (io/file new))
+                    (digest/sha-256 (io/file path)))))))
+
+    (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
+      (case status
+        200 (let [relevant (select-keys headers [:last-modified :etag :content-length])
+                  cached (get @head-results iri)]
+              (not (and cached (= relevant cached))))
+        (301 302 303 307 308) (upstream-changed? (:location headers))
+        304 false
+        (throw (Exception. (str "TODO: Handle status " status)))))))
+
 (defn fetch-upstream [iri]
-  (if (re-find #"^ftp" iri)
-    (let [rdr (java.io.BufferedReader. (java.io.InputStreamReader. (.openStream (java.net.URL. iri))))
+  (if (ftp-iri? iri)
+    (let [rdr (curl-get iri)
           version-iri (xml->version-iri rdr)
           fname (iri->upstream-path version-iri)]
-      (spit-gzipped! fname rdr))
+      (deliver (promise) (spit-gzipped! fname rdr)))
     (http/request
      {:url iri
       :follow-redirects false}

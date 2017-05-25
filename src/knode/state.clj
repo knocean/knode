@@ -54,4 +54,4 @@
        (map (fn [[k v]] (format "%-18s %s" k (str v))))
        (string/join "\n")))
 
-(def state (atom (init env)))
+(defonce state (atom (init env)))

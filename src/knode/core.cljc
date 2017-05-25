@@ -166,7 +166,7 @@
 
 (defn get-curie
   [env iri]
-  (if-let [[prefix name] (find-prefix env iri)]
+  (when-let [[prefix name] (find-prefix env iri)]
     (clojure.string/replace iri prefix (str name ":"))))
 
 ;; ### Label

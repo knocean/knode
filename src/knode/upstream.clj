@@ -12,7 +12,7 @@
 "http://purl.obolibrary.org/obo/mro.owl"
 "https://raw.githubusercontent.com/IEDB/MRO/v2016-12-15/mro.owl"
 
-(def head-results (atom {}))
+(def upstream-meta (atom {}))
 
 (defn xml->version-iri [stream]
   (->> stream
@@ -69,7 +69,7 @@
     (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
       (case status
         200 (let [relevant (select-keys headers [:last-modified :etag :content-length])
-                  cached (get @head-results iri)]
+                  cached (get @upstream-meta iri)]
               (not (and cached (= relevant cached))))
         (301 302 303 307 308) (upstream-changed? (:location headers))
         304 false
@@ -80,14 +80,18 @@
     (let [rdr (curl-get iri)
           version-iri (xml->version-iri rdr)
           fname (iri->upstream-path version-iri)]
-      (deliver (promise) (spit-gzipped! fname rdr)))
+      (spit-gzipped! fname rdr)
+      (swap! upstream-meta #(assoc % iri {:sha256 (digest/sha-256 (io/file fname))}))
+      (deliver (promise) true))
     (http/request
      {:url iri
       :follow-redirects false}
      (fn [{:keys [status headers body error]}]
        (case status
          200 (let [version-iri (xml-string->version-iri body)
-                   fname (iri->upstream-path version-iri)]
+                   fname (iri->upstream-path version-iri)
+                   relevant (select-keys headers [:last-modified :etag :content-length])]
+               (swap! upstream-meta #(assoc % iri relevant))
                (spit-gzipped! fname body))
          (301 302 303 307 308) (fetch-upstream (:location headers))
          (throw (Exception. (str "TODO: Handle status " status))))))))

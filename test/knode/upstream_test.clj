@@ -15,7 +15,8 @@
 (deftest test-gzipped
   (with-tempfile [raw (tempfile lorem)
                   gzipped (tempfile)
-                  other-gzipped (tempfile)]
+                  other-gzipped (tempfile)
+                  doubled (tempfile)]
     (spit-gzipped! gzipped lorem)
     (spit-gzipped! other-gzipped lorem)
     (testing "slurp-gzipped on a gzipped file returns the original input to spit-gzipped!"
@@ -24,4 +25,8 @@
       (is (> (.length raw) (.length gzipped))))
     (testing "Two compressed files with the same content hash equivalently"
       (is (= (digest/sha-256 (io/file gzipped))
-             (digest/sha-256 (io/file other-gzipped)))))))
+             (digest/sha-256 (io/file other-gzipped)))))
+    (testing "Spitting to an existing file overwrites rather than appending"
+      (do (spit-gzipped! doubled lorem)
+          (spit-gzipped! doubled lorem)
+          (is (= (slurp raw) (slurp-gzipped doubled)))))))

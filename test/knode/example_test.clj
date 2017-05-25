@@ -13,7 +13,8 @@
 (def example-iri (ex "0000002"))
 
 (def example-add-json
-  {"name" "Foo"
+  {"template" "example class"
+   "name" "Foo"
    "alternative term" ["bar" "baz"]})
 
 (def example-add-kn
@@ -58,7 +59,7 @@ label: Example Foo")
              :predicate {:iri "http://www.w3.org/2000/01/rdf-schema#label"}
              :object {:lexical "Example Two"}}]))
 
-    (is (= (string/trim (emit/emit-index (:env @state) (:terms @state)))
+    (is (= (string/trim (emit/emit-index (:env @state) (server/get-terms @state)))
            (->> "test/example/ontology/index.tsv"
                 slurp
                 string/split-lines
@@ -66,59 +67,10 @@ label: Example Foo")
                 (string/trim))))
 
     ;(is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
-                                        ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
+    ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
 
-    (is (= (emit/emit-kn-terms (:env @state) nil (:terms @state))
-           (string/trim (slurp "test/example/ontology/example.kn")))))
-  (testing "make example class"
-    (let [{:keys [subject blocks] as :term}
-          (server/make-term
-           (get-in @state [:templates "http://example.com/template-1"])
-           example-add-json)]
-      (is (= (emit/emit-kn-term (:env @state) nil subject blocks)
-             example-add-kn))))
-  (with-redefs [server/add-term-to-state! :no-op]
-    (testing "Unauthenticated"
-      (is (= (:status (server/add-json-term! nil))
-             401))
-      (is (= (:status
-              (server/add-json-term!
-               {"template" "example class"
-                "name" "Foo"}))
-             403))
-      (is (= (:status
-              (server/add-json-term!
-               {"api-key" "NOT THE RIGHT KEY"}))
-             403)))
-    (testing "Wrong template"
-      (is (= (:status
-              (server/add-json-term!
-               {"api-key" "NOT SECRET"
-                "template" "foo"}))
-             400)))
-    (testing "Missing required predicates"
-      (is (= (:status
-              (server/add-json-term!
-               {"api-key" "NOT SECRET"
-                "template" "example class"}))
-             400)))
-    (testing "Duplicate label"
-      (is (= (:status
-              (server/add-json-term!
-               {"api-key" "NOT SECRET"
-                "template" "example class"
-                "name" "One"}))
-             400)))
-    (testing "Actually add a term"
-      (let [result (server/add-json-term!
-                    {"api-key" "NOT SECRET"
-                     "template" "example class"
-                     "name" "Foo"})
-            body (json/read-str (:body result))]
-        (is (= (:status result) 201))
-        (is (nil? (:error result)))
-        (is (= (get body "iri") "https://example.com/ontology/EXAMPLE_0000005"))
-        (is (= (get body "curie") "EXAMPLE:0000005"))))))
+    (is (= (emit/emit-kn-terms (:env @state) nil (server/get-terms @state))
+           (string/trim (slurp "test/example/ontology/example.kn"))))))
 
 (deftest test-term-query
   (reset! state (knode.state/init test-state))
@@ -162,11 +114,14 @@ label: Example Foo")
              "IRI"
              emit/rdfs:label
              "http://purl.obolibrary.org/obo/IAO_0000118"])
-           [[[{:curie "EXAMPLE:0000001"}]
+           [[[{:curie "EXAMPLE:0000001" :iri (ex "0000001")}]
              [{:iri (ex "0000001")}]
              [{:lexical "Example One"}]
              [{:lexical "ex 1"} {:lexical "ex one"}]]
-            [[{:curie "FOO:BAR"}] [{:iri "FOO:BAR"}] [] []]])))
+            [[{:curie "FOO:BAR" :iri "FOO:BAR"}]
+             [{:iri "FOO:BAR"}]
+             []
+             []]])))
 
   (testing "More general queries as table"
     (is (= (sparql/query-predicates-tabular

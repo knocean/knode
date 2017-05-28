@@ -12,7 +12,15 @@
 "http://purl.obolibrary.org/obo/mro.owl"
 "https://raw.githubusercontent.com/IEDB/MRO/v2016-12-15/mro.owl"
 
-(def upstream-meta (atom {}))
+(def upstream-meta
+  (atom
+   (if (.exists (io/file "knode-meta.edn"))
+     (read-string (slurp "knode-meta.edn"))
+     {})))
+(defn store-upstream-meta1 [iri meta]
+  (swap! upstream-meta #(assoc % iri meta))
+  (spit "knode-meta.edn" @upstream-meta)
+  nil)
 
 (defn xml->version-iri [stream]
   (->> stream
@@ -44,8 +52,11 @@
   (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]
     (slurp in)))
 
-(defn iri->upstream-path [iri]
-  (io/as-relative-path (str "tmp/" (.getPath (java.net.URL. iri)))))
+(defn ->upstream-path [prefix iri]
+  (io/as-relative-path (str prefix (.getPath (java.net.URL. iri)))))
+
+(defn iri->upstream-path [iri] (->upstream-path "tmp/" iri))
+(defn iri->temp-upstream-path [iri] (->upstream-path "tmp/compare/" iri))
 
 (defn ftp-iri? [iri]
   (re-find #"^ftp" iri))
@@ -59,12 +70,12 @@
 
     (let [rdr (curl-get iri)
           version-iri (xml->version-iri rdr)
-          path (iri->upstream-path version-iri)]
+          path (iri->upstream-path version-iri)
+          tmp-path (iri->temp-upstream-path version-iri)]
       (or (not (.exists (io/as-file path)))
-          (tmp/with-tempfile [new (tmp/tempfile)]
-            (spit-gzipped! new rdr)
-            (not (= (digest/sha-256 (io/file new))
-                    (digest/sha-256 (io/file path)))))))
+          (do (spit-gzipped! tmp-path rdr)
+              (not (= (digest/sha-256 (io/file tmp-path))
+                      (digest/sha-256 (io/file path)))))))
 
     (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
       (case status
@@ -81,7 +92,7 @@
           version-iri (xml->version-iri rdr)
           fname (iri->upstream-path version-iri)]
       (spit-gzipped! fname rdr)
-      (swap! upstream-meta #(assoc % iri {:sha256 (digest/sha-256 (io/file fname))}))
+      (store-upstream-meta! iri {:sha256 (digest/sha-256 (io/file fname))})
       (deliver (promise) true))
     (http/request
      {:url iri
@@ -91,7 +102,7 @@
          200 (let [version-iri (xml-string->version-iri body)
                    fname (iri->upstream-path version-iri)
                    relevant (select-keys headers [:last-modified :etag :content-length])]
-               (swap! upstream-meta #(assoc % iri relevant))
+               (store-upstream-meta! iri relevant)
                (spit-gzipped! fname body))
          (301 302 303 307 308) (fetch-upstream (:location headers))
          (throw (Exception. (str "TODO: Handle status " status))))))))

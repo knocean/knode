@@ -17,7 +17,7 @@
    (if (.exists (io/file "knode-meta.edn"))
      (read-string (slurp "knode-meta.edn"))
      {})))
-(defn store-upstream-meta1 [iri meta]
+(defn store-upstream-meta! [iri meta]
   (swap! upstream-meta #(assoc % iri meta))
   (spit "knode-meta.edn" @upstream-meta)
   nil)

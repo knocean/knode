@@ -2,44 +2,40 @@
   (:require
    [clojure.java.io :as io]
    [clojure.data :as dat]
+   [clojure.data.xml :as xml]
 
    digest
    [tempfile.core :as tmp]
    [org.httpkit.client :as http]
    [clojure.data.xml :as xml]))
 
-"http://purl.obolibrary.org/obo/chebi.owl"
-"ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.owl"
-"http://purl.obolibrary.org/obo/mro.owl"
-"https://raw.githubusercontent.com/IEDB/MRO/v2016-12-15/mro.owl"
-
-(require '[knode.upstream :as up])
-(require '[clojure.data.xml :as xml])
-(def parsed (xml/parse (java.io.StringReader. (up/slurp-gzipped "tmp/obo/mro/2016-12-15/mro.owl"))))
-(do (def ont (slurp "tmp/obo/chebi/151/chebi-raw.owl")) nil)
-
 (def upstream-meta
   (atom
    (if (.exists (io/file "knode-meta.edn"))
      (read-string (slurp "knode-meta.edn"))
      {})))
-(defn store-upstream-meta! [iri meta]
+
+(defn store-upstream-meta!
+  [iri meta]
   (swap! upstream-meta #(assoc % iri meta))
   (spit "knode-meta.edn" @upstream-meta)
   nil)
 
-(defn xml->version-iri [stream]
+(defn xml->version-iri
+  [stream]
   (->> stream
        xml/parse
        :content first :content (filter #(= :versionIRI (:tag %)))
        first :attrs :rdf/resource))
 
-(defn xml-string->version-iri [string]
+(defn xml-string->version-iri
+  [string]
   (xml->version-iri (java.io.StringReader. string)))
 
 (defmulti spit-gzipped! #(class %2))
 
-(defmethod spit-gzipped! java.io.BufferedReader [path content]
+(defmethod spit-gzipped! java.io.BufferedReader
+  [path content]
   (io/make-parents path)
   (with-open [s (-> path
                     clojure.java.io/output-stream
@@ -51,27 +47,39 @@
           (println ln)
           (recur (.readLine content)))))))
 
-(defmethod spit-gzipped! java.lang.String [path content]
+(defmethod spit-gzipped! java.lang.String
+  [path content]
   (spit-gzipped! path (java.io.BufferedReader. (java.io.StringReader. content))))
 
-(defn slurp-gzipped [path]
+(defn slurp-gzipped
+  [path]
   (with-open [in (java.util.zip.GZIPInputStream. (io/input-stream path))]
     (slurp in)))
 
-(defn ->upstream-path [prefix iri]
+(defn ->upstream-path
+  [prefix iri]
   (io/as-relative-path (str prefix (.getPath (java.net.URL. iri)))))
 
-(defn iri->upstream-path [iri] (->upstream-path "tmp/" iri))
-(defn iri->temp-upstream-path [iri] (->upstream-path "tmp/compare/" iri))
+(defn iri->upstream-path
+  [iri]
+  (->upstream-path "tmp/" iri))
 
-(defn ftp-iri? [iri]
+(defn iri->temp-upstream-path
+  [iri]
+  (->upstream-path "tmp/compare/" iri))
+
+(defn ftp-iri?
+  [iri]
   (re-find #"^ftp" iri))
 
 (defn curl-get
-  ([iri] (java.io.BufferedReader. (java.io.InputStreamReader. (.openStream (java.net.URL. iri)))))
-  ([iri callback] (callback (curl-get iri))))
+  ([iri]
+   (java.io.BufferedReader. (java.io.InputStreamReader. (.openStream (java.net.URL. iri)))))
+  ([iri callback]
+   (callback (curl-get iri))))
 
-(defn xml->terms [xml-str]
+(defn xml->terms
+  [xml-str]
   (set
    (filter
     #(not (nil? %))
@@ -79,11 +87,14 @@
      #(->> % :attrs :rdf/about)
      (->> (java.io.StringReader. xml-str) xml/parse :content)))))
 
-(defn compare-ontologies [xml-str-a xml-str-b]
-  (let [[in-a in-b _] (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
+(defn compare-ontologies
+  [xml-str-a xml-str-b]
+  (let [[in-a in-b _]
+        (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
     [in-a in-b]))
 
-(defn upstream-changed? [iri]
+(defn upstream-changed?
+  [iri]
   (if (ftp-iri? iri)
 
     (let [rdr (curl-get iri)
@@ -104,7 +115,8 @@
         304 false
         (throw (Exception. (str "TODO: Handle status " status)))))))
 
-(defn fetch-upstream [iri]
+(defn fetch-upstream
+  [iri]
   (if (ftp-iri? iri)
     (let [rdr (curl-get iri)
           version-iri (xml->version-iri rdr)

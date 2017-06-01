@@ -96,6 +96,7 @@
 
 (defn fetch-upstream-meta!
   "Requests the given IRI from a remote server and extracts the final (non-redirect) IRI, as well as the version IRI of the corresponding XML file.
+  Returns nil if the remote is an HTTP resource that returns a 304 response (this designates an unchanged resource)
   Transparently handles HTTP re-directs to FTP resources."
   [iri]
   (if (ftp-iri? iri)
@@ -111,54 +112,44 @@
         304 nil
         (throw (Exception. (str "TODO: Handle status " status)))))))
 
+(defn meta-recorded?
+  [iri]
+  (not (not (contains? @upstream-meta iri))))
+
 (defn get-upstream-meta!
-  "Checks the cache for the given URI. If found, returns it, otherwise calls fetch-upstream-meta! to get the source."
-  [uri]
-  (when (not (contains? @upstream-meta uri))
-    (if-let [fetched (fetch-upstream-meta! uri)]
-      (store-upstream-meta! uri fetched)))
-  (get @upstream-meta uri))
+  "Checks the cache for the given IRI. If found, returns it, otherwise calls fetch-upstream-meta! to get the source."
+  [iri]
+  (when (not (meta-recorded? iri))
+    (if-let [fetched (fetch-upstream-meta! iri)]
+      (store-upstream-meta! iri fetched)))
+  (get @upstream-meta iri))
 
 (defn upstream-changed?
+  "Returns true if the given IRI corresponds to an upstream ontology that has changed since its last recorded version (or if the given IRI was never recorded locally), and false otherwise."
   [iri]
-  (if (ftp-iri? iri)
-
-    (let [rdr (curl-get iri)
-          version-iri (xml->version-iri rdr)
-          path (iri->upstream-path version-iri)
-          tmp-path (iri->temp-upstream-path version-iri)]
-      (or (not (.exists (io/as-file path)))
-          (do (spit-gzipped! tmp-path rdr)
-              (not (= (digest/sha-256 (io/file tmp-path))
-                      (digest/sha-256 (io/file path)))))))
-
-    (let [{:keys [status headers body error] :as res} @(http/request {:url iri :follow-redirects false})]
-      (case status
-        200 (let [relevant (select-keys headers [:last-modified :etag :content-length])
-                  cached (get @upstream-meta iri)]
-              (not (and cached (= relevant cached))))
-        (301 302 303 307 308) (upstream-changed? (:location headers))
-        304 false
-        (throw (Exception. (str "TODO: Handle status " status)))))))
+  (or (not (meta-recorded? iri))
+      (let [current (get-upstream-meta! iri)
+            {:keys [version-iri] :as fresh} (fetch-upstream-meta! iri)
+            path (iri->upstream-path version-iri)
+            tmp-path (iri->temp-upstream-path version-iri)]
+        (or (nil? fresh)
+            (not= current fresh)
+            (and (ftp-iri? (:final-iri fresh))
+                 (or (not (.exists (io/as-file (iri->upstream-path version-iri))))
+                     (do (spit-gzipped! tmp-path (curl-get iri))
+                         (not (= (digest/sha-256 (io/file tmp-path))
+                                 (digest/sha-256 (io/file path)))))))
+            false))))
 
 (defn fetch-upstream!
   [iri]
-  (if (ftp-iri? iri)
-    (let [rdr (curl-get iri)
-          version-iri (xml->version-iri rdr)
-          fname (iri->upstream-path version-iri)]
-      (spit-gzipped! fname rdr)
-      (store-upstream-meta! iri {:sha256 (digest/sha-256 (io/file fname))})
-      (deliver (promise) true))
-    (http/request
-     {:url iri
-      :follow-redirects false}
-     (fn [{:keys [status headers body error]}]
-       (case status
-         200 (let [version-iri (xml-string->version-iri body)
-                   fname (iri->upstream-path version-iri)
-                   relevant (select-keys headers [:last-modified :etag :content-length])]
-               (store-upstream-meta! iri relevant)
-               (spit-gzipped! fname body))
-         (301 302 303 307 308) (fetch-upstream! (:location headers))
-         (throw (Exception. (str "TODO: Handle status " status))))))))
+  (let [{:keys [final-iri version-iri]} (get-upstream-meta! iri)
+        fname (iri->upstream-path version-iri)]
+    (if (ftp-iri? final-iri)
+      (spit-gzipped! fname (curl-get final-iri))
+      @(http/request
+        {:url final-iri}
+        (fn [{:keys [status headers body error]}]
+          (if (= 200 status)
+            (spit-gzipped! fname body)
+            (throw (Exception. (str "TODO: Handle status " status)))))))))

@@ -1,4 +1,4 @@
-(ns knode.server
+(ns knode.server.server
   (:require
    [clojure.java.io :as io]
    [clojure.string :as string]
@@ -21,127 +21,11 @@
    [knode.core :as core]
    [knode.emit :as emit]
    [knode.sparql :as sparql]
-   [knode.util :as util])
+   [knode.util :as util]
+
+   [knode.server.util :refer [re-root get-terms json-error login? developer?] :as sutil]
+   [knode.server.template :refer [base-template]])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
-
-;; ## Utilities
-
-(defn re-root
-  [state req uri]
-  (string/replace
-   uri
-   (:root-iri state)
-   (str "https://" (get-in req [:headers "host"] "localhost") "/")))
-
-(defn get-terms
-  [state]
-  (->> state
-       :terms
-       vals
-       (sort-by #(->> % :subject :iri))))
-
-(defn json-error
-  [status & messages]
-  {:status status
-   :headers {"Content-Type" "application/json"}
-   :body
-   (json/write-str
-    {:error (string/join " " messages)}
-    :escape-slash false)})
-
-(defn login?
-  [req]
-  (let [host (get-in req [:headers "host"])
-        google-id (:google-client-id @state)
-        google-secret (:google-client-secret @state)]
-    (and (string? host)
-         (string? google-id)
-         (not (string/blank? google-id))
-         (string? google-secret)
-         (not (string/blank? google-secret)))))
-
-(defn developer?
-  [req]
-  (or
-   ; Google login
-   (and (get-in req [:session :email])
-        (not (string/blank? (:developers @state)))
-        (contains?
-         (set (string/split (:developers @state) #"\s+"))
-         (get-in req [:session :email])))
-
-   ; API Key header
-   (let [dev-key (:dev-key @state)
-         api-key (get-in req [:headers "x-api-key"])]
-     (and (string? dev-key)
-          (string? api-key)
-          (not (string/blank? dev-key))
-          (= dev-key api-key)))))
-
-;; ## Base Template
-
-(defn stylesheet
-  [name]
-  [:link {:href (str "/assets/" name) :rel "stylesheet"}])
-
-(defn base-template
-  [req {:keys [title error message content] :as data}]
-  (pg/html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:http-equiv "X-UA-Compatible" :content "IE=edge"}]
-    [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-    [:meta {:name "description" :content ""}]
-    [:meta {:name "author" :content ""}]
-
-    [:title (or title (when error "Error"))]
-
-    (map
-     stylesheet
-     ["bootstrap.min.css"
-      "ie10-viewport-bug-workaround.css"
-      "style.css"])
-
-    "<!--[if lt IE 9]>" [:script "/assets/ie8-responsive-file-warning.js"] "<![endif]-->"
-    [:script {:src "/assets/ie-emulation-modes-warning.js"}]
-
-    ;; HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries
-    "<!--[if lt IE 9]>"
-    [:script {:src "https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"}]
-    [:script {:src "https://oss.maxcdn.com/respond/1.4.2/respond.min.js"}]
-    "<![endif]-->"]
-
-   [:body
-    [:div {:class "container"}
-     [:nav {:class "navbar navbar-default"}
-      [:div {:class "container-fluid"}
-       [:div {:class "navbar-header"}
-        [:button {:type "button" :class "navbar-toggle collapsed" :data-toggle "collapse" :data-target "#navbar" :aria-expanded "false" :aria-controls "navbar"}
-         [:span {:class "sr-only"} "Toggle navigation"]
-         [:span {:class "icon-bar"}]
-         [:span {:class "icon-bar"}]
-         [:span {:class "icon-bar"}]]
-        [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
-       [:div {:id "navbar" :class "navbar-collapse collapse"}
-        [:ul {:class "nav navbar-nav"}
-         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]
-        (if (login? req)
-          [:ul {:class "nav navbar-nav navbar-right"}
-           (if-let [name (get-in req [:session :name])]
-             [:li [:a {:href "/logout"} name  " (Log out)"]]
-             [:li [:a {:href "/login-google"} "Log in"]])])]]]
-
-     (when error
-       [:p {:id "error"} error])
-     (when message
-       [:p {:id "message"} message])
-     (when content
-       [:div {:id "content"} content])]
-
-    [:script {:src "/assets/jquery.min.js"}]
-    [:script {:src "/assets/bootstrap.min.js"}]
-    [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]]))
-
 ;; ## Authentication
 
 (defn login
@@ -223,7 +107,7 @@
 (defn render-html-predicate
   [state req label {:keys [iri datatype cardinality]}]
   [:li
-   [:a {:href (re-root state req iri)} label]
+   [:a {:href (sutil/re-root state req iri)} label]
    " ("
    cardinality
    ", "
@@ -422,7 +306,7 @@
                values (core/collect-values (:blocks term))]
            [:li
             [:a
-             {:href (re-root state req iri)}
+             {:href (sutil/re-root state req iri)}
              (core/get-curie (:env state) iri)
              " "
              (get-in values [emit/rdfs:label 0 :lexical])]]))]]})})

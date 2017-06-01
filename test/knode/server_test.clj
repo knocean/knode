@@ -6,7 +6,8 @@
             [knode.state]
             [knode.core :as core]
             [knode.sparql :as sparql]
-            [knode.server :as server]))
+            [knode.server.server :as server]
+            [knode.server.util :as sutil]))
 
 (defn ex [x] (str "https://example.com/ontology/EXAMPLE_" x))
 
@@ -135,7 +136,7 @@
                  [{"subject" {:iri (ex "0000001")} "value" {:lexical "foo"}}
                   {"subject" {:iri (ex "0000001")} "value" {:lexical "bar"}}])
                 server/render-result mock-render-result
-                server/developer? (constantly true)
+                sutil/developer? (constantly true)
                 server/validate-term (constantly nil)
                 server/update-state! (fn [state-atom new-state] new-state)]
     (test-request
@@ -146,7 +147,7 @@
     (test-request
      "retrieve project terms"
      (request :get "/ontology/EXAMPLE")
-     {:terms (server/get-terms test-state)})
+     {:terms (sutil/get-terms test-state)})
 
     (test-request
      "filter for one term"
@@ -156,14 +157,14 @@
     (test-request
      "filter for multiple terms"
      (request :get "/ontology/?CURIE=in.EXAMPLE:0000001")
-     {:terms (server/get-terms test-state)})
+     {:terms (sutil/get-terms test-state)})
 
     (test-request
      "filter for multiple terms"
      (body
       (request :post "/ontology/?method=get")
       "CURIE\nEXAMPLE:0000001")
-     {:terms (server/get-terms test-state)})
+     {:terms (sutil/get-terms test-state)})
 
     (test-request
      "select project terms and columns"

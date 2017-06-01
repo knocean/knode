@@ -7,9 +7,10 @@
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
-   [knode.server :as server]
    [knode.sparql :as sparql]
-   [knode.upstream :as up])
+   [knode.upstream :as up]
+
+   [knode.server.server :as server])
   (:gen-class))
 
 ; TODO: This is a big mess. The TSV code should be generalized.

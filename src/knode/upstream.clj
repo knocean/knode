@@ -58,7 +58,8 @@
 
 (defn ->upstream-path
   [prefix iri]
-  (io/as-relative-path (str prefix (.getPath (java.net.URL. iri)))))
+  (io/as-relative-path
+   (str prefix (.getPath (java.net.URL. iri)) ".gz")))
 
 (defn iri->upstream-path
   [iri]

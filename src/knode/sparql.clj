@@ -4,7 +4,8 @@
             [clojure.pprint :as pprint]
             [knode.state :refer [state]]
             [knode.core :as core]
-            [knode.emit :as emit])
+            [knode.emit :as emit]
+            [knode.upstream :as up])
   (:import [org.openrdf.model BNode URI Literal]
            [org.openrdf.query QueryLanguage]
            [org.openrdf.rio RDFFormat]
@@ -160,6 +161,27 @@
           (.add (io/file path) "base:" RDFFormat/TURTLE contexts)
           (.commit))
         (catch RepositoryException e
+          (println (.getMessage e))
+          (.rollback conn))))))
+
+(defn load!
+  [{:keys [blazegraph] :as state} iri]
+  (with-open [conn (.getConnection blazegraph)]
+    (let [path (up/iri->upstream-path iri)
+          rdf-format (cond
+                       (re-matches #"\.ttl" path) RDFFormat/TURTLE
+                       :else RDFFormat/RDFXML)
+          contexts (->> iri
+                        (.createURI (.getValueFactory conn))
+                        vector
+                        (into-array))]
+      (try
+        (doto conn
+          (.begin)
+          (.remove nil nil nil contexts)
+          (.add (io/file path) "base:" rdf-format contexts)
+          (.commit))
+        (catch Exception e
           (println (.getMessage e))
           (.rollback conn))))))
 

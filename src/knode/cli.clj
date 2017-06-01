@@ -8,7 +8,8 @@
    [knode.core :as core]
    [knode.emit :as emit]
    [knode.server :as server]
-   [knode.sparql :as sparql])
+   [knode.sparql :as sparql]
+   [knode.upstream :as up])
   (:gen-class))
 
 ; TODO: This is a big mess. The TSV code should be generalized.
@@ -107,6 +108,13 @@
                    (emit/emit-index (:env @state) (:terms @state))))
     "load-ncbi" (do (sparql/init-dataset! state)
                     (sparql/load-taxa! @state "tmp/taxdmp.zip"))
+    "load" (let [iri (first args)]
+             @(up/fetch-upstream iri)
+             (sparql/init-dataset! state)
+             (sparql/load! @state iri))
+    "query" (let [query (first args)]
+             (sparql/init-dataset! state)
+             (println "Results:" (sparql/select @state query)))
     "validate" (do (load!)
                    (sparql/init-dataset! state)
                    (sparql/load-terms! @state)

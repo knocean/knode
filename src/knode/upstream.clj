@@ -11,14 +11,14 @@
 
 (def upstream-meta
   (atom
-   (if (.exists (io/file "knode-meta.edn"))
-     (read-string (slurp "knode-meta.edn"))
+   (if (.exists (io/file "tmp/knode-meta.edn"))
+     (read-string (slurp "tmp/knode-meta.edn"))
      {})))
 
 (defn store-upstream-meta!
   [iri meta]
   (swap! upstream-meta #(assoc % iri meta))
-  (spit "knode-meta.edn" @upstream-meta)
+  (spit "tmp/knode-meta.edn" @upstream-meta)
   nil)
 
 (defn xml->version-iri
@@ -94,6 +94,31 @@
         (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
     [in-a in-b]))
 
+(defn fetch-upstream-meta!
+  "Requests the given IRI from a remote server and extracts the final (non-redirect) IRI, as well as the version IRI of the corresponding XML file.
+  Transparently handles HTTP re-directs to FTP resources."
+  [iri]
+  (if (ftp-iri? iri)
+    (let [version-iri (xml->version-iri (curl-get iri))]
+      {:final-iri iri :version-iri version-iri})
+    (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
+      (case status
+        200 (let [version-iri (xml->version-iri (curl-get iri))]
+              (merge
+               (select-keys headers [:last-modified :etag :content-length])
+               {:final-iri iri :version-iri version-iri}))
+        (301 302 303 307 308) (fetch-upstream-meta! (:location headers))
+        304 nil
+        (throw (Exception. (str "TODO: Handle status " status)))))))
+
+(defn get-upstream-meta!
+  "Checks the cache for the given URI. If found, returns it, otherwise calls fetch-upstream-meta! to get the source."
+  [uri]
+  (when (not (contains? @upstream-meta uri))
+    (if-let [fetched (fetch-upstream-meta! uri)]
+      (store-upstream-meta! uri fetched)))
+  (get @upstream-meta uri))
+
 (defn upstream-changed?
   [iri]
   (if (ftp-iri? iri)
@@ -107,7 +132,7 @@
               (not (= (digest/sha-256 (io/file tmp-path))
                       (digest/sha-256 (io/file path)))))))
 
-    (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
+    (let [{:keys [status headers body error] :as res} @(http/request {:url iri :follow-redirects false})]
       (case status
         200 (let [relevant (select-keys headers [:last-modified :etag :content-length])
                   cached (get @upstream-meta iri)]
@@ -116,7 +141,7 @@
         304 false
         (throw (Exception. (str "TODO: Handle status " status)))))))
 
-(defn fetch-upstream
+(defn fetch-upstream!
   [iri]
   (if (ftp-iri? iri)
     (let [rdr (curl-get iri)

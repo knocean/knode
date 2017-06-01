@@ -110,7 +110,7 @@
     "load-ncbi" (do (sparql/init-dataset! state)
                     (sparql/load-taxa! @state "tmp/taxdmp.zip"))
     "load" (let [iri (first args)]
-             @(up/fetch-upstream iri)
+             @(up/fetch-upstream! iri)
              (sparql/init-dataset! state)
              (sparql/load! @state iri))
     "query" (let [query (first args)]

@@ -8,6 +8,7 @@ subclass of: owl:Thing
 : EXAMPLE:0000002
 template: example class
 name: Two
+subclass of: EXAMPLE:0000001
 
 : EXAMPLE:0000003
 template: example class

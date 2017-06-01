@@ -543,8 +543,8 @@
 ;; ### TSV
 
 (defn seq->tsv-string
-  [headers rows]
-  (with-out-str (csv/write-csv *out* (concat [headers] rows) :separator \tab)))
+  [rows]
+  (with-out-str (csv/write-csv *out* rows :separator \tab)))
 
 (defn render-tsv-result
   [state req {:keys [status headers error term terms table] :as result}]
@@ -554,8 +554,13 @@
            :headers headers
            :body
            (seq->tsv-string
-            (:column-headers result)
-            (sparql/table-seqs->strings table))}))
+            (concat
+             (when-not
+              (->> (get-in req [:params "show-headers"] "true")
+                   string/lower-case
+                   (= "false"))
+               [(:column-headers result)])
+             (sparql/table-seqs->strings table)))}))
 
 (defn render-text-result
   [state req result]
@@ -735,10 +740,15 @@
         predicate-labels (string/split select  #",")
         predicates
         (map #(if (contains? #{"IRI" "CURIE" "recognized"} %)
-                [% %]
+                [% % nil]
                 (try
-                  [% (:iri (core/resolve-name (:env state) {:name %}))]
-                  (catch Exception e [% nil])))
+                  (let [[_ name _ fmt]
+                        (re-matches #"^(.*?)(\s*\[(\w+)\])?$" %)
+                        iri (->> {:name (string/trim name)}
+                                 (core/resolve-name (:env state))
+                                 :iri)]
+                    [% iri fmt])
+                  (catch Exception e [% nil nil])))
              predicate-labels)
         predicate-iris (map second predicates)
         iris (or iris [iri])]
@@ -752,7 +762,7 @@
       (not (util/all? predicate-iris))
       {:error
        (str
-        "Some predicate labels cannot be resolved:"
+        "Some predicate labels cannot be resolved: "
         (->> predicates
              (filter #(nil? (second %)))
              (map first)
@@ -761,8 +771,7 @@
       :else
       {:column-headers predicate-labels
        :table
-       (concat
-        (sparql/query-predicates state compact iris predicate-iris))})))
+       (sparql/query-predicates state compact iris predicates)})))
 
 (defn make-term
   [state params]

@@ -52,6 +52,8 @@ label: Example Foo")
              :object {:iri "http://example.com/template-1"}}
             {:predicate {:iri "https://example.com/ontology/EXAMPLE_name"}
              :object {:lexical "Two"}}
+            {:predicate {:iri "http://www.w3.org/2000/01/rdf-schema#subClassOf"}
+             :object {:iri (ex "0000001")}}
             {:template "http://example.com/template-1"
              :predicate {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"}
              :object {:iri "http://www.w3.org/2002/07/owl#Class"}}
@@ -110,10 +112,10 @@ label: Example Foo")
             true
             [(ex "0000001")
              "FOO:BAR"]
-            ["CURIE"
-             "IRI"
-             emit/rdfs:label
-             "http://purl.obolibrary.org/obo/IAO_0000118"])
+            [["CURIE" "CURIE" nil]
+             ["IRI" "IRI" nil]
+             ["label" emit/rdfs:label nil]
+             ["rep" "http://purl.obolibrary.org/obo/IAO_0000118" nil]])
            [[[{:curie "EXAMPLE:0000001" :iri (ex "0000001")}]
              [{:iri (ex "0000001")}]
              [{:lexical "Example One"}]
@@ -121,7 +123,22 @@ label: Example Foo")
             [[{:curie "FOO:BAR" :iri "FOO:BAR"}]
              [{:iri "FOO:BAR"}]
              []
-             []]])))
+             []]]))
+
+    (is (= (sparql/query-predicates
+            @state
+            true
+            [(ex "0000002")]
+            [["CURIE" "CURIE" nil]
+             ["subclass of"
+              "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+              nil]
+             ["subclass of [label]"
+              "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+              "label"]])
+           [[[{:curie "EXAMPLE:0000002" :iri (ex "0000002")}]
+             [{:curie "EXAMPLE:0000001" :iri (ex "0000001")}]
+             [{:lexical "Example One"}]]])))
 
   (testing "More general queries as table"
     (is (= (sparql/query-predicates-tabular
@@ -129,10 +146,10 @@ label: Example Foo")
             true
             [(ex "0000001")
              "FOO:BAR"]
-            ["CURIE"
-             "IRI"
-             emit/rdfs:label
-             "recognized"
-             "http://purl.obolibrary.org/obo/IAO_0000118"])
+            [["CURIE" "CURIE" nil]
+             ["IRI" "IRI" nil]
+             ["label" emit/rdfs:label nil]
+             ["recognized" "recognized" nil]
+             ["rep" "http://purl.obolibrary.org/obo/IAO_0000118" nil]])
            [["EXAMPLE:0000001" (ex "0000001") "Example One" "true" "ex 1|ex one"]
             ["FOO:BAR" "FOO:BAR" "" "false" ""]]))))

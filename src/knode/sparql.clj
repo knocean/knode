@@ -263,8 +263,16 @@ WHERE {
   ?subject %s ?value .
 }")
 
+(def predicate-label-query "SELECT DISTINCT ?subject ?value
+WHERE {
+  VALUES ?subject { %s }
+  ?subject %s ?x .
+  ?x <http://www.w3.org/2000/01/rdf-schema#label> ?value .
+}")
+
 (defn query-predicate
-  [state compact subject-iris predicate-iri]
+  [state compact subject-iris
+   [predicate-label predicate-iri predicate-format]]
   (case predicate-iri
     "IRI" (reduce
            (fn [coll iri] (assoc coll iri [{:iri iri}]))
@@ -279,7 +287,7 @@ WHERE {
              subject-iris)
     "recognized"
     (let [results
-          (->> "?predicate"
+          (->> ["recognized" "?predicate" nil]
                (query-predicate state compact subject-iris)
                (into {}))]
       (reduce
@@ -293,7 +301,9 @@ WHERE {
        subject-iris))
     ; else
     (->> (format
-          predicate-query
+          (if (= "label" predicate-format)
+            predicate-label-query
+            predicate-query)
           (->> subject-iris
                (filter string?)
                (map #(str "<" % ">"))
@@ -305,15 +315,19 @@ WHERE {
          (reduce
           (fn [coll match]
             (let [value (get match "value")
-                  value (if compact (compact-value (:env state) value) value)
+                  value (if (or (= "CURIE" predicate-format)
+                                (and compact
+                                     (not= "IRI" predicate-format)))
+                          (compact-value (:env state) value)
+                          value)
                   subject (get-in match ["subject" :iri])]
               (update-in coll [subject] (fnil conj []) value)))
           {}))))
 
 (defn query-predicates
-  [state compact subject-iris predicate-iris]
+  [state compact subject-iris predicates]
   (let [predicate-value-maps
-        (map #(query-predicate state compact subject-iris %) predicate-iris)]
+        (map #(query-predicate state compact subject-iris %) predicates)]
     (for [subject-iri subject-iris]
       (for [predicate-value-map predicate-value-maps]
         (sort-by :lexical (get predicate-value-map subject-iri))))))
@@ -327,9 +341,9 @@ WHERE {
            (string/join "|")))))
 
 (defn query-predicates-tabular
-  [state compact subject-iris predicate-iris]
+  [state compact subject-iris predicates]
   (table-seqs->strings
-   (query-predicates state compact subject-iris predicate-iris)))
+   (query-predicates state compact subject-iris predicates)))
 
 (defn validate-rule
   [state rule limit]

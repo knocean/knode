@@ -1,6 +1,7 @@
 (ns knode.upstream
   (:require
    [clojure.java.io :as io]
+   [clojure.data :as dat]
 
    digest
    [tempfile.core :as tmp]
@@ -11,6 +12,11 @@
 "ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.owl"
 "http://purl.obolibrary.org/obo/mro.owl"
 "https://raw.githubusercontent.com/IEDB/MRO/v2016-12-15/mro.owl"
+
+(require '[knode.upstream :as up])
+(require '[clojure.data.xml :as xml])
+(def parsed (xml/parse (java.io.StringReader. (up/slurp-gzipped "tmp/obo/mro/2016-12-15/mro.owl"))))
+(do (def ont (slurp "tmp/obo/chebi/151/chebi-raw.owl")) nil)
 
 (def upstream-meta
   (atom
@@ -64,6 +70,18 @@
 (defn curl-get
   ([iri] (java.io.BufferedReader. (java.io.InputStreamReader. (.openStream (java.net.URL. iri)))))
   ([iri callback] (callback (curl-get iri))))
+
+(defn xml->terms [xml-str]
+  (set
+   (filter
+    #(not (nil? %))
+    (map
+     #(->> % :attrs :rdf/about)
+     (->> (java.io.StringReader. xml-str) xml/parse :content)))))
+
+(defn compare-ontologies [xml-str-a xml-str-b]
+  (let [[in-a in-b _] (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
+    [in-a in-b]))
 
 (defn upstream-changed? [iri]
   (if (ftp-iri? iri)

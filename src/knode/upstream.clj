@@ -153,3 +153,17 @@
           (if (= 200 status)
             (spit-gzipped! fname body)
             (throw (Exception. (str "TODO: Handle status " status)))))))))
+
+(defn upstream-report []
+  (->> @upstream-meta
+       vals
+       (map #(select-keys % [:final-iri :version-iri]))
+       distinct
+       (map (fn [el]
+              (assoc
+               el
+               :bytes (.length (io/as-file (iri->upstream-path (:version-iri el))))
+               ;; :term-count (count (try
+               ;;                      (xml->terms (slurp-gzipped (iri->upstream-path (:version-iri el))))
+               ;;                      (catch Exception e #{})))
+               )))))

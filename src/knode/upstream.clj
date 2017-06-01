@@ -160,5 +160,5 @@
                    relevant (select-keys headers [:last-modified :etag :content-length])]
                (store-upstream-meta! iri relevant)
                (spit-gzipped! fname body))
-         (301 302 303 307 308) (fetch-upstream (:location headers))
+         (301 302 303 307 308) (fetch-upstream! (:location headers))
          (throw (Exception. (str "TODO: Handle status " status))))))))

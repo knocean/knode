@@ -89,7 +89,8 @@
                 {:iri (:iri target)
                  :datatype datatype
                  :cardinality (or cardinality "zero or more")})
-      (assoc-in [:iri-labels (:iri target)] label)))
+      (assoc-in [:iri-labels (:iri target)] label)
+      (update-in [:predicates] (fnil conj []) label)))
 
 (defn update-environment
   "Given an environment and a block-map,
@@ -483,6 +484,18 @@
        :datatype {:iri (get-in object [:datatype :iri])}}
       :else
       (select-keys object [:lexical]))}))
+
+(defn sort-blocks
+  "Given an environment with :predicates and a sequence of blocks,
+   sort the blocks by the order of the predicates."
+  [{:keys [predicates iri-label] :as env} blocks]
+  (let [order (reduce-kv (fn [acc k v] (assoc acc v k)) {} predicates)]
+    (sort-by
+     (fn [{:keys [predicate object]}]
+       [(get order (:label predicate) (count predicates))
+        (when (:lexical object) (string/lower-case (:lexical object)))
+        (:iri object)])
+     blocks)))
 
 (defn collect-values
   "Given a sequence of blocks (presumably for the same subject),

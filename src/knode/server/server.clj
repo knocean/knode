@@ -63,6 +63,21 @@
           (sort-by first)
           (map (partial apply render-html-predicate state req)))]]])
 
+(defn html-term
+  [env context subject blocks]
+  (let [values (core/collect-values blocks)
+        sorted-blocks (core/sort-blocks env blocks)]
+    [:div
+     (when (= "true" (get-in values [emit/owl:deprecated 0 :lexical]))
+       [:p
+        [:strong "OBSOLETE"]
+        " This term is obsolete and should not be used for new data."])
+     (when-let [iri (get-in values [emit/iao:replacement 0 :iri])]
+       [:p
+        [:strong "REPLACED BY " [:a {:href iri} iri]]])
+     (doall
+      (emit/emit-rdfa-term env context subject sorted-blocks))]))
+
 (defn render-html-term
   [state
    {:keys [params uri iri] :as req}
@@ -82,12 +97,11 @@
        [:div
         [:h2 (:curie subject) " " label]
         [:p [:a {:href iri} iri]]
-        (doall
-         (emit/emit-rdfa-term
-          (:env state)
-          (:context state)
-          (:subject old-term)
-          (:blocks old-term)))
+        (html-term
+         (:env state)
+         (:context state)
+         (:subject old-term)
+         (:blocks old-term))
         [:p
          "Other formats: "
          [:a
@@ -116,12 +130,11 @@
                [:input {:type "hidden"
                         :name "term-string"
                         :value (get params "term-string")}]
-               (doall
-                (emit/emit-rdfa-term
-                 (:env state)
-                 (:context state)
-                 (:subject new-term)
-                 (:blocks new-term)))
+               (html-term
+                (:env state)
+                (:context state)
+                (:subject new-term)
+                (:blocks new-term))
                [:p
                 [:input
                  {:class "btn btn-primary"

@@ -91,6 +91,7 @@
             {:prefixes {"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}}
             "@label type: rdf:type > link")
            [{:prefixes {"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}
+             :predicates ["type"]
              :labels
              {"type"
               {:iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"

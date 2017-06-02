@@ -159,11 +159,13 @@
        vals
        (map #(select-keys % [:final-iri :version-iri]))
        distinct
-       (map (fn [el]
-              (assoc
-               el
-               :bytes (.length (io/as-file (iri->upstream-path (:version-iri el))))
-               ;; :term-count (count (try
-               ;;                      (xml->terms (slurp-gzipped (iri->upstream-path (:version-iri el))))
-               ;;                      (catch Exception e #{})))
-               )))))
+       (map (fn [{:keys [version-iri] :as el}]
+              (let [f (io/as-file (iri->upstream-path version-iri))]
+                (assoc
+                 el
+                 :bytes (.length f)
+                 :name (.getName f)
+                 ;; :term-count (count (try
+                 ;;                      (xml->terms (slurp-gzipped (iri->upstream-path (:version-iri el))))
+                 ;;                      (catch Exception e #{})))
+                 ))))))

@@ -24,7 +24,8 @@
 
    [knode.server.util :as sutil]
    [knode.server.template :refer [base-template]]
-   [knode.server.authentication :as auth])
+   [knode.server.authentication :as auth]
+   [knode.server.upstream :as up])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
 
 ;; ## Ontology Term Rendering
@@ -730,6 +731,7 @@
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)
+  (GET "/dev/upstream" [] up/render-upstream-report)
 
   ; static resources
   (route/resources "")

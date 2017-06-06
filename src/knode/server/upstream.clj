@@ -8,7 +8,8 @@
   [upstream req]
   {:status 200
    :headers {"Content-Type" "text/html"}
-   :body (let [upstream-name "Foo"]
+   :body (let [iri (get-in req [:params "ontology"])
+               upstream-name "Foo"]
            (pg/base-template
             req
             {:title (str upstream-name " - Delta Report")
@@ -31,4 +32,4 @@
                                   {:method "POST"}
                                   [:input {:type "hidden" :name "ontology" :value final-iri}]
                                   [:input {:type "submit" :value "Refresh"}]]])
-                              (up/upstream-report))]})})
+                              (up/upstream-report!))]})})

@@ -94,6 +94,7 @@
   (load-state! (:ontology-dir @state) (:project-name @state)))
 
 ;; (swap! state #(assoc % :root-dir "/home/inaimathi/projects/ONTIE/" :ontology-dir "/home/inaimathi/projects/ONTIE/ontology/" :project-name "ontie"))
+;; (def xml (clojure.data.xml/parse (java.io.StringReader. (up/slurp-gzipped "tmp/obo/mro/2016-12-15/mro.owl.gz"))))
 
 ;; TODO: test command
 (defn -main [task & args]

@@ -15,10 +15,20 @@
      (read-string (slurp "tmp/knode-meta.edn"))
      {})))
 
+(add-watch
+ upstream-meta :naive-serializer
+ (fn [_key _ref _old new]
+   (spit "tmp/knode-meta.edn" new)
+   nil))
+
 (defn store-upstream-meta!
   [iri meta]
   (swap! upstream-meta #(assoc % iri meta))
-  (spit "tmp/knode-meta.edn" @upstream-meta)
+  nil)
+
+(defn amend-upstream-meta!
+  [iri meta]
+  (swap! upstream-meta #(assoc % iri (merge (get % iri) meta)))
   nil)
 
 (defn xml->version-iri
@@ -124,8 +134,24 @@
       (store-upstream-meta! iri fetched)))
   (get @upstream-meta iri))
 
+(defn description-tag->map
+  [description-tag]
+  (when description-tag
+    (->> description-tag
+         :content
+         (map (fn [t] {(:tag t) (:content t)}))
+         (apply merge-with concat)
+         (map (fn [[k v]] [k (case (count v)
+                               0 nil
+                               1 (first v)
+                               (vec v))]))
+         (filter #(not (nil? (second %))))
+         (into {}))))
+
 (defn fetch-upstream!
-  [iri {:keys [path-fn] :or {path-fn iri->upstream-path}}]
+  [iri & {:keys [path-fn update-meta?]
+          :or {path-fn iri->upstream-path
+               update-meta? true}}]
   (let [{:keys [final-iri version-iri]} (get-upstream-meta! iri)
         fname (path-fn version-iri)]
     (if (ftp-iri? final-iri)
@@ -136,11 +162,20 @@
           (if (= 200 status)
             (spit-gzipped! fname body)
             (throw (Exception. (str "TODO: Handle status " status)))))))
+    (when update-meta?
+      (let [xml (xml/parse (java.io.StringReader. (slurp-gzipped fname)))
+            terms (:content xml)]
+        (amend-upstream-meta!
+         iri {:internal-meta
+              (merge
+               {:term-count (count terms)}
+               (description-tag->map
+                (first (filter #(= :Description (:tag %)) terms))))})))
     fname))
 
 (defn fetch-for-comparison!
   [iri]
-  (fetch-upstream! iri :path-fn iri->temp-upstream-path))
+  (fetch-upstream! iri :path-fn iri->temp-upstream-path :update-meta? false))
 
 (defn upstream-changed?
   "Returns true if the given IRI corresponds to an upstream ontology that has changed since its last recorded version (or if the given IRI was never recorded locally), and false otherwise."
@@ -150,7 +185,7 @@
             {:keys [version-iri] :as fresh} (fetch-upstream-meta! iri)
             path (iri->upstream-path version-iri)]
         (or (nil? fresh)
-            (not= current fresh)
+            (not= (dissoc current :internal-meta) fresh)
             (and (ftp-iri? (:final-iri fresh))
                  (or (not (.exists (io/as-file path)))
                      (let [tmp-path (fetch-for-comparison! (:final-iri fresh))]
@@ -169,17 +204,9 @@
      (slurp-gzipped comp-path))))
 
 (defn upstream-report! []
-  (->> @upstream-meta
-       vals
-       (map #(select-keys % [:final-iri :version-iri]))
-       distinct
-       (map (fn [{:keys [version-iri] :as el}]
-              (let [f (io/as-file (iri->upstream-path version-iri))]
-                (assoc
-                 el
-                 :bytes (.length f)
-                 :name (.getName f)
-                 ;; :term-count (count (try
-                 ;;                      (xml->terms (slurp-gzipped (iri->upstream-path (:version-iri el))))
-                 ;;                      (catch Exception e #{})))
-                 ))))))
+  (map (fn [[k {:keys [version-iri] :as v}]]
+         (let [f (io/as-file (iri->upstream-path version-iri))]
+           (merge
+            {:iri k :name (.getName f) :bytes (.length f)}
+            (select-keys v [:final-iri :version-iri :name :bytes :term-count]))))
+       @upstream-meta))

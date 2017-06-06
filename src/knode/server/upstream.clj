@@ -2,19 +2,21 @@
   (:require
    [knode.upstream :as up]
 
-   [knode.server.template :as pg]))
+   [knode.server.template :as pg]
+   [knode.server.util :as util]))
 
 (defn render-upstream-delta
-  [upstream req]
+  [req]
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body (let [iri (get-in req [:params "ontology"])
-               upstream-name "Foo"]
+               meta (up/get-upstream-meta! iri)]
            (pg/base-template
             req
-            {:title (str upstream-name " - Delta Report")
+            {:title (str (:name meta) " - Delta Report")
              :content
              [:div
+              [:p (str "Upstream: " iri)]
               [:ul [:li "Removed Terms"]]
               [:ul [:li "New Terms"]]]}))})
 
@@ -25,11 +27,12 @@
    :body (pg/base-template
           req
           {:title "Upstream Ontology Report"
-           :content [:ul (map (fn [{:keys [final-iri version-iri bytes name]}]
+           :content [:ul (map (fn [{:keys [iri final-iri version-iri bytes name]}]
                                 [:li
-                                 [:a {:href "#"} name] " - " [:a {:href final-iri} "Source"]
-                                 [:form
-                                  {:method "POST"}
-                                  [:input {:type "hidden" :name "ontology" :value final-iri}]
-                                  [:input {:type "submit" :value "Refresh"}]]])
+                                 [:a {:href ""} name] " - " [:a {:href final-iri} "Source"] " - " iri
+                                 (when (not (util/login? req))
+                                   [:form
+                                    {:method "GET" :action "/dev/upstream/delta"}
+                                    [:input {:type "hidden" :name "ontology" :value iri}]
+                                    [:input {:type "submit" :value "Refresh"}]])])
                               (up/upstream-report!))]})})

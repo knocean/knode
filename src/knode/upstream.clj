@@ -163,14 +163,16 @@
             (spit-gzipped! fname body)
             (throw (Exception. (str "TODO: Handle status " status)))))))
     (when update-meta?
-      (let [xml (xml/parse (java.io.StringReader. (slurp-gzipped fname)))
+      (let [file (io/as-file fname)
+            xml (xml/parse (java.io.StringReader. (slurp-gzipped fname)))
             terms (:content xml)]
         (amend-upstream-meta!
          iri {:internal-meta
-              (merge
-               {:term-count (count terms)}
+              (assoc
                (description-tag->map
-                (first (filter #(= :Description (:tag %)) terms))))})))
+                (first (filter #(= :Description (:tag %)) terms)))
+               :term-count (count terms)
+               :bytes (.length file))})))
     fname))
 
 (defn fetch-for-comparison!
@@ -206,7 +208,7 @@
 (defn upstream-report! []
   (map (fn [[k {:keys [version-iri] :as v}]]
          (let [f (io/as-file (iri->upstream-path version-iri))]
-           (merge
-            {:iri k :name (.getName f) :bytes (.length f)}
-            (select-keys v [:final-iri :version-iri :name :bytes :term-count]))))
+           (assoc
+            (:internal-meta v)
+            :iri k :final-iri (:final-iri v))))
        @upstream-meta))

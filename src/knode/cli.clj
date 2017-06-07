@@ -7,9 +7,10 @@
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
-   [knode.server :as server]
    [knode.sparql :as sparql]
-   [knode.upstream :as up])
+   [knode.upstream :as up]
+
+   [knode.server.server :as server])
   (:gen-class))
 
 ; TODO: This is a big mess. The TSV code should be generalized.
@@ -93,6 +94,7 @@
   (load-state! (:ontology-dir @state) (:project-name @state)))
 
 ;; (swap! state #(assoc % :root-dir "/home/inaimathi/projects/ONTIE/" :ontology-dir "/home/inaimathi/projects/ONTIE/ontology/" :project-name "ontie"))
+;; (def xml (clojure.data.xml/parse (java.io.StringReader. (up/slurp-gzipped "tmp/obo/mro/2016-12-15/mro.owl.gz"))))
 
 ;; TODO: test command
 (defn -main [task & args]
@@ -109,7 +111,7 @@
     "load-ncbi" (do (sparql/init-dataset! state)
                     (sparql/load-taxa! @state "tmp/taxdmp.zip"))
     "load" (let [iri (first args)]
-             @(up/fetch-upstream iri)
+             (up/fetch-upstream! iri)
              (sparql/init-dataset! state)
              (sparql/load! @state iri))
     "query" (let [query (first args)]

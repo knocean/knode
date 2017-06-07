@@ -6,8 +6,10 @@
             [knode.core :as core]
             [knode.emit :as emit]
             [knode.cli :as cli]
-            [knode.server :as server]
-            [knode.sparql :as sparql]))
+            [knode.sparql :as sparql]
+
+            [knode.server.server :as server]
+            [knode.server.util :as sutil]))
 
 (defn ex [x] (str "https://example.com/ontology/EXAMPLE_" x))
 (def example-iri (ex "0000002"))
@@ -61,7 +63,7 @@ label: Example Foo")
              :predicate {:iri "http://www.w3.org/2000/01/rdf-schema#label"}
              :object {:lexical "Example Two"}}]))
 
-    (is (= (string/trim (emit/emit-index (:env @state) (server/get-terms @state)))
+    (is (= (string/trim (emit/emit-index (:env @state) (sutil/get-terms @state)))
            (->> "test/example/ontology/index.tsv"
                 slurp
                 string/split-lines
@@ -71,7 +73,7 @@ label: Example Foo")
     ;(is (= (emit/emit-ttl-terms (:env @state) (:context @state) (:terms @state))
     ;       (string/trim (slurp "test/example/ontology/example.ttl"))))
 
-    (is (= (emit/emit-kn-terms (:env @state) nil (server/get-terms @state))
+    (is (= (emit/emit-kn-terms (:env @state) nil (sutil/get-terms @state))
            (string/trim (slurp "test/example/ontology/example.kn"))))))
 
 (deftest test-term-query

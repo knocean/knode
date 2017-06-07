@@ -1,4 +1,4 @@
-(ns knode.server
+(ns knode.server.server
   (:require
    [clojure.java.io :as io]
    [clojure.string :as string]
@@ -15,215 +15,25 @@
    [hiccup.page :as pg]
    [markdown.core :as md]
    [yaml.core :as yaml]
-   [oauth.google :as google]
 
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
    [knode.sparql :as sparql]
-   [knode.util :as util])
+   [knode.util :as util]
+
+   [knode.server.util :as sutil]
+   [knode.server.template :refer [base-template]]
+   [knode.server.authentication :as auth]
+   [knode.server.upstream :as up])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
 
-;; ## Utilities
-
-(defn re-root
-  [state req uri]
-  (string/replace
-   uri
-   (:root-iri state)
-   (str "https://" (get-in req [:headers "host"] "localhost") "/")))
-
-(defn get-terms
-  [state]
-  (->> state
-       :terms
-       vals
-       (sort-by #(->> % :subject :iri))))
-
-(defn json-error
-  [status & messages]
-  {:status status
-   :headers {"Content-Type" "application/json"}
-   :body
-   (json/write-str
-    {:error (string/join " " messages)}
-    :escape-slash false)})
-
-(defn login?
-  [req]
-  (let [host (get-in req [:headers "host"])
-        google-id (:google-client-id @state)
-        google-secret (:google-client-secret @state)]
-    (and (string? host)
-         (string? google-id)
-         (not (string/blank? google-id))
-         (string? google-secret)
-         (not (string/blank? google-secret)))))
-
-(defn developer?
-  [req]
-  (or
-   ; Google login
-   (and (get-in req [:session :email])
-        (not (string/blank? (:developers @state)))
-        (contains?
-         (set (string/split (:developers @state) #"\s+"))
-         (get-in req [:session :email])))
-
-   ; API Key header
-   (let [dev-key (:dev-key @state)
-         api-key (get-in req [:headers "x-api-key"])]
-     (and (string? dev-key)
-          (string? api-key)
-          (not (string/blank? dev-key))
-          (= dev-key api-key)))))
-
-;; ## Base Template
-
-(defn stylesheet
-  [name]
-  [:link {:href (str "/assets/" name) :rel "stylesheet"}])
-
-(defn base-template
-  [req {:keys [title error message content] :as data}]
-  (pg/html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:http-equiv "X-UA-Compatible" :content "IE=edge"}]
-    [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-    [:meta {:name "description" :content ""}]
-    [:meta {:name "author" :content ""}]
-
-    [:title (or title (when error "Error"))]
-
-    (map
-     stylesheet
-     ["bootstrap.min.css"
-      "ie10-viewport-bug-workaround.css"
-      "style.css"])
-
-    "<!--[if lt IE 9]>" [:script "/assets/ie8-responsive-file-warning.js"] "<![endif]-->"
-    [:script {:src "/assets/ie-emulation-modes-warning.js"}]
-
-    ;; HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries
-    "<!--[if lt IE 9]>"
-    [:script {:src "https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"}]
-    [:script {:src "https://oss.maxcdn.com/respond/1.4.2/respond.min.js"}]
-    "<![endif]-->"]
-
-   [:body
-    [:div {:class "container"}
-     [:nav {:class "navbar navbar-default"}
-      [:div {:class "container-fluid"}
-       [:div {:class "navbar-header"}
-        [:button {:type "button" :class "navbar-toggle collapsed" :data-toggle "collapse" :data-target "#navbar" :aria-expanded "false" :aria-controls "navbar"}
-         [:span {:class "sr-only"} "Toggle navigation"]
-         [:span {:class "icon-bar"}]
-         [:span {:class "icon-bar"}]
-         [:span {:class "icon-bar"}]]
-        [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
-       [:div {:id "navbar" :class "navbar-collapse collapse"}
-        [:ul {:class "nav navbar-nav"}
-         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]
-        (if (login? req)
-          [:ul {:class "nav navbar-nav navbar-right"}
-           (if-let [name (get-in req [:session :name])]
-             [:li [:a {:href "/logout"} name  " (Log out)"]]
-             [:li [:a {:href "/login-google"} "Log in"]])])]]]
-
-     (when error
-       [:p {:id "error"} error])
-     (when message
-       [:p {:id "message"} message])
-     (when content
-       [:div {:id "content"} content])]
-
-    [:script {:src "/assets/jquery.min.js"}]
-    [:script {:src "/assets/bootstrap.min.js"}]
-    [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]]))
-
-;; ## Authentication
-
-(defn login
-  [req]
-  (let [host (get-in req [:headers "host"])
-        google-id (:google-client-id @state)
-        google-secret (:google-client-secret @state)]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :body
-     (base-template
-      req
-      (if (login? req)
-        {:title "Log In"
-         :content
-         [:a
-          {:href (str "https://" host "/login-google")}
-          "Log in with your Google account."]}
-        {:title "Cannot Log In"
-         :error "No login options have been configured for this project."}))}))
-
-(defn login-google
-  [req]
-  (let [host (get-in req [:headers "host"])
-        google-id (:google-client-id @state)
-        google-secret (:google-client-secret @state)]
-    (cond
-      (or (not (string? host)) (string/blank? host))
-      (json-error 403 "The hosst could not be determined.")
-
-      (or (not (string? google-id)) (string/blank? google-id))
-      (json-error 403 "The Google Client ID has not been configured.")
-
-      (or (not (string? google-secret)) (string/blank? google-secret))
-      (json-error 403 "The Google Client Secret has not been configured.")
-
-      :else
-      (redirect
-       (google/oauth-authorization-url
-        google-id
-        (str "https://" host "/oauth2-callback-google"))))))
-
-(defn oauth2-callback-google
-  [req]
-  (let [session
-        (->> (get-in req [:headers "host"])
-             (format "https://%s/oauth2-callback-google")
-             (google/oauth-access-token
-              (:google-client-id @state)
-              (:google-client-secret @state)
-              (string/replace (:query-string req) #"^code=" ""))
-             :access-token
-             google/oauth-client
-             google/user-info)]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :session session
-     :body
-     (base-template
-      (assoc req :session session)
-      {:title "Logged In"
-       :message "You have logged in."})}))
-
-(defn logout
-  [req]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :session {}
-   :body
-   (base-template
-    (dissoc req :session)
-    {:title "Log Out"
-     :message "You have logged out."})})
-
 ;; ## Ontology Term Rendering
-
 ;; ### HTML
-
 (defn render-html-predicate
   [state req label {:keys [iri datatype cardinality]}]
   [:li
-   [:a {:href (re-root state req iri)} label]
+   [:a {:href (sutil/re-root state req iri)} label]
    " ("
    cardinality
    ", "
@@ -306,7 +116,7 @@
           {:href (str (string/replace uri #".html^" "") ".tsv")}
           "TSV (tsv)"]
          "."]
-        (when (developer? req)
+        (when (sutil/developer? req)
           [:div.devlopment.container-fluid
            [:h3 "Edit Term"]
            [:div.edit.col-md-6
@@ -366,7 +176,7 @@
     {:title (:idspace state)
      :content
      [:div
-      (when (developer? req)
+      (when (sutil/developer? req)
         [:div.development.container-fluid
          [:h3 "Add Term"]
          [:div.edit.col-md-6
@@ -435,7 +245,7 @@
                values (core/collect-values (:blocks term))]
            [:li
             [:a
-             {:href (re-root state req iri)}
+             {:href (sutil/re-root state req iri)}
              (core/get-curie (:env state) iri)
              " "
              (get-in values [emit/rdfs:label 0 :lexical])]]))]]})})
@@ -443,7 +253,7 @@
 (defn render-html-value
   [state req {:keys [curie iri lexical] :as value}]
   (if iri
-    [:a {:href (re-root state req iri)} (or curie iri)]
+    [:a {:href (sutil/re-root state req iri)} (or curie iri)]
     (or curie lexical)))
 
 (defn render-html-table
@@ -485,7 +295,7 @@
    {:keys [status headers error term terms table] :as result}]
   (cond
     (and (= :post method) (find params "validate"))
-    (render-html-terms state req (assoc result :terms (get-terms state)))
+    (render-html-terms state req (assoc result :terms (sutil/get-terms state)))
 
     error {:status 400
            :body (base-template req {:title "Error" :error error})}
@@ -505,7 +315,6 @@
     term (render-html-term state req result)))
 
 ;; ### Turtle
-
 (defn render-ttl-result
   [state req {:keys [status headers error message term terms table] :as result}]
   (cond
@@ -532,7 +341,6 @@
             (:blocks term)))}))
 
 ;; ### JSON-LD
-
 (defn render-jsonld-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
@@ -554,7 +362,6 @@
            :escape-slash false)}))
 
 ;; ### TSV
-
 (defn seq->tsv-string
   [rows]
   (with-out-str (csv/write-csv *out* rows :separator \tab)))
@@ -591,7 +398,6 @@
       nil)))
 
 ;; ## Build Ontology Term
-
 (defn get-next-iri
   [iri-format iris]
   (->> (range 1 10000000)
@@ -625,7 +431,6 @@
     (throw (Exception. (str "Unknown input format: " input-format)))))
 
 ;; ## Update Ontology Terms
-
 (defn validate-term
   [state term]
   (let [iri (get-in term [:subject :iri])
@@ -636,7 +441,6 @@
     failure))
 
 ;; ## Ontology Term Methods
-
 (defn parse-request-output-format
   [{:keys [params uri] :as req}]
   (or
@@ -815,7 +619,7 @@
 
       ; authenticate
       (and (contains? #{:put :post} method)
-           (not (developer? req)))
+           (not (sutil/developer? req)))
       {:status 403 :error "Restricted to developers"}
 
       ; PUT
@@ -860,22 +664,21 @@
             {:new-state (assoc-in state [:terms iri] term)
              :status 201
              :headers {"Location"
-                       (re-root state req (get-in term [:subject :iri]))}
+                       (sutil/re-root state req (get-in term [:subject :iri]))}
              :message "Term added"
              :term term})))
 
       :else nil)
     (catch Exception e {:status 400 :error (str e)})))
-    ;(catch Exception e (throw e))))
 
 (defn update-state!
   [state-atom new-state]
   (spit
    (str (:root-dir new-state) "ontology/index.tsv")
-   (emit/emit-index (:env new-state) (get-terms new-state)))
+   (emit/emit-index (:env new-state) (sutil/get-terms new-state)))
   (spit
    (str (:root-dir new-state) "ontology/" (:project-name new-state) ".kn")
-   (emit/emit-kn-terms (:env new-state) nil (get-terms new-state)))
+   (emit/emit-kn-terms (:env new-state) nil (sutil/get-terms new-state)))
   (reset! state-atom new-state))
 
 (defn ontology-request!
@@ -891,7 +694,6 @@
      (dissoc result :new-state))))
 
 ;; ## Render Documentation
-
 (defn render-doc
   [req doc]
   {:status 200
@@ -908,7 +710,6 @@
            :content (md/md-to-html-string content)}))))})
 
 ;; ## Status
-
 (defn render-status
   [req]
   {:status 200
@@ -925,13 +726,12 @@
        [:ul [:li [:b "Terms Count"] "-" term-count]]}))})
 
 ;; ## Routes
-
 (defroutes knode-routes
   ; ## Authentication
-  (GET "/login" [] login)
-  (GET "/login-google" [] login-google)
-  (GET "/oauth2-callback-google" [] oauth2-callback-google)
-  (GET "/logout" [] logout)
+  (GET "/login" [] auth/login)
+  (GET "/login-google" [] auth/login-google)
+  (GET "/oauth2-callback-google" [] auth/oauth2-callback-google)
+  (GET "/logout" [] auth/logout)
 
   ; ## Public Pages
   ; ontology terms
@@ -944,6 +744,8 @@
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)
+  (GET "/dev/upstream/delta" [] up/render-upstream-delta)
+  (GET "/dev/upstream" [] up/render-upstream-report)
 
   ; static resources
   (route/resources "")

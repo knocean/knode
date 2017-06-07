@@ -11,14 +11,24 @@
 
 (def upstream-meta
   (atom
-   (if (.exists (io/file "knode-meta.edn"))
-     (read-string (slurp "knode-meta.edn"))
+   (if (.exists (io/file "tmp/knode-meta.edn"))
+     (read-string (slurp "tmp/knode-meta.edn"))
      {})))
+
+(add-watch
+ upstream-meta :naive-serializer
+ (fn [_key _ref _old new]
+   (spit "tmp/knode-meta.edn" new)
+   nil))
 
 (defn store-upstream-meta!
   [iri meta]
   (swap! upstream-meta #(assoc % iri meta))
-  (spit "knode-meta.edn" @upstream-meta)
+  nil)
+
+(defn amend-upstream-meta!
+  [iri meta]
+  (swap! upstream-meta #(assoc % iri (merge (get % iri) meta)))
   nil)
 
 (defn xml->version-iri
@@ -94,46 +104,111 @@
         (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
     [in-a in-b]))
 
-(defn upstream-changed?
+(defn fetch-upstream-meta!
+  "Requests the given IRI from a remote server and extracts the final (non-redirect) IRI, as well as the version IRI of the corresponding XML file.
+  Returns nil if the remote is an HTTP resource that returns a 304 response (this designates an unchanged resource)
+  Transparently handles HTTP re-directs to FTP resources."
   [iri]
   (if (ftp-iri? iri)
-
-    (let [rdr (curl-get iri)
-          version-iri (xml->version-iri rdr)
-          path (iri->upstream-path version-iri)
-          tmp-path (iri->temp-upstream-path version-iri)]
-      (or (not (.exists (io/as-file path)))
-          (do (spit-gzipped! tmp-path rdr)
-              (not (= (digest/sha-256 (io/file tmp-path))
-                      (digest/sha-256 (io/file path)))))))
-
+    (let [version-iri (xml->version-iri (curl-get iri))]
+      {:final-iri iri :version-iri version-iri})
     (let [{:keys [status headers body error] :as res} @(http/request {:url iri :method :head :follow-redirects false})]
       (case status
-        200 (let [relevant (select-keys headers [:last-modified :etag :content-length])
-                  cached (get @upstream-meta iri)]
-              (not (and cached (= relevant cached))))
-        (301 302 303 307 308) (upstream-changed? (:location headers))
-        304 false
+        200 (let [version-iri (xml->version-iri (curl-get iri))]
+              (merge
+               (select-keys headers [:last-modified :etag :content-length])
+               {:final-iri iri :version-iri version-iri}))
+        (301 302 303 307 308) (fetch-upstream-meta! (:location headers))
+        304 nil
         (throw (Exception. (str "TODO: Handle status " status)))))))
 
-(defn fetch-upstream
+(defn meta-recorded?
   [iri]
-  (if (ftp-iri? iri)
-    (let [rdr (curl-get iri)
-          version-iri (xml->version-iri rdr)
-          fname (iri->upstream-path version-iri)]
-      (spit-gzipped! fname rdr)
-      (store-upstream-meta! iri {:sha256 (digest/sha-256 (io/file fname))})
-      (deliver (promise) true))
-    (http/request
-     {:url iri
-      :follow-redirects false}
-     (fn [{:keys [status headers body error]}]
-       (case status
-         200 (let [version-iri (xml-string->version-iri body)
-                   fname (iri->upstream-path version-iri)
-                   relevant (select-keys headers [:last-modified :etag :content-length])]
-               (store-upstream-meta! iri relevant)
-               (spit-gzipped! fname body))
-         (301 302 303 307 308) (fetch-upstream (:location headers))
-         (throw (Exception. (str "TODO: Handle status " status))))))))
+  (not (not (contains? @upstream-meta iri))))
+
+(defn get-upstream-meta!
+  "Checks the cache for the given IRI. If found, returns it, otherwise calls fetch-upstream-meta! to get the source."
+  [iri]
+  (when (not (meta-recorded? iri))
+    (if-let [fetched (fetch-upstream-meta! iri)]
+      (store-upstream-meta! iri fetched)))
+  (get @upstream-meta iri))
+
+(defn description-tag->map
+  [description-tag]
+  (when description-tag
+    (->> description-tag
+         :content
+         (map (fn [t] {(:tag t) (:content t)}))
+         (apply merge-with concat)
+         (map (fn [[k v]] [k (case (count v)
+                               0 nil
+                               1 (first v)
+                               (vec v))]))
+         (filter #(not (nil? (second %))))
+         (into {}))))
+
+(defn fetch-upstream!
+  [iri & {:keys [path-fn update-meta?]
+          :or {path-fn iri->upstream-path
+               update-meta? true}}]
+  (let [{:keys [final-iri version-iri]} (get-upstream-meta! iri)
+        fname (path-fn version-iri)]
+    (if (ftp-iri? final-iri)
+      (spit-gzipped! fname (curl-get final-iri))
+      @(http/request
+        {:url final-iri}
+        (fn [{:keys [status headers body error]}]
+          (if (= 200 status)
+            (spit-gzipped! fname body)
+            (throw (Exception. (str "TODO: Handle status " status)))))))
+    (when update-meta?
+      (let [file (io/as-file fname)
+            xml (xml/parse (java.io.StringReader. (slurp-gzipped fname)))
+            terms (:content xml)]
+        (amend-upstream-meta!
+         iri {:internal-meta
+              (assoc
+               (description-tag->map
+                (first (filter #(= :Description (:tag %)) terms)))
+               :term-count (count terms)
+               :bytes (.length file))})))
+    fname))
+
+(defn fetch-for-comparison!
+  [iri]
+  (fetch-upstream! iri :path-fn iri->temp-upstream-path :update-meta? false))
+
+(defn upstream-changed?
+  "Returns true if the given IRI corresponds to an upstream ontology that has changed since its last recorded version (or if the given IRI was never recorded locally), and false otherwise."
+  [iri]
+  (or (not (meta-recorded? iri))
+      (let [current (get-upstream-meta! iri)
+            {:keys [version-iri] :as fresh} (fetch-upstream-meta! iri)
+            path (iri->upstream-path version-iri)]
+        (or (nil? fresh)
+            (not= (dissoc current :internal-meta) fresh)
+            (and (ftp-iri? (:final-iri fresh))
+                 (or (not (.exists (io/as-file path)))
+                     (let [tmp-path (fetch-for-comparison! (:final-iri fresh))]
+                       (not (= (digest/sha-256 (io/file tmp-path))
+                               (digest/sha-256 (io/file path)))))))
+            false))))
+
+(defn upstream-delta! [iri]
+  (let [{:keys [final-iri version-iri] :as meta} (get-upstream-meta! iri)
+        path (iri->upstream-path version-iri)
+        comp-path (iri->temp-upstream-path version-iri)]
+    (when (not (.exists (io/as-file comp-path))) (fetch-for-comparison! iri))
+    (when (not (.exists (io/as-file path))) (fetch-upstream! iri))
+    (compare-ontologies
+     (slurp-gzipped path)
+     (slurp-gzipped comp-path))))
+
+(defn upstream-report! []
+  (map (fn [[k {:keys [version-iri] :as v}]]
+         (let [f (io/as-file (iri->upstream-path version-iri))]
+           (assoc
+            (:internal-meta v)
+            :iri k :final-iri (:final-iri v))))
+       @upstream-meta))

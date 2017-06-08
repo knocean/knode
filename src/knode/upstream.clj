@@ -5,6 +5,7 @@
    [clojure.data.xml :as xml]
 
    digest
+   [me.raynes.fs :as fs]
    [tempfile.core :as tmp]
    [org.httpkit.client :as http]
    [clojure.data.xml :as xml]))
@@ -196,17 +197,29 @@
                                (digest/sha-256 (io/file path)))))))
             false))))
 
-(defn upstream-delta! [iri]
+(defn replace-with-compared!
+  [iri]
   (let [{:keys [final-iri version-iri] :as meta} (get-upstream-meta! iri)
         path (iri->upstream-path version-iri)
         comp-path (iri->temp-upstream-path version-iri)]
-    (when (not (.exists (io/as-file comp-path))) (fetch-for-comparison! iri))
-    (when (not (.exists (io/as-file path))) (fetch-upstream! iri))
+    (when (.exists (io/as-file comp-path))
+      (fs/rename comp-path path))))
+
+(defn upstream-delta!
+  [iri & {:keys [fresh-compare?] :or [fresh-compare? false]}]
+  (let [{:keys [final-iri version-iri] :as meta} (get-upstream-meta! iri)
+        path (iri->upstream-path version-iri)
+        comp-path (iri->temp-upstream-path version-iri)]
+    (when (or fresh-compare? (not (.exists (io/as-file comp-path))))
+      (fetch-for-comparison! iri))
+    (when (not (.exists (io/as-file path)))
+      (fetch-upstream! iri))
     (compare-ontologies
      (slurp-gzipped path)
      (slurp-gzipped comp-path))))
 
-(defn upstream-report! []
+(defn upstream-report!
+  []
   (map (fn [[k {:keys [version-iri] :as v}]]
          (let [f (io/as-file (iri->upstream-path version-iri))]
            (assoc

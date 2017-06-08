@@ -16,8 +16,9 @@
 (defn replace-upstream!
   [req]
   (let [iri (get-in req [:params "ontology"])
-        {:keys [internal-meta final-iri] :as meta} (up/get-upstream-meta! iri)
-        {:keys [title name]} internal-meta]
+        {:keys [final-iri]
+         {:keys [title name]} :internal-meta
+         :as meta} (up/get-upstream-meta! iri)]
     (up/replace-with-compared! iri)
     {:status 200
      :headers {"Content-Type" "text/html"}
@@ -35,8 +36,9 @@
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body (let [iri (get-in req [:params "ontology"])
-               {:keys [internal-meta final-iri] :as meta} (up/get-upstream-meta! iri)
-               {:keys [title name]} internal-meta
+               {:keys [final-iri]
+                {:keys [title name]} :internal-meta
+                :as meta} (up/get-upstream-meta! iri)
                [deleted added] (up/upstream-delta! iri :fresh-compare? true)]
            (pg/base-template
             req

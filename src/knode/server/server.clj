@@ -257,7 +257,9 @@
     (or curie lexical)))
 
 (defn render-html-table
-  [state req {:keys [status headers error message table] :as result}]
+  [state
+   {:keys [params uri] :as req}
+   {:keys [status headers error message table] :as result}]
   {:status (or status 200)
    :headers headers
    :body
@@ -268,6 +270,33 @@
      :message message
      :content
      [:div
+      (when (= uri "/query")
+        [:form
+         {:method "GET" :action "/query"}
+         [:input {:type "hidden" :name "compact" :value "true"}]
+         [:textarea
+          {:name "sparql"
+           :rows (-> state :env :prefixes count (+ 6))
+           :style "width: 100%"}
+          (or
+           (get params "sparql")
+           (string/join
+            "\n"
+            (concat
+             (for [[prefix iri] (-> state :env :prefixes)]
+               (format "PREFIX %s: <%s>" prefix iri))
+             [""
+              "SELECT *"
+              "WHERE {"
+              "  ?s ?p ?o"
+              "}"
+              "LIMIT 10"])))]
+         [:p
+          [:input
+           {:class "btn btn-primary"
+            :type "submit"
+            :name "query"
+            :value "Run Query"}]]])
       [:p
        "Other formats: "
        [:a
@@ -515,10 +544,16 @@
        [(if (= "true" (get params "compact")) "CURIE" "IRI")
         (->> state :terms keys sort)]))))
 
+(defn parse-request-method
+  [{:keys [params request-method] :as req}]
+  (if (find params "method")
+    (-> (get params "method" "") string/lower-case keyword)
+    request-method))
+
 (defn parse-ontology-request
   "Given a state and a request map,
    return a map with :format and :iris keys."
-  [state {:keys [params request-method] :as req}]
+  [state {:keys [params] :as req}]
   (cond
     (and (find params "IRI")
          (not (re-find #"^(eq|in)\." (get params "IRI"))))
@@ -536,10 +571,7 @@
 
     :else
     (merge
-     (when-let [method
-                (if (find params "method")
-                  (-> (get params "method" "") string/lower-case keyword)
-                  request-method)]
+     (when-let [method (parse-request-method req)]
        {:method method})
      (when-let [output-format (parse-request-output-format req)]
        {:output-format output-format})
@@ -693,6 +725,25 @@
      req
      (dissoc result :new-state))))
 
+(defn query-request!
+  [state-atom {:keys [params] :as req}]
+  (let [method (parse-request-method req)
+        compact (= "true" (get params "compact"))
+        output-format (parse-request-output-format req)
+        sparql (get params "sparql")]
+    (render-result
+     @state-atom
+     (assoc req :method method :output-format output-format)
+     (cond
+       (not= :get method)
+       {:error "Only GET is currently supported"}
+       (nil? sparql)
+       {:table []}
+       :else
+       (let [results (sparql/select-table @state-atom compact sparql)]
+         {:column-headers (first results)
+          :table (rest results)})))))
+
 ;; ## Render Documentation
 (defn render-doc
   [req doc]
@@ -736,6 +787,8 @@
   ; ## Public Pages
   ; ontology terms
   (ANY "/ontology/*" [:as req] (ontology-request! state req))
+
+  (ANY "/query" [:as req] (query-request! state req))
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))

@@ -10,15 +10,28 @@
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body (let [iri (get-in req [:params "ontology"])
-               meta (up/get-upstream-meta! iri)]
+               {:keys [internal-meta final-iri] :as meta} (up/get-upstream-meta! iri)
+               {:keys [title name]} internal-meta
+               [deleted added] (up/upstream-delta! iri)]
            (pg/base-template
             req
-            {:title (str (:name meta) " - Delta Report")
+            {:title (str (or title name) " - Delta Report")
              :content
              [:div
-              [:p (str "Upstream: " iri)]
-              [:ul [:li "Removed Terms"]]
-              [:ul [:li "New Terms"]]]}))})
+              [:h1 (or title name) " Delta"]
+              [:p (str meta)]
+              (when (not= iri final-iri)
+                [:i [:code "[" iri " -> " final-iri "]"]])
+              (when (and (empty? deleted) (empty? added))
+                [:p "No terms changed..."])
+              (when (not (empty? deleted))
+                [:div
+                 [:h3 "Removed Terms:"]
+                 [:ul (map (fn [term] [:li term]) deleted)]])
+              (when (not (empty? added))
+                [:div
+                 [:h3 "New Terms:"]
+                 [:ul (map (fn [term] [:li term]) added)]])]}))})
 
 (defn render-upstream-report
   [req]
@@ -27,9 +40,11 @@
    :body (pg/base-template
           req
           {:title "Upstream Ontology Report"
-           :content [:ul (map (fn [{:keys [iri final-iri version-iri bytes name]}]
+           :content [:ul (map (fn [{:keys [iri final-iri version-iri bytes title name]}]
                                 [:li
-                                 [:a {:href ""} name] " - " [:a {:href final-iri} "Source"] " - " iri
+                                 (or title name) " - " [:a {:href final-iri :hover final-iri} "Source"]
+                                 (when (not= iri final-iri)
+                                   [:code "[" iri " -> " final-iri "]"])
                                  (when (not (util/login? req))
                                    [:form
                                     {:method "GET" :action "/dev/upstream/delta"}

@@ -20,6 +20,7 @@
 (add-watch
  upstream-meta :naive-serializer
  (fn [_key _ref _old new]
+   (io/make-parents +upstream-meta-file+)
    (spit +upstream-meta-file+ new)
    nil))
 

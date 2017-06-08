@@ -75,7 +75,7 @@
                                  (or title name) " - " [:a {:href final-iri :hover final-iri} "Source"]
                                  (when (not= iri final-iri)
                                    [:code "[" iri " -> " final-iri "]"])
-                                 (when (not (util/login? req))
+                                 (when (util/login? req)
                                    (action-form
                                     "/dev/upstream/delta" "Refresh"
                                     :hidden {"ontology" iri}))])

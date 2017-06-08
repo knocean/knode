@@ -9,16 +9,17 @@
    [org.httpkit.client :as http]
    [clojure.data.xml :as xml]))
 
+(def +upstream-meta-file+ "tmp/knode-meta.edn")
 (def upstream-meta
   (atom
-   (if (.exists (io/file "tmp/knode-meta.edn"))
-     (read-string (slurp "tmp/knode-meta.edn"))
+   (if (.exists (io/file +upstream-meta-file+))
+     (read-string (slurp +upstream-meta-file+))
      {})))
 
 (add-watch
  upstream-meta :naive-serializer
  (fn [_key _ref _old new]
-   (spit "tmp/knode-meta.edn" new)
+   (spit +upstream-meta-file+ new)
    nil))
 
 (defn store-upstream-meta!

@@ -744,6 +744,7 @@
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)
+  (POST "/dev/upstream/delta" [] up/replace-upstream!)
   (GET "/dev/upstream/delta" [] up/render-upstream-delta)
   (GET "/dev/upstream" [] up/render-upstream-report)
 

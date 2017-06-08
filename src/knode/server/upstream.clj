@@ -15,53 +15,71 @@
 
 (defn replace-upstream!
   [req]
-  (let [iri (get-in req [:params "ontology"])
-        {:keys [final-iri]
-         {:keys [title name]} :internal-meta
-         :as meta} (up/get-upstream-meta! iri)]
-    (up/replace-with-compared! iri)
-    {:status 200
+  (if (util/login? req)
+    (let [iri (get-in req [:params "ontology"])
+          {:keys [final-iri]
+           {:keys [title name]} :internal-meta
+           :as meta} (up/get-upstream-meta! iri)]
+      (up/replace-with-compared! iri)
+      {:status 200
+       :headers {"Content-Type" "text/html"}
+       :body (pg/base-template
+              req
+              {:title (str (or title name) " - Updated")
+               :content
+               [:div
+                [:h1 (or title name) " Updated"]
+                [:p "The ontology " (or title name) " has been updated."]
+                [:p [:a {:href "/dev/upstream"} "Click here"] " to return to the upstream report."]]})})
+    {:status 403
      :headers {"Content-Type" "text/html"}
      :body (pg/base-template
             req
-            {:title (str (or title name) " - Updated")
-             :content
-             [:div
-              [:h1 (or title name) " Updated"]
-              [:p "The ontology " (or title name) " has been updated."]
-              [:p [:a {:href "/dev/upstream"} "Click here"] " to return to the upstream report."]]})}))
+            {:title "Forbidden"
+             :content [:div
+                       [:h1 "Forbidden"]
+                       [:p "You must be logged in to replace an upstream ontology."]]})}))
 
 (defn render-upstream-delta
   [req]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :body (let [iri (get-in req [:params "ontology"])
-               {:keys [final-iri]
-                {:keys [title name]} :internal-meta
-                :as meta} (up/get-upstream-meta! iri)
-               [deleted added] (up/upstream-delta! iri :fresh-compare? true)]
-           (pg/base-template
+  (if (util/login? req)
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body (let [iri (get-in req [:params "ontology"])
+                 {:keys [final-iri]
+                  {:keys [title name]} :internal-meta
+                  :as meta} (up/get-upstream-meta! iri)
+                 [deleted added] (up/upstream-delta! iri :fresh-compare? true)]
+             (pg/base-template
+              req
+              {:title (str (or title name) " - Delta Report")
+               :content
+               [:div
+                [:h1 (or title name) " Delta"]
+                (when (not= iri final-iri)
+                  [:p [:i [:code "[" iri " -> " final-iri "]"]]])
+                (if (and (empty? deleted) (empty? added))
+                  [:p "No change since last sync."]
+                  (action-form
+                   "/dev/upstream/delta" "Accept New Version"
+                   :method "POST"
+                   :hidden {"ontology" iri}))
+                (when (not (empty? deleted))
+                  [:div
+                   [:h3 "Removed Terms:"]
+                   [:ul (map (fn [term] [:li term]) deleted)]])
+                (when (not (empty? added))
+                  [:div
+                   [:h3 "New Terms:"]
+                   [:ul (map (fn [term] [:li term]) added)]])]}))}
+    {:status 403
+     :headers {"Content-Type" "text/html"}
+     :body (pg/base-template
             req
-            {:title (str (or title name) " - Delta Report")
-             :content
-             [:div
-              [:h1 (or title name) " Delta"]
-              (when (not= iri final-iri)
-                [:p [:i [:code "[" iri " -> " final-iri "]"]]])
-              (if (and (empty? deleted) (empty? added))
-                [:p "No change since last sync."]
-                (action-form
-                 "/dev/upstream/delta" "Accept New Version"
-                 :method "POST"
-                 :hidden {"ontology" iri}))
-              (when (not (empty? deleted))
-                [:div
-                 [:h3 "Removed Terms:"]
-                 [:ul (map (fn [term] [:li term]) deleted)]])
-              (when (not (empty? added))
-                [:div
-                 [:h3 "New Terms:"]
-                 [:ul (map (fn [term] [:li term]) added)]])]}))})
+            {:title "Forbidden"
+             :content [:div
+                       [:h1 "Forbidden"]
+                       [:p "You must be logged in to view an upstream ontology delta."]]})}))
 
 (defn render-upstream-report
   [req]

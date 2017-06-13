@@ -10,6 +10,7 @@
    [ring.util.response :refer [redirect]]
    [ring.middleware.session :refer [wrap-session]]
    [ring.middleware.params :refer [wrap-params]]
+   [ring.middleware.head :refer [wrap-head]]
 
    [hiccup.core :as hiccup]
    [hiccup.page :as pg]
@@ -341,6 +342,7 @@
         req
         {:title "Term added"
          :content [:p "Added new term: " [:a {:href location} iri]]})})
+
     term (render-html-term state req result)))
 
 ;; ### Turtle
@@ -415,8 +417,18 @@
   [state req result]
   (str result))
 
+(defn http-time
+  [date]
+  (when date
+    (let [df (java.text.SimpleDateFormat.
+              "EEE, dd MMM yyyy HH:mm:ss z"
+              java.util.Locale/US)]
+      (.setTimeZone df (java.util.TimeZone/getTimeZone "GMT"))
+      (.format df date))))
+
 (defn render-result
-  [state {:keys [output-format] :as req} result]
+  [{:keys [last-modified] :as state}
+   {:keys [output-format] :as req} result]
   (when result
     (case (or output-format "html")
       "html" (render-html-result state req result)
@@ -711,19 +723,25 @@
   (spit
    (str (:root-dir new-state) "ontology/" (:project-name new-state) ".kn")
    (emit/emit-kn-terms (:env new-state) nil (sutil/get-terms new-state)))
-  (reset! state-atom new-state))
+  (reset!
+   state-atom
+   (assoc new-state :last-modified (java.util.Date.))))
 
 (defn ontology-request!
   [state-atom req]
   (let [req (merge (parse-ontology-request @state-atom req) req)
-        {:keys [new-state] :as result}
-        (ontology-request-handler @state-atom req)]
-    (render-result
-     (if new-state
-       (update-state! state-atom new-state)
-       @state-atom)
-     req
-     (dissoc result :new-state))))
+        result (ontology-request-handler @state-atom req)
+        state (if (:new-state result)
+                (update-state! state-atom (:new-state result))
+                @state-atom)
+        result (dissoc result :new-state)
+        result (if (:last-modified state)
+                 (assoc-in
+                  result
+                  [:headers "Last-Modified"]
+                  (http-time (:last-modified state)))
+                 result)]
+    (render-result state req result)))
 
 (defn query-request!
   [state-atom {:keys [params] :as req}]
@@ -829,7 +847,8 @@
    (httpkit/run-server
     (->> knode-routes
          wrap-session
-         wrap-params)
+         wrap-params
+         wrap-head)
     {:port (Integer. (:port @state))})))
 
 (defn stop

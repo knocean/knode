@@ -54,4 +54,5 @@
        (map (fn [[k v]] (format "%-18s %s" k (str v))))
        (string/join "\n")))
 
-(defonce state (atom (init env)))
+(defonce state
+  (atom (assoc (init env) :last-modified (java.util.Date.))))

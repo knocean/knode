@@ -19,6 +19,7 @@
                  [ring/ring-mock "0.3.0"]
                  [compojure "1.5.1"]
                  [oauth-clj "0.1.15"]
+                 [clj-jgit "0.8.9"]
 
                  [com.blazegraph/bigdata-core "2.1.4"]]
 

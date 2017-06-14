@@ -16,6 +16,7 @@
    [hiccup.page :as pg]
    [markdown.core :as md]
    [yaml.core :as yaml]
+   [clj-jgit.porcelain :as git]
 
    [knode.state :refer [state]]
    [knode.core :as core]
@@ -613,7 +614,8 @@
     (catch Exception e [nil {:label (.getMessage e)}])))
 
 (defn ontology-request-handler
-  [state {:keys [params error method output-format uri iri iris] :as req}]
+  [{:keys [env] :as state}
+   {:keys [params error method output-format uri iri iris] :as req}]
   (try
     (cond
       error {:error error}
@@ -638,7 +640,8 @@
       (= :put method)
       (when (and iri (get-in state [:terms iri]))
         (let [[term failure] (make-term state params)
-              iri (get-in term [:subject :iri])]
+              iri (get-in term [:subject :iri])
+              curie (core/get-curie env iri)]
           (cond
             failure
             {:error (str "Validation failed: " (:label failure))}
@@ -655,13 +658,15 @@
             :else
             {:new-state (assoc-in state [:terms iri] term)
              :message "Term updated"
+             :log (str "Update term " curie)
              :term term})))
 
       ; POST
       (= :post method)
       (when (= uri (str "/ontology/" (:idspace state)))
         (let [[term failure] (make-term state params)
-              iri (get-in term [:subject :iri])]
+              iri (get-in term [:subject :iri])
+              curie (core/get-curie env iri)]
           (cond
             failure
             {:error (str "Validation failed: " (:label failure))}
@@ -678,29 +683,43 @@
              :headers {"Location"
                        (sutil/re-root state req (get-in term [:subject :iri]))}
              :message "Term added"
+             :log (str "Add term " curie)
              :term term})))
 
       :else nil)
     (catch Exception e {:status 400 :error (str e)})))
 
 (defn update-state!
-  [state-atom new-state]
-  (spit
-   (str (:root-dir new-state) "ontology/index.tsv")
-   (emit/emit-index (:env new-state) (sutil/get-terms new-state)))
-  (spit
-   (str (:root-dir new-state) "ontology/" (:project-name new-state) ".kn")
-   (emit/emit-kn-terms (:env new-state) nil (sutil/get-terms new-state)))
-  (reset!
-   state-atom
-   (assoc new-state :last-modified (java.util.Date.))))
+  [state-atom
+   {:keys [ontology-dir project-name env git-repo] :as new-state}
+   message username email]
+  (let [index-path (str ontology-dir "index.tsv")
+        term-path (str ontology-dir project-name ".kn")]
+    (spit
+     index-path
+     (emit/emit-index env (sutil/get-terms new-state)))
+    (spit
+     term-path
+     (emit/emit-kn-terms env nil (sutil/get-terms new-state)))
+    (when (and git-repo message username email)
+      (git/git-add git-repo index-path)
+      (git/git-add git-repo term-path)
+      (git/git-commit git-repo message {:name username :email email}))
+    (reset!
+     state-atom
+     (assoc new-state :last-modified (java.util.Date.)))))
 
 (defn ontology-request!
   [state-atom req]
   (let [req (merge (parse-ontology-request @state-atom req) req)
         result (ontology-request-handler @state-atom req)
         state (if (:new-state result)
-                (update-state! state-atom (:new-state result))
+                (update-state!
+                 state-atom
+                 (:new-state result)
+                 (:log result)
+                 (get-in req [:session :name])
+                 (get-in req [:session :email]))
                 @state-atom)
         result (dissoc result :new-state)
         result (if (:last-modified state)

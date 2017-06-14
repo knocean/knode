@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [environ.core :refer [env]]
+            [clj-jgit.porcelain :as git]
 
             [knode.core :as core]))
 
@@ -55,4 +56,8 @@
        (string/join "\n")))
 
 (defonce state
-  (atom (assoc (init env) :last-modified (java.util.Date.))))
+  (-> env
+      init
+      (assoc :last-modified (java.util.Date.))
+      (assoc :git-repo (git/load-repo "."))
+      atom))

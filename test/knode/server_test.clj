@@ -138,7 +138,9 @@
                 server/render-result mock-render-result
                 sutil/developer? (constantly true)
                 server/validate-term (constantly nil)
-                server/update-state! (fn [state-atom new-state] new-state)]
+                server/update-state!
+                (fn [state-atom new-state message username email]
+                  new-state)]
     (test-request
      "retrieve one term"
      (request :get "/ontology/EXAMPLE_0000001")
@@ -206,6 +208,7 @@
        :term-string update-term-string
        :add "Add Term"})
      {:message "Term updated"
+      :log "Update term EXAMPLE:0000001"
       :term updated-term})
 
     (test-request
@@ -218,6 +221,7 @@
      {:status 201
       :headers {"Location" "https://localhost/ontology/EXAMPLE_0000002"}
       :message "Term added"
+      :log "Add term EXAMPLE:0000002"
       :term added-term})
 
     (test-request

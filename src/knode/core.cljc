@@ -548,11 +548,11 @@
              (get templates template-iri)]
          (doseq [label required-predicates]
            (let [iri (get-in env [:labels label :iri])]
-             (when-not (= 1 (count (get coll iri)))
+             (when (= 0 (count (get coll iri)))
                (util/throw-exception
                 "Predicate '"
                 label
-                "' must have exactly one value in "
+                "' must have at least one value in "
                 coll))))
          (for [statement statements]
            (let [block (substitute env coll statement)]

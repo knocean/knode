@@ -10,6 +10,7 @@
 
                  [tempfile "0.2.0"]
                  [digest "1.4.5"]
+                 [me.raynes/fs "1.4.6"]
 
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]

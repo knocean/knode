@@ -17,7 +17,7 @@
 
 (defn replace-upstream!
   [req]
-  (if (util/login? req)
+  (if (util/developer? req)
     (let [iri (get-in req [:params "ontology"])
           {:keys [final-iri version-iri]
            {:keys [title name]} :internal-meta
@@ -47,7 +47,7 @@
 
 (defn render-upstream-delta
   [req]
-  (if (util/login? req)
+  (if (util/developer? req)
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body (let [iri (get-in req [:params "ontology"])
@@ -98,7 +98,7 @@
                                  (or title name) " - " [:a {:href final-iri :hover final-iri} "Source"]
                                  (when (not= iri final-iri)
                                    [:code "[" iri " -> " final-iri "]"])
-                                 (when (util/login? req)
+                                 (when (util/developer? req)
                                    (action-form
                                     "/dev/upstream/delta" "Refresh"
                                     :hidden {"ontology" iri}))])

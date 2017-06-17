@@ -3,7 +3,9 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :plugins [[lein-cljsbuild "1.1.6"]]
   :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojurescript "1.9.521"]
                  [org.clojure/data.json "0.2.6"]
                  [org.clojure/data.csv "0.1.3"]
                  [org.clojure/data.xml "0.0.8"]
@@ -22,6 +24,11 @@
                  [clj-jgit "0.8.9"]
 
                  [com.blazegraph/bigdata-core "2.1.4"]]
+
+  :cljsbuild {:builds [{:source-paths ["src/knode/front_end"]
+                        :compiler {:output-to "resources/public/js/main.js"
+                                   :optimizations :whitespace
+                                   :pretty-print true}}]}
 
   :main knode.cli
   :aot [knode.cli])

@@ -1,6 +1,8 @@
 (ns knode.server.upstream
   (:require
    [knode.upstream :as up]
+   [knode.state :as state]
+   [knode.sparql :as sparql]
 
    [knode.server.template :as pg]
    [knode.server.util :as util]))
@@ -17,10 +19,13 @@
   [req]
   (if (util/login? req)
     (let [iri (get-in req [:params "ontology"])
-          {:keys [final-iri]
+          {:keys [final-iri version-iri]
            {:keys [title name]} :internal-meta
            :as meta} (up/get-upstream-meta! iri)]
       (up/replace-with-compared! iri)
+      (sparql/init-dataset! state/state)
+      (sparql/load! @state/state version-iri)
+
       {:status 200
        :headers {"Content-Type" "text/html"}
        :body (pg/base-template

@@ -27,7 +27,8 @@
    [knode.server.util :as sutil]
    [knode.server.template :refer [base-template]]
    [knode.server.authentication :as auth]
-   [knode.server.upstream :as up])
+   [knode.server.upstream :as up]
+   [knode.server.query :as query])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
 
 ;; ## Ontology Term Rendering
@@ -825,7 +826,8 @@
   ; ontology terms
   (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
-  (ANY "/query" [:as req] (query-request! state req))
+  (ANY "/api/query" [:as req] (query-request! state req))
+  (GET "/query" [] query/render-query-interface)
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))

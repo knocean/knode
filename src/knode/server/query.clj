@@ -11,8 +11,6 @@
           req
           {:title "Query Interface"
            :content [:div
-                     [:div {:id "editor" :style "width: 100%; height: 400px;"}]
+                     [:div {:id "editor"}]
                      [:button {:class "send-query"} "Query"]
-                     [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]
-                     [:script
-                      "var editor = ace.edit(\"editor\"); editor.setTheme(\"ace/theme/monokai\"); editor.getSession().setMode(\"ace/mode/sqlserver\");"]]})})
+                     [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]]})})

@@ -1,3 +1,5 @@
 (ns knode.front-end.core)
 
-(.log js/console "Hello from auto-loading Clojurescript!")
+(def editor (.edit js/ace "editor"))
+(.setTheme editor "ace/theme/monokai")
+(-> editor (.getSession) (.setMode "ace/mode/sqlserver"))

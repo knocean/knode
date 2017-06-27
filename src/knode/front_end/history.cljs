@@ -3,11 +3,24 @@
 
 (def storage? (not (not (type js/Storage))))
 
-(def history (atom (reader/read-string (or (and storage? (.getItem js/localStorage "query-history")) "[]"))))
+(def history (atom
+              (clj->js
+               (reader/read-string
+                (or (and storage? (.getItem js/localStorage "query-history"))
+                    "[]")))))
 (defn history-max [] (max 0 (- (count @history) 1)))
 (def history-position (atom (history-max)))
 
 (defn max? [] (= (history-max) @history-position))
+
+(defn get-defaults! []
+  (-> js/$
+      (.get "/static/default-queries.edn")
+      (.done (fn [data]
+               (when (not (empty? data))
+                 (let [qs (clj->js (reader/read-string data))]
+                   (swap! history #(vec (concat qs %)))
+                   (swap! history-position #(+ % (count qs)))))))))
 
 (defn push! [query]
   (when (and (not (empty? query)) (not (= (last @history) query)))

@@ -40,5 +40,7 @@
    (when (= (history/current) (.getValue ed)) (history/next!))
    (.setValue ed (history/current))))
 
+(history/get-defaults!)
+
 (-> (js/$ ".send-query")
     (.click #(send-query (.getValue editor))))

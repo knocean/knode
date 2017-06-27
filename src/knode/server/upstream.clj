@@ -54,7 +54,12 @@
                  {:keys [final-iri]
                   {:keys [title name]} :internal-meta
                   :as meta} (up/get-upstream-meta! iri)
-                 [deleted added] (up/upstream-delta! iri :fresh-compare? true)]
+                 [deleted added changed] (up/upstream-delta! iri :fresh-compare? true)
+                 maybe-ul (fn [label seq]
+                            (when (not (empty? seq))
+                              [:div
+                               [:h3 label]
+                               [:ul (map (fn [thing] [:li thing]) seq)]]))]
              (pg/base-template
               req
               {:title (str (or title name) " - Delta Report")
@@ -63,20 +68,16 @@
                 [:h1 (or title name) " Delta"]
                 (when (not= iri final-iri)
                   [:p [:i [:code "[" iri " -> " final-iri "]"]]])
-                (if (and (empty? deleted) (empty? added))
+                (if (and (empty? deleted) (empty? added) (empty? changed))
                   [:p "No change since last sync."]
                   (action-form
                    "/dev/upstream/delta" "Accept New Version"
                    :method "POST"
                    :hidden {"ontology" iri}))
-                (when (not (empty? deleted))
-                  [:div
-                   [:h3 "Removed Terms:"]
-                   [:ul (map (fn [term] [:li term]) deleted)]])
-                (when (not (empty? added))
-                  [:div
-                   [:h3 "New Terms:"]
-                   [:ul (map (fn [term] [:li term]) added)]])]}))}
+                (maybe-ul "Removed Terms:" deleted)
+                (maybe-ul "New Terms:" added)
+                (maybe-ul "Changed Terms:" changed)]}))}
+
     {:status 403
      :headers {"Content-Type" "text/html"}
      :body (pg/base-template

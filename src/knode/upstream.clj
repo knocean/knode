@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.data :as dat]
    [clojure.data.xml :as xml]
+   [clojure.set :as set]
 
    digest
    [me.raynes.fs :as fs]
@@ -94,18 +95,25 @@
 
 (defn xml->terms
   [xml-str]
-  (set
-   (filter
-    #(not (nil? %))
+  (dissoc
+   (into
+    {}
     (map
-     #(->> % :attrs :rdf/about)
-     (->> (java.io.StringReader. xml-str) xml/parse :content)))))
+     (fn [entry]
+       [(->> entry :attrs :rdf/about)
+        (digest/sha-256 (->> entry :content vec str))])
+     (->> (java.io.StringReader. xml-str) xml/parse :content)))
+   nil))
 
 (defn compare-ontologies
   [xml-str-a xml-str-b]
-  (let [[in-a in-b _]
-        (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))]
-    [in-a in-b]))
+  (let [[ar br _] (dat/diff (xml->terms xml-str-a) (xml->terms xml-str-b))
+        [a b] (map #(set (keys %)) [ar br])
+        deleted (set/difference a b)
+        added (set/difference b a)
+        changed (set/intersection a b)
+        delta (into {} (map (fn [k] [k {:from (get ar k) :to (get br k)}]) changed))]
+    [deleted added changed delta]))
 
 (defn fetch-upstream-meta!
   "Requests the given IRI from a remote server and extracts the final (non-redirect) IRI, as well as the version IRI of the corresponding XML file.

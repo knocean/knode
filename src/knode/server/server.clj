@@ -374,13 +374,25 @@
             (:blocks term)))}))
 
 ;; ### JSON-LD
+(defn result->edn
+  [{:keys [column-headers error table] :as result}]
+  {:error error
+   :headers column-headers
+   :result (vec
+            (for [row table]
+              (into {} (map (fn [k vs] [k vs]) column-headers row))))})
+
+(defn render-jsonld-table
+  [{:keys [status] :as result}]
+  ; TODO: render multiple terms in JSON-LD
+  {:status (or status 200)
+   :body (json/write-str (result->edn result))})
+
 (defn render-jsonld-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
     error {:status (or status 400) :body error}
-    table {:status (or status 400)
-           :body "Cannot render table to JSON-LD format"}
-    ; TODO: render multiple terms in JSON-LD
+    table (render-jsonld-table result)
     terms {:status (or status 400)
            :body "Cannot render multiple term to JSON-LD format"}
     term {:status (or status 200)

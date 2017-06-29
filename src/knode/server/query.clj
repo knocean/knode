@@ -13,4 +13,5 @@
            :content [:div
                      [:div {:id "editor"}]
                      [:button {:class "send-query"} "Query"]
+                     [:div {:id "result"}]
                      [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]]})})

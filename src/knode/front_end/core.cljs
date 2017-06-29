@@ -1,19 +1,42 @@
 (ns knode.front-end.core
-  (:require [knode.front-end.history :as history]))
+  (:require [clojure.string :as str]
+            [crate.core :as crate]
+
+            [knode.front-end.history :as history]))
 
 (def editor (.edit js/ace "editor"))
 (.setTheme editor "ace/theme/monokai")
 (-> editor (.getSession) (.setMode "ace/mode/sqlserver"))
 
+(defn blink! [selector & {:keys [delay color] :or {delay 500 color "#FFFF9C"}}]
+  (let [$el (js/$ selector)
+        origin (or (-> $el (.css "background-color")) "initial")]
+    (-> $el
+        (.stop) (.css "background-color" color)
+        (.fadeTo 100 0.3 (fn [] (-> $el (.fadeTo delay 1.0 (fn [] (-> $el (.css "background-color" origin))))))))))
+
 (defn send-query [query]
-  (.log js/console "Sending current query...")
-  (.log js/console query)
   (history/push! query)
   (-> js/$
-      (.get "/api/query" (clj->js {:sparql query}))
+      (.get "/api/query" (clj->js {:sparql query :output-format "json"}))
       (.done (fn [data]
-               (.log js/console "GOT RESPONSE")
-               (.log js/console data)))))
+               (let [dat (js->clj (.parse js/JSON data))
+                     headers (get dat "headers")
+                     result (get dat "result")]
+                 (.log js/console "GOT RESPONSE")
+                 (.log js/console dat (get (js->clj dat) "headers") result)
+                 (-> (js/$ "#result")
+                     (.empty)
+                     (.append (crate/html
+                               [:table {:class "table"}
+                                [:tr (for [h headers] [:th h])]
+                                (for [row result]
+                                  [:tr (for [h headers]
+                                         [:td (str/join " | "
+                                                        (map (fn [val] val
+                                                               (or (get val "lexical") (get val "curie") (get val "iri")))
+                                                             (get row h)))])])])))
+                 (blink! "#result"))))))
 
 (defn add-command [name keys fn]
   (.addCommand

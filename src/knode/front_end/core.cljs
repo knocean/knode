@@ -15,6 +15,13 @@
         (.stop) (.css "background-color" color)
         (.fadeTo 100 0.3 (fn [] (-> $el (.fadeTo delay 1.0 (fn [] (-> $el (.css "background-color" origin))))))))))
 
+(defn update-result!
+  [content]
+  (-> (js/$ "#result")
+      (.empty)
+      (.append (crate/html content)))
+  (blink! "#result"))
+
 (defn send-query [query]
   (history/push! query)
   (-> js/$
@@ -23,20 +30,16 @@
                (let [dat (js->clj (.parse js/JSON data))
                      headers (get dat "headers")
                      result (get dat "result")]
-                 (.log js/console "GOT RESPONSE")
-                 (.log js/console dat (get (js->clj dat) "headers") result)
-                 (-> (js/$ "#result")
-                     (.empty)
-                     (.append (crate/html
-                               [:table {:class "table"}
-                                [:tr (for [h headers] [:th h])]
-                                (for [row result]
-                                  [:tr (for [h headers]
-                                         [:td (str/join " | "
-                                                        (map (fn [val] val
-                                                               (or (get val "lexical") (get val "curie") (get val "iri")))
-                                                             (get row h)))])])])))
-                 (blink! "#result"))))))
+                 (update-result!
+                  [:table {:class "table"}
+                   [:tr (for [h headers] [:th h])]
+                   (for [row result]
+                     [:tr (for [h headers]
+                            [:td (str/join " | "
+                                           (map (fn [val] val
+                                                  (or (get val "lexical") (get val "curie") (get val "iri")))
+                                                (get row h)))])])]))))
+      (.fail (fn [xhr] (update-result! [:pre {:class "error"} (.-responseText xhr)])))))
 
 (defn add-command [name keys fn]
   (.addCommand

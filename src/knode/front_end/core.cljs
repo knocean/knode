@@ -2,7 +2,12 @@
   (:require [clojure.string :as str]
             [crate.core :as crate]
 
-            [knode.front-end.history :as history]))
+            [knode.front-end.history :as history]
+            [knode.front-end.query :as query]))
+
+(def $result (js/$ "#result"))
+(def $more-button (js/$ ".more-results"))
+(def $send-button (js/$ ".send-query"))
 
 (def editor (.edit js/ace "editor"))
 (.setTheme editor "ace/theme/monokai")
@@ -15,31 +20,51 @@
         (.stop) (.css "background-color" color)
         (.fadeTo 100 0.3 (fn [] (-> $el (.fadeTo delay 1.0 (fn [] (-> $el (.css "background-color" origin))))))))))
 
-(defn update-result!
-  [content]
-  (-> (js/$ "#result")
+(defn render-error!
+  [xhr]
+  (-> $result
       (.empty)
-      (.append (crate/html content)))
-  (blink! "#result"))
+      (.append (crate/html [:pre {:class "error"} (.-responseText xhr)]))))
 
-(defn send-query [query]
+(defn render-result!
+  [dat]
+  (let [headers (get dat "headers")
+        result (get dat "result")
+        content [:table {:class "table"}
+                 [:tr (for [h headers] [:th h])]
+                 (for [row result]
+                   [:tr (for [h headers]
+                          [:td (str/join " | "
+                                         (map (fn [val] val
+                                                (or (get val "lexical") (get val "curie") (get val "iri")))
+                                              (get row h)))])])]]
+    (.log js/console "RENDER-RESULT!" dat)
+    (.log js/console " ===== " (get dat "result") (crate/html content))
+    (-> $result
+        (.append (crate/html content))
+        (blink!))))
+
+(defn more!
+  []
+  (-> (query/more!)
+      (.then (fn [data]
+               (let [dat (js->clj (.parse js/JSON data))]
+                 (.log js/console "RESULT" dat)
+                 ;; (when (empty? (get dat "result")) (.hide $more-button))
+                 (render-result! dat))))
+      (.fail render-error!)))
+
+(defn new-query!
+  [query]
   (history/push! query)
-  (-> js/$
-      (.get "/api/query" (clj->js {:sparql query :output-format "json"}))
-      (.done (fn [data]
-               (let [dat (js->clj (.parse js/JSON data))
-                     headers (get dat "headers")
-                     result (get dat "result")]
-                 (update-result!
-                  [:table {:class "table"}
-                   [:tr (for [h headers] [:th h])]
-                   (for [row result]
-                     [:tr (for [h headers]
-                            [:td (str/join " | "
-                                           (map (fn [val] val
-                                                  (or (get val "lexical") (get val "curie") (get val "iri")))
-                                                (get row h)))])])]))))
-      (.fail (fn [xhr] (update-result! [:pre {:class "error"} (.-responseText xhr)])))))
+  (query/new-query! query)
+  (-> (query/more!)
+      (.then (fn [data]
+               (let [dat (js->clj (.parse js/JSON data))]
+                 (.show $more-button)
+                 (.empty $result)
+                 (render-result! dat))))
+      (.fail render-error!)))
 
 (defn add-command [name keys fn]
   (.addCommand
@@ -50,7 +75,7 @@
  "sendQuery"
  {:win "Ctrl-Enter" :mac "Ctrl-Enter"}
  (fn [ed]
-   (send-query (.getValue ed))))
+   (new-query! (.getValue ed))))
 
 (add-command
  "historyBack"
@@ -68,5 +93,6 @@
 
 (history/get-defaults!)
 
-(-> (js/$ ".send-query")
-    (.click #(send-query (.getValue editor))))
+(.click $send-button #(new-query! (.getValue editor)))
+(.click $more-button more!)
+(.hide $more-button)

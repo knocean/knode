@@ -754,6 +754,29 @@
      state-atom
      (assoc new-state :last-modified (java.util.Date.)))))
 
+(defn query-request!
+  [state-atom {:keys [params] :as req}]
+  (let [method (parse-request-method req)
+        compact (= "true" (get params "compact"))
+        output-format (parse-request-output-format req)
+        sparql (query/sanitized-sparql
+                (get params "sparql")
+                :page (try
+                        (int (Float/parseFloat (get params "page")))
+                        (catch Exception e 0)))]
+    (render-result
+     @state-atom
+     (assoc req :method method :output-format output-format)
+     (cond
+       (not= :get method)
+       {:error "Only GET is currently supported"}
+       (nil? sparql)
+       {:table []}
+       :else
+       (let [results (sparql/select-table @state-atom compact sparql)]
+         {:column-headers (first results)
+          :table (rest results)})))))
+
 (defn ontology-request!
   [state-atom req]
   (let [req (merge (parse-ontology-request @state-atom req) req)
@@ -774,25 +797,6 @@
                   (http-time (:last-modified state)))
                  result)]
     (render-result state req result)))
-
-(defn query-request!
-  [state-atom {:keys [params] :as req}]
-  (let [method (parse-request-method req)
-        compact (= "true" (get params "compact"))
-        output-format (parse-request-output-format req)
-        sparql (get params "sparql")]
-    (render-result
-     @state-atom
-     (assoc req :method method :output-format output-format)
-     (cond
-       (not= :get method)
-       {:error "Only GET is currently supported"}
-       (nil? sparql)
-       {:table []}
-       :else
-       (let [results (sparql/select-table @state-atom compact sparql)]
-         {:column-headers (first results)
-          :table (rest results)})))))
 
 ;; ## Render Documentation
 (defn render-doc

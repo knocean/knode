@@ -1,6 +1,8 @@
 (ns knode.server.query
   (:require
    [clojure.string :as string]
+
+   [knode.sparql :as sparql]
    [knode.server.template :as pg]
    [knode.server.util :as util]))
 
@@ -20,9 +22,9 @@
     (str query "\nOFFSET " (* limit page))))
 
 (defn sanitized-sparql
-  [query & {:keys [page] :or {page 0}}]
+  [query & {:keys [page]}]
   (let [[query limit] (-ensure-limit query)]
-    (-ensure-offset query limit page)))
+    (-ensure-offset query limit (or page 0))))
 
 (defn render-query-interface
   [req]
@@ -35,4 +37,5 @@
                      [:div {:id "editor"}]
                      [:button {:class "send-query"} "Query"]
                      [:div {:id "result"}]
+                     [:button {:class "more-results"} "More"]
                      [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]]})})

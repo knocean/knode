@@ -3,7 +3,7 @@
             [crate.core :as crate]
 
             [knode.front-end.history :as history]
-            [knode.front-end.query :as query]))
+            [knode.front-end.pagination :as pg]))
 
 (def $result (js/$ "#result"))
 (def $more-button (js/$ ".more-results"))
@@ -45,7 +45,7 @@
 
 (defn more!
   []
-  (-> (query/more!)
+  (-> (pg/more!)
       (.then (fn [data]
                (let [dat (js->clj (.parse js/JSON data))]
                  (when (empty? (get dat "result")) (.hide $more-button))
@@ -55,8 +55,8 @@
 (defn new-query!
   [query]
   (history/push! query)
-  (query/new-query! query)
-  (-> (query/more!)
+  (pg/new-query! query)
+  (-> (pg/more!)
       (.then (fn [data]
                (let [dat (js->clj (.parse js/JSON data))]
                  (.show $more-button)

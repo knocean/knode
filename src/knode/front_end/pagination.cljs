@@ -1,4 +1,4 @@
-(ns knode.front-end.query
+(ns knode.front-end.pagination
   (:require [cljs.reader :as reader]))
 
 (def page (atom 0))

@@ -816,6 +816,17 @@
                  result)]
     (render-result state req result)))
 
+;; ## Render tree view
+(defn render-tree-view
+  [req name]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body
+   (base-template
+    req
+    {:title "Stubbed tree view"
+     :content "Stubbed tree-view goes here."})})
+
 ;; ## Render Documentation
 (defn render-doc
   [req doc]
@@ -860,10 +871,14 @@
   ; ontology terms
   (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
+  ; queries
   (ANY "/api/query" [:as req] (query-request! state req))
   (GET "/query" [] query/render-query-interface)
   (GET "/query/default-queries" [:as req]
        query/render-default-queries)
+
+  ; tree view
+  (GET "/tree/:name" [name :as req] (render-tree-view req name))
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))

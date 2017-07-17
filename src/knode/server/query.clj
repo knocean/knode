@@ -9,7 +9,7 @@
 (def +default-limit+ 200)
 
 (defn -ensure-limit [query]
-  (if-let [res (re-find #"LIMIT (\d+)" query)]
+  (if-let [res (re-find #"(?i)LIMIT (\d+)" query)]
     (let [given-limit (read-string (second res))]
       (if (> given-limit +default-limit+)
         [(string/replace query (re-pattern (first res)) (str "LIMIT " +default-limit+)) +default-limit+]
@@ -17,7 +17,7 @@
     [(str query "\nLIMIT " +default-limit+) +default-limit+]))
 
 (defn -ensure-offset [query limit page]
-  (if (or (= 0 page) (re-find #"OFFSET (\d+)" query))
+  (if (or (= 0 page) (re-find #"(?i)OFFSET (\d+)" query))
     query
     (str query "\nOFFSET " (* limit page))))
 

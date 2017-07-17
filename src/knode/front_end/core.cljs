@@ -10,8 +10,9 @@
 (def $send-button (js/$ ".send-query"))
 
 (def editor (.edit js/ace "editor"))
-(.setTheme editor "ace/theme/monokai")
+(.setTheme editor "ace/theme/github")
 (-> editor (.getSession) (.setMode "ace/mode/sqlserver"))
+(.focus editor)
 
 (defn blink! [selector & {:keys [delay color] :or {delay 500 color "#FFFF9C"}}]
   (let [$el (js/$ selector)
@@ -38,8 +39,6 @@
                                          (map (fn [val] val
                                                 (or (get val "lexical") (get val "curie") (get val "iri")))
                                               (get row h)))])])]]
-    (.log js/console "RENDER-RESULT!" dat)
-    (.log js/console " ===== " (get dat "result") (crate/html content))
     (-> $result
         (.append (crate/html content))
         (blink!))))
@@ -49,8 +48,7 @@
   (-> (query/more!)
       (.then (fn [data]
                (let [dat (js->clj (.parse js/JSON data))]
-                 (.log js/console "RESULT" dat)
-                 ;; (when (empty? (get dat "result")) (.hide $more-button))
+                 (when (empty? (get dat "result")) (.hide $more-button))
                  (render-result! dat))))
       (.fail render-error!)))
 

@@ -1,7 +1,10 @@
 (ns knode.server.query
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as string]
+   [clojure.edn :as edn]
 
+   [knode.state :refer [state]]
    [knode.sparql :as sparql]
    [knode.server.template :as pg]
    [knode.server.util :as util]))
@@ -25,6 +28,15 @@
   [query & {:keys [page]}]
   (let [[query limit] (-ensure-limit query)]
     (-ensure-offset query limit (or page 0))))
+
+(defn render-default-queries
+  [req]
+  {:status 200
+   :headers {"Content-Type" "application/edn"}
+   :body (try
+           (str (edn/read (java.io.PushbackReader. (io/reader (str (:ontology-dir @state))))))
+           (catch Exception e
+             (str ["SELECT * WHERE { ?s ?p ?o }"])))})
 
 (defn render-query-interface
   [req]

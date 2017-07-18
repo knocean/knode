@@ -15,10 +15,12 @@
 
 (defn get-defaults! []
   (-> js/$
-      (.get "/static/default-queries.edn")
+      (.get "/query/default-queries")
       (.done (fn [data]
+               (.log js/console "DEFAULT QUERIES DATA: " data)
                (when (not (empty? data))
                  (let [qs (clj->js (reader/read-string data))]
+                   (.log js/console "DEFAULT QUERIES DATA: " qs)
                    (swap! history #(vec (concat qs %)))
                    (swap! history-position #(+ % (count qs)))))))))
 

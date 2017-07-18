@@ -844,6 +844,8 @@
 
   (ANY "/api/query" [:as req] (query-request! state req))
   (GET "/query" [] query/render-query-interface)
+  (GET "/query/default-queries" [:as req]
+       query/render-default-queries)
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))

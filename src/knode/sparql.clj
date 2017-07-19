@@ -232,6 +232,27 @@
                    (swap! results conj))))))
       @results)))
 
+(defn select-table
+  [{:keys [blazegraph] :as state} compact query]
+  (with-open [conn (.getConnection blazegraph)]
+    (let [tq (.prepareTupleQuery conn QueryLanguage/SPARQL query)
+          results (atom [])]
+      (.setMaxQueryTime tq 10)
+      (with-open [tr (.evaluate tq)]
+        (let [variables (.getBindingNames tr)]
+          (reset! results [variables])
+          (while (.hasNext tr)
+            (let [bindings (.next tr)]
+              (->> variables
+                   (map #(.getValue bindings %))
+                   (map get-value-map)
+                   (map #(if compact
+                           (compact-value (:env state) %)
+                           %))
+                   (map (fn [x] [x]))
+                   (swap! results conj))))))
+      @results)))
+
 (def term-status-query "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX obo: <http://purl.obolibrary.org/obo/>

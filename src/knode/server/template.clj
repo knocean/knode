@@ -51,7 +51,8 @@
         [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
         [:ul {:class "nav navbar-nav"}
-         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]
+         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]
+         [:li [:a {:href "/query"} "Query"]]]
         (if (sutil/login? req)
           [:ul {:class "nav navbar-nav navbar-right"}
            (if-let [name (get-in req [:session :name])]

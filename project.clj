@@ -18,6 +18,7 @@
 
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]
+                 [crate "0.2.4"]
                  [markdown-clj "0.9.89"]
                  [io.forward/yaml "1.0.6"]
                  [http-kit "2.1.18"]
@@ -33,6 +34,5 @@
                                    :optimizations :whitespace
                                    :pretty-print true}
                         :jar true}]}
-
   :main knode.cli
   :aot [knode.cli])

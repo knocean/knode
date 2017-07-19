@@ -4,6 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :plugins [[lein-cljsbuild "1.1.6"]]
+  :hooks [leiningen.cljsbuild]
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.521"]
                  [org.clojure/data.json "0.2.6"]
@@ -13,6 +14,7 @@
                  [tempfile "0.2.0"]
                  [digest "1.4.5"]
                  [me.raynes/fs "1.4.6"]
+                 [me.raynes/conch "0.8.0"]
 
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]
@@ -30,7 +32,7 @@
   :cljsbuild {:builds [{:source-paths ["src/knode/front_end"]
                         :compiler {:output-to "resources/public/js/main.js"
                                    :optimizations :whitespace
-                                   :pretty-print true}}]}
-
+                                   :pretty-print true}
+                        :jar true}]}
   :main knode.cli
   :aot [knode.cli])

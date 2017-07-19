@@ -17,12 +17,14 @@
    [markdown.core :as md]
    [yaml.core :as yaml]
    [clj-jgit.porcelain :as git]
+   [me.raynes.conch :as sh]
 
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
    [knode.sparql :as sparql]
    [knode.util :as util]
+   [knode.conf :as conf]
 
    [knode.server.util :as sutil]
    [knode.server.template :refer [base-template]]
@@ -755,10 +757,20 @@
     (when (and git-repo message username email)
       (git/git-add git-repo index-path)
       (git/git-add git-repo term-path)
-      (git/git-commit git-repo message {:name username :email email}))
+      (git/git-commit git-repo message {:name username :email email})
+      ;; NOTE - In theory (git/with-identity {:private <slurped private key> :public <slurped public key>} (-> git-repo (.push) (.call)))
+      ;;        should work here, but it keeps throwing JSchException USERAUTH fail errors, and I've decided that two hours of poking
+      ;;        through
+      ;;         http://download.eclipse.org/jgit/docs/jgit-2.0.0.201206130900-r/apidocs/org/eclipse/jgit/api/Git.html
+      ;;        and http://clj-jgit.github.io/clj-jgit/
+      ;;        is quite enough. So we're doing it the stupid way for now. FIXME later.
+      (sh/with-programs [ssh-add git]
+        (ssh-add conf/git-repo-key)
+        (git (str "--git-dir=" (-> git-repo (.getRepository) (.getDirectory) (.toString))) "push" "origin" "master")))
     (reset!
      state-atom
      (assoc new-state :last-modified (java.util.Date.)))))
+
 
 (defn query-request!
   [state-atom {:keys [params] :as req}]

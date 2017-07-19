@@ -47,7 +47,7 @@
           {:title "Query Interface"
            :content [:div
                      [:div {:id "editor"}]
-                     [:button {:class "send-query"} "Query"]
+                     [:button {:class "send-query btn btn-primary"} "Query"]
                      [:div {:id "result"}]
-                     [:button {:class "more-results"} "More"]
+                     [:button {:class "more-results btn btn-primary"} "More"]
                      [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]]})})

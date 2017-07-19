@@ -35,10 +35,14 @@
                  [:tr (for [h headers] [:th h])]
                  (for [row result]
                    [:tr (for [h headers]
-                          [:td (str/join " | "
-                                         (map (fn [val] val
-                                                (or (get val "lexical") (get val "curie") (get val "iri")))
-                                              (get row h)))])])]]
+                          [:td (interpose
+                                " | "
+                                (map (fn [val]
+                                       (let [v (or (get val "lexical") (get val "curie") (get val "iri"))]
+                                         (if-let [href (get val "href")]
+                                           [:a {:href href :target "_blank"} v]
+                                           v)))
+                                     (get row h)))])])]]
     (-> $result
         (.append (crate/html content))
         (blink!))))

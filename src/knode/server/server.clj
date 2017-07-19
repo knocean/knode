@@ -375,24 +375,30 @@
 
 ;; ### JSON-LD
 (defn result->edn
-  [{:keys [column-headers error table] :as result}]
+  [{:keys [column-headers error table] :as result} & {:keys [link-fn] :or {link-fn identity}}]
   {:error error
    :headers column-headers
    :result (vec
             (for [row table]
-              (into {} (map (fn [k vs] [k vs]) column-headers row))))})
+              (into {} (map (fn [k vs]
+                              [k (map (fn [res]
+                                        (if-let [iri (:iri res)]
+                                          (assoc res :href (link-fn iri))
+                                          res))
+                                      vs)])
+                            column-headers row))))})
 
 (defn render-jsonld-table
-  [{:keys [status] :as result}]
+  [{:keys [status] :as result} & {:keys [link-fn] :or {link-fn identity}}]
   ; TODO: render multiple terms in JSON-LD
   {:status (or status 200)
-   :body (json/write-str (result->edn result))})
+   :body (json/write-str (result->edn result :link-fn link-fn))})
 
 (defn render-jsonld-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
     error {:status (or status 400) :body error}
-    table (render-jsonld-table result)
+    table (render-jsonld-table result :link-fn (partial sutil/re-root state req))
     terms {:status (or status 400)
            :body "Cannot render multiple term to JSON-LD format"}
     term {:status (or status 200)

@@ -29,8 +29,8 @@
 
                  [com.blazegraph/bigdata-core "2.1.4"]]
 
-  :cljsbuild {:builds [{:source-paths ["src/knode/front_end"]
-                        :compiler {:output-to "resources/public/js/main.js"
+  :cljsbuild {:builds [{:source-paths ["src/knode/front_end/query_editor"]
+                        :compiler {:output-to "resources/public/js/query_editor.js"
                                    :optimizations :whitespace
                                    :pretty-print true}
                         :jar true}]}

@@ -68,5 +68,4 @@
 
     [:script {:src "/assets/jquery.min.js"}]
     [:script {:src "/assets/bootstrap.min.js"}]
-    [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]
-    [:script {:src "/js/main.js"}]]))
+    [:script {:src "/assets/ie10-viewport-bug-workaround.js"}]]))

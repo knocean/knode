@@ -1,4 +1,4 @@
-(ns knode.front-end.history
+(ns knode.front-end.query-editor.history
   (:require [cljs.reader :as reader]))
 
 (def storage? (not (not (type js/Storage))))

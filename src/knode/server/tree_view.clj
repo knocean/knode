@@ -12,4 +12,5 @@
     {:title (str name " - Tree View")
      :content [:div
                [:p "Stubbed tree-view for " [:code name] " goes here."]
-               [:script {:src "/assets/inspire-tree.min.js" :type "text/javascript" :charset "utf-8"}]]})})
+               [:script {:src "/assets/inspire-tree.min.js" :type "text/javascript" :charset "utf-8"}]
+               [:script {:src "/js/tree_view.js"}]]})})

@@ -5,26 +5,15 @@
             [knode.front-end.util :as util]
             [knode.front-end.query-editor.history :as history]
             [knode.front-end.query-editor.pagination :as pg]))
-(set!
- (.-onload js/window)
- (fn []
-   (def $result (js/$ "#result"))
-   (def $more-button (js/$ ".more-results"))
-   (def $send-button (js/$ ".send-query"))
 
-   (def editor (.edit js/ace "editor"))
-   (.setTheme editor "ace/theme/github")
-   (-> editor (.getSession) (.setMode "ace/mode/sqlserver"))
-   (.focus editor)
-
-   (defn render-error!
-     [xhr]
-     (-> $result
+(defn render-error!
+     [target-div xhr]
+     (-> target-div
          (.empty)
          (.append (crate/html [:pre {:class "error"} (.-responseText xhr)]))))
 
-   (defn render-result!
-     [dat]
+(defn render-result!
+     [target-div dat]
      (let [headers (get dat "headers")
            result (get dat "result")
            content [:table {:class "table"}
@@ -39,55 +28,67 @@
                                               [:a {:href href :target "_blank"} v]
                                               v)))
                                         (get row h)))])])]]
-       (-> $result
+       (-> target-div
            (.append (crate/html content))
            (util/blink!))))
 
-   (defn more!
-     []
-     (-> (pg/more!)
-         (.then (fn [data]
-                  (let [dat (js->clj (.parse js/JSON data))]
-                    (when (empty? (get dat "result")) (.hide $more-button))
-                    (render-result! dat))))
-         (.fail render-error!)))
+(defn more!
+  [result-div more-button]
+  (-> (pg/more!)
+      (.then (fn [data]
+               (let [dat (js->clj (.parse js/JSON data))]
+                 (when (empty? (get dat "result")) (.hide more-button))
+                 (render-result! result-div dat))))
+      (.fail (partial render-error! result-div))))
 
-   (defn new-query!
-     [query]
-     (history/push! query)
-     (pg/new-query! query)
-     (-> (pg/more!)
-         (.then (fn [data]
-                  (let [dat (js->clj (.parse js/JSON data))]
-                    (.show $more-button)
-                    (.empty $result)
-                    (render-result! dat))))
-         (.fail render-error!)))
+(defn new-query!
+  [result-div more-button query]
+  (history/push! query)
+  (pg/new-query! query)
+  (-> (pg/more!)
+      (.then (fn [data]
+               (let [dat (js->clj (.parse js/JSON data))]
+                 (.show more-button)
+                 (.empty result-div)
+                 (render-result! result-div dat))))
+      (.fail (partial render-error! result-div))))
 
-   (defn add-command! [name keys fn]
-     (.addCommand
-      editor.commands
-      (clj->js {:name name :bindKey keys :exec fn})))
+(defn add-command! [ed name keys fn]
+  (.addCommand
+   (.-commands ed)
+   (clj->js {:name name :bindKey keys :exec fn})))
 
-   (defn add-commands! [& commands]
-     (doseq [[name keys f] commands]
-       (add-command! name keys f)))
+(defn add-commands! [ed & commands]
+  (doseq [[name keys f] commands]
+    (add-command! ed name keys f)))
 
-   (add-commands!
-    ["sendQuery" {:win "Ctrl-Enter" :mac "Ctrl-Enter"}
-     (fn [ed]
-       (new-query! (.getValue ed)))]
-    ["historyBack" {:win "Ctrl-Up" :mac "Command-Up"}
-     (fn [ed]
-       (when (= (history/current) (.getValue ed)) (history/prev!))
-       (.setValue ed (history/current)))]
-    ["historyForward" {:win "Ctrl-Down" :mac "Command-Down"}
-     (fn [ed]
-       (when (= (history/current) (.getValue ed)) (history/next!))
-       (.setValue ed (history/current)))])
+(defn initialize-query-editor! [editor-id $result $more-button $send-button]
+  (let [editor (.edit js/ace editor-id)]
+    (.setTheme editor "ace/theme/github")
+    (-> editor (.getSession) (.setMode "ace/mode/sqlserver"))
 
-   (history/get-defaults!)
+    (add-commands!
+     editor
+     ["sendQuery" {:win "Ctrl-Enter" :mac "Ctrl-Enter"}
+      (fn [ed]
+        (new-query! $result $more-button (.getValue ed)))]
+     ["historyBack" {:win "Ctrl-Up" :mac "Command-Up"}
+      (fn [ed]
+        (when (= (history/current) (.getValue ed)) (history/prev!))
+        (.setValue ed (history/current)))]
+     ["historyForward" {:win "Ctrl-Down" :mac "Command-Down"}
+      (fn [ed]
+        (when (= (history/current) (.getValue ed)) (history/next!))
+        (.setValue ed (history/current)))])
 
-   (.click $send-button #(new-query! (.getValue editor)))
-   (.click $more-button more!)
-   (.hide $more-button)))
+    (history/get-defaults!)
+
+    (.click $send-button #(new-query! $result $more-button (.getValue editor)))
+    (.click $more-button (fn [] (more! $result $more-button)))
+    (.hide $more-button)
+    (.focus editor)))
+
+(set! (.-onload js/window)
+      #(initialize-query-editor!
+        "editor" (js/$ "#result")
+        (js/$ ".more-results") (js/$ ".send-query")))

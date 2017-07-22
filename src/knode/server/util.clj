@@ -56,3 +56,28 @@
           (string? api-key)
           (not (string/blank? dev-key))
           (= dev-key api-key)))))
+
+(defn parse-request-output-format
+  [{:keys [params uri] :as req}]
+  (or
+   (when (find params "output-format")
+     (string/lower-case (get params "output-format")))
+   (when (find params "format")
+     (string/lower-case (get params "format")))
+   (case (get-in req [:headers "accept"])
+     "text/html" "html"
+     "text/turtle" "ttl"
+     "text/tab-separated-values" "tsv"
+     "application/json" "json"
+     nil)
+   (when-let [[_ extension]
+              (re-matches
+               #"^.*\.(html|ttl|json|tsv)$"
+               (string/lower-case (or uri "")))]
+     extension)))
+
+(defn parse-request-method
+  [{:keys [params request-method] :as req}]
+  (if (find params "method")
+    (-> (get params "method" "") string/lower-case keyword)
+    request-method))

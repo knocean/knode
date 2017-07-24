@@ -25,10 +25,5 @@
         [{:text "D" :iri "d"}
          {:text "E" :iri "e"}]}]}]}])
 
-(.log js/console "HELLO FROM TREE VIEW!")
-
-(def tree (new js/InspireTree (clj->js {:data (fn [] sample-tree)})))
-(.log js/console "INSTANTIATED InspireTree")
-
+(def tree (new js/InspireTree (clj->js {:data sample-tree})))
 (new js/InspireTreeDOM tree (clj->js {:target ".tree"}))
-(.log js/console "STARTED DOM")

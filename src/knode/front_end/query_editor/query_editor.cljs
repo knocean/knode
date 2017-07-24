@@ -1,4 +1,4 @@
-(ns knode.front-end.query-editor.core
+(ns knode.front-end.query-editor.query-editor
   (:require [clojure.string :as str]
             [crate.core :as crate]
 

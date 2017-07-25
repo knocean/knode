@@ -1,4 +1,5 @@
-(ns knode.front-end.tree-view.core)
+(ns knode.front-end.tree-view.tree_view
+  (:require [knode.front-end.util :refer [log! tap!]]))
 
 (def sample-trips
   [["d" "c" "D"]
@@ -7,7 +8,7 @@
    ["f" "a" "F"]
    ["c" "b" "C"]
    ["e" "c" "E"]
-   ["a" "" "A"]])
+   ["a" nil "A"]])
 
 (def sample-tree
   [{:text "A" :iri "a"
@@ -25,5 +26,28 @@
         [{:text "D" :iri "d"}
          {:text "E" :iri "e"}]}]}]}])
 
-(def tree (new js/InspireTree (clj->js {:data sample-tree})))
+(defn triples->parent-lookup [triples]
+  (reduce
+   (fn [memo [subject parent label]]
+     (assoc memo parent
+            (conj
+             (get memo parent [])
+             {:text label :iri subject})))
+   {} triples))
+
+(defn -tree-from-lookup [table elem]
+  (let [children (get table (get elem :iri))]
+    (if (empty? children)
+      elem
+      (assoc elem :children
+             (vec (map (partial -tree-from-lookup table)
+                       children))))))
+
+(defn build-tree [triples]
+  (let [tbl (triples->parent-lookup triples)]
+    (vec (map (partial -tree-from-lookup tbl) (get tbl nil)))))
+
+(def built-tree (tap! "BUILT-TREE result -- " (build-tree sample-trips)))
+
+(def tree (new js/InspireTree (clj->js {:data built-tree})))
 (new js/InspireTreeDOM tree (clj->js {:target ".tree"}))

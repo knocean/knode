@@ -2,6 +2,12 @@
   (:require
    [knode.server.template :as pg]))
 
+(defn render-tree-data
+  [req name]
+  {:status 200
+   :headers {"Content-Type" "text/plain"}
+   :body (str "THIS IS THE DATA PAGE FOR " name req)})
+
 (defn render-tree-view
   [req name]
   {:status 200

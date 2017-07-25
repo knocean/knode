@@ -45,9 +45,12 @@
 
 (defn build-tree [triples]
   (let [tbl (triples->parent-lookup triples)]
-    (vec (map (partial -tree-from-lookup tbl) (get tbl nil)))))
+    (vec (map (partial -tree-from-lookup tbl)
+              (concat (get tbl nil)
+                      (get tbl ""))))))
 
-(def built-tree (tap! "BUILT-TREE result -- " (build-tree sample-trips)))
+(defn setup-tree-view []
+  (let [tree (new js/InspireTree (clj->js {:data (build-tree sample-trips)}))]
+    (new js/InspireTreeDOM tree (clj->js {:target ".tree"}))))
 
-(def tree (new js/InspireTree (clj->js {:data built-tree})))
-(new js/InspireTreeDOM tree (clj->js {:target ".tree"}))
+(setup-tree-view)

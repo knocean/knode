@@ -1,5 +1,7 @@
 (ns knode.front-end.tree-view.tree_view
-  (:require [knode.front-end.util :as util :refer [log! tap!]]))
+  (:require
+   [cljs.reader :as reader]
+   [knode.front-end.util :as util :refer [log! tap!]]))
 
 (def sample-trips
   [["d" "c" "D"]
@@ -49,12 +51,14 @@
               (concat (get tbl nil)
                       (get tbl ""))))))
 
+(defn tree-name []
+  (.-tree-name js/document))
+
 (defn setup-tree-view []
-  (.log js/console (str "TREE NAME:" (.-tree-name js/document)))
   (-> js/$
-      (.get "/api/tree/foo/nodes" (clj->js {}))
-      (.done (fn [data] (.log js/console data))))
-  (let [tree (new js/InspireTree (clj->js {:data (build-tree sample-trips)}))]
-    (new js/InspireTreeDOM tree (clj->js {:target ".tree"}))))
+      (.get (str "/api/tree/" (.-tree-name js/document) "/nodes") (clj->js {}))
+      (.done (fn [data]
+               (let [tree (new js/InspireTree (clj->js {:data (build-tree (reader/read-string data))}))]
+                 (new js/InspireTreeDOM tree (clj->js {:target ".tree"})))))))
 
 (util/dom-loaded setup-tree-view)

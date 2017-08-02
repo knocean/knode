@@ -1,12 +1,21 @@
 (ns knode.server.tree-view
   (:require
+   [clojure.java.io :as io]
+   [clojure.edn :as edn]
+
+   [knode.state :refer [state]]
    [knode.server.template :as pg]))
 
 (defn render-tree-data
   [req name]
   {:status 200
-   :headers {"Content-Type" "text/plain"}
-   :body (str "THIS IS THE DATA PAGE FOR " name req)})
+   :headers {"Content-Type" "application/edn"}
+   :body (str
+          (try
+            (let [fname (str (:ontology-dir @state) "trees.edn")]
+              (get (edn/read (java.io.PushbackReader. (io/reader fname))) name []))
+            (catch Exception e
+              [])))})
 
 (defn render-tree-view
   [req name]

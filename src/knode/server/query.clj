@@ -34,7 +34,8 @@
   {:status 200
    :headers {"Content-Type" "application/edn"}
    :body (try
-           (str (edn/read (java.io.PushbackReader. (io/reader (str (:ontology-dir @state))))))
+           (let [fname (str (:ontology-dir @state) "default-queries.edn")]
+             (str (edn/read (java.io.PushbackReader. (io/reader fname)))))
            (catch Exception e
              (str ["SELECT * WHERE { ?s ?p ?o }"])))})
 

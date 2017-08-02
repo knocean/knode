@@ -88,7 +88,8 @@
     (.hide $more-button)
     (.focus editor)))
 
-(set! (.-onload js/window)
-      #(initialize-query-editor!
-        "editor" (js/$ "#result")
-        (js/$ ".more-results") (js/$ ".send-query")))
+
+(util/dom-loaded
+ #(initialize-query-editor!
+   "editor" (js/$ "#result")
+   (js/$ ".more-results") (js/$ ".send-query")))

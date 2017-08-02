@@ -842,7 +842,7 @@
        query/render-default-queries)
 
   ; tree view
-  (GET "/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
+  (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
   (GET "/tree/:name" [name :as req] (tree/render-tree-view req name))
 
   ; doc directory

@@ -17,3 +17,6 @@
     (-> $el
         (.stop) (.css "background-color" color)
         (.fadeTo 100 0.3 (fn [] (-> $el (.fadeTo delay 1.0 (fn [] (-> $el (.css "background-color" origin))))))))))
+
+(defn dom-loaded [fn]
+  (.addEventListener js/document "DOMContentLoaded" fn))

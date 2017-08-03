@@ -42,8 +42,11 @@
     (if (empty? children)
       elem
       (assoc elem :children
-             (vec (map (partial -tree-from-lookup table)
-                       children))))))
+             (let [final-children (vec (map (partial -tree-from-lookup table)
+                                            children))]
+               (if (empty? final-children)
+                 true
+                 final-children))))))
 
 (defn build-tree [triples]
   (let [tbl (triples->parent-lookup triples)]
@@ -65,6 +68,10 @@
        (.done callback))))
 
 (defn setup-tree-view []
+  ;; (with-tree-nodes
+  ;;   (fn [data]
+  ;;     (.log js/console data))
+  ;;   :root "a")
   (with-tree-nodes
     (fn [data]
       (let [tree (new js/InspireTree (clj->js {:data (build-tree (reader/read-string data))}))]

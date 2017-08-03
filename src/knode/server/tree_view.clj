@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.edn :as edn]
+   [clojure.data.json :as json]
 
    [knode.state :refer [state]]
    [knode.server.template :as pg]))
@@ -22,14 +23,18 @@
 (defn render-tree-children
   [req name]
   {:status 200
-   :headers {"Content-Type" "application/edn"}
+   :headers {"Content-Type" "application/json"}
    :body (let [tree (read-tree! name)
                root (get-in req [:params "root"])]
-           (str (vec (filter
-                      (if (empty? root)
-                        (fn [[a b c]] (nil? b))
-                        (fn [[a b c]] (= b root)))
-                      tree))))})
+           (json/write-str
+            (vec (map (fn [[subject parent label]]
+                        {:text label :iri subject :id subject
+                         :children (some #(= subject (second %)) tree)})
+                      (filter
+                       (if (empty? root)
+                         (fn [[a b c]] (nil? b))
+                         (fn [[a b c]] (= b root)))
+                       tree)))))})
 
 (defn render-tree-view
   [req name]

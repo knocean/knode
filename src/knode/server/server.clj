@@ -843,6 +843,7 @@
 
   ; tree view
   (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
+  (GET "/api/tree/:name/children" [name :as req] (tree/render-tree-children req name))
   (GET "/tree/:name" [name :as req] (tree/render-tree-view req name))
 
   ; doc directory

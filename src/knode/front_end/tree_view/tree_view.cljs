@@ -54,11 +54,20 @@
 (defn tree-name []
   (.-tree-name js/document))
 
+(defn with-tree-nodes
+  ([callback]
+   (-> js/$
+       (.get (str "/api/tree/" (.-tree-name js/document) "/nodes") (clj->js {}))
+       (.done callback)))
+  ([callback & {:keys [root]}]
+   (-> js/$
+       (.get (str "/api/tree/" (.-tree-name js/document) "/children") (clj->js {:root root}))
+       (.done callback))))
+
 (defn setup-tree-view []
-  (-> js/$
-      (.get (str "/api/tree/" (.-tree-name js/document) "/nodes") (clj->js {}))
-      (.done (fn [data]
-               (let [tree (new js/InspireTree (clj->js {:data (build-tree (reader/read-string data))}))]
-                 (new js/InspireTreeDOM tree (clj->js {:target ".tree"})))))))
+  (with-tree-nodes
+    (fn [data]
+      (let [tree (new js/InspireTree (clj->js {:data (build-tree (reader/read-string data))}))]
+        (new js/InspireTreeDOM tree (clj->js {:target ".tree"}))))))
 
 (util/dom-loaded setup-tree-view)

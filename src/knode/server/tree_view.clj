@@ -6,16 +6,30 @@
    [knode.state :refer [state]]
    [knode.server.template :as pg]))
 
+(defn read-tree! [tree-name]
+  (try
+    (let [fname (str (:ontology-dir @state) "trees.edn")]
+      (get (edn/read (java.io.PushbackReader. (io/reader fname))) tree-name []))
+    (catch Exception e
+      [])))
+
 (defn render-tree-data
   [req name]
   {:status 200
    :headers {"Content-Type" "application/edn"}
-   :body (str
-          (try
-            (let [fname (str (:ontology-dir @state) "trees.edn")]
-              (get (edn/read (java.io.PushbackReader. (io/reader fname))) name []))
-            (catch Exception e
-              [])))})
+   :body (str (read-tree! name))})
+
+(defn render-tree-children
+  [req name]
+  {:status 200
+   :headers {"Content-Type" "application/edn"}
+   :body (let [tree (read-tree! name)
+               root (get-in req [:params "root"])]
+           (str (vec (filter
+                      (if (empty? root)
+                        (fn [[a b c]] (nil? b))
+                        (fn [[a b c]] (= b root)))
+                      tree))))})
 
 (defn render-tree-view
   [req name]

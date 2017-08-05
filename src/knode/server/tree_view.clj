@@ -14,11 +14,15 @@
     (catch Exception e
       [])))
 
-(defn render-tree-data
-  [req name]
-  {:status 200
-   :headers {"Content-Type" "application/edn"}
-   :body (str (read-tree! name))})
+(defn tree-children [triples root]
+  (vec (map (fn [[subject parent label]]
+              {:text label :iri subject :id subject
+               :children (some #(= subject (second %)) triples)})
+            (filter
+             (if (empty? root)
+               (fn [[a b c]] (nil? b))
+               (fn [[a b c]] (= b root)))
+             triples))))
 
 (defn render-tree-children
   [req name]
@@ -26,15 +30,13 @@
    :headers {"Content-Type" "application/json"}
    :body (let [tree (read-tree! name)
                root (get-in req [:params "root"])]
-           (json/write-str
-            (vec (map (fn [[subject parent label]]
-                        {:text label :iri subject :id subject
-                         :children (some #(= subject (second %)) tree)})
-                      (filter
-                       (if (empty? root)
-                         (fn [[a b c]] (nil? b))
-                         (fn [[a b c]] (= b root)))
-                       tree)))))})
+           (json/write-str (tree-children tree root)))})
+
+(defn render-tree-data
+  [req name]
+  {:status 200
+   :headers {"Content-Type" "application/edn"}
+   :body (str (read-tree! name))})
 
 (defn render-tree-view
   [req name]

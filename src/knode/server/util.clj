@@ -80,8 +80,7 @@
           (string/lower-case (get params "output-format")))
         (when (find params "format")
           (string/lower-case (get params "format")))
-        (get mimetype-table (first accept))
-        (get mimetype-table (second accept))
+        (first (drop-while nil? (map #(get mimetype-table %) accept)))
         (when-let [[_ extension]
                    (re-matches
                     #"^.*\.(html|ttl|json|tsv)$"

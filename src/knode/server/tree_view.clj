@@ -34,6 +34,37 @@
     (catch Exception e
       [])))
 
+(defn triples->parent-lookup [triples]
+  (reduce
+   (fn [memo [subject parent label]]
+     (assoc memo parent
+            (conj
+             (get memo parent [])
+             {:text label :iri subject})))
+   {} triples))
+
+(defn tree->tsv2 [triples]
+  (let [numbered (->> triples
+                      (sort-by #(get % 2) natural-compare)
+                      (map (fn [n trip] (cons n trip)) (range)))
+        parent-tbl (reduce
+                    (fn [memo [line-num subject parent label]]
+                      (assoc memo subject [line-num parent]))
+                    {} numbered)
+        path-of (fn [iri]
+                  (reverse
+                   ((fn rec [k]
+                      (let [[line-num parent] (get parent-tbl k)]
+                        (if (nil? parent)
+                          (list line-num)
+                          (cons line-num (lazy-seq (rec parent))))))
+                    iri)))]
+    (map
+     (fn [[line-num subject parent label]]
+       [line-num subject parent label
+        (str/join ":" (path-of subject))])
+     numbered)))
+
 (defn tree-children [triples root]
   (->> triples
        (filter
@@ -69,6 +100,7 @@
                "json" (json/write-str tree)
                "edn" (str tree)
                "tsv" (sutil/seq->tsv-string tree)
+               "tsv2" (sutil/seq->tsv-string (tree->tsv2 tree))
                (str tree)))}))
 
 (defn render-tree-view

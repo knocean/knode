@@ -2,8 +2,13 @@
   (:require
    [clojure.string :as string]
    [clojure.data.json :as json]
+   [clojure.data.csv :as csv]
 
    [knode.state :refer [state]]))
+
+(defn seq->tsv-string
+  [rows]
+  (with-out-str (csv/write-csv *out* rows :separator \tab)))
 
 (defn re-root
   [state req uri]
@@ -57,24 +62,31 @@
           (not (string/blank? dev-key))
           (= dev-key api-key)))))
 
+(def mimetype-table
+  {"text/html" "html"
+   "text/turtle" "ttl"
+   "text/tab-separated-values" "tsv"
+   "application/json" "json"
+   "application/edn" "edn"})
+
+(defn format->content-type
+  ([format] (format->content-type format "json"))
+  ([format default] {"Content-Type" (get (clojure.set/map-invert mimetype-table) format default)}))
+
 (defn parse-request-output-format
   [{:keys [params uri] :as req}]
-  (or
-   (when (find params "output-format")
-     (string/lower-case (get params "output-format")))
-   (when (find params "format")
-     (string/lower-case (get params "format")))
-   (case (get-in req [:headers "accept"])
-     "text/html" "html"
-     "text/turtle" "ttl"
-     "text/tab-separated-values" "tsv"
-     "application/json" "json"
-     nil)
-   (when-let [[_ extension]
-              (re-matches
-               #"^.*\.(html|ttl|json|tsv)$"
-               (string/lower-case (or uri "")))]
-     extension)))
+  (let [accept (string/split (get-in req [:headers "accept"] "") #", ?")]
+    (or (when (find params "output-format")
+          (string/lower-case (get params "output-format")))
+        (when (find params "format")
+          (string/lower-case (get params "format")))
+        (get mimetype-table (first accept))
+        (get mimetype-table (second accept))
+        (when-let [[_ extension]
+                   (re-matches
+                    #"^.*\.(html|ttl|json|tsv)$"
+                    (string/lower-case (or uri "")))]
+          extension))))
 
 (defn parse-request-method
   [{:keys [params request-method] :as req}]

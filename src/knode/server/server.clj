@@ -416,10 +416,6 @@
            :escape-slash false)}))
 
 ;; ### TSV
-(defn seq->tsv-string
-  [rows]
-  (with-out-str (csv/write-csv *out* rows :separator \tab)))
-
 (defn render-tsv-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
@@ -427,7 +423,7 @@
     table {:status (or status 200)
            :headers headers
            :body
-           (seq->tsv-string
+           (sutil/seq->tsv-string
             (concat
              (when-not
               (->> (get-in req [:params "show-headers"] "true")

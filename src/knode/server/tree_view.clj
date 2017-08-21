@@ -6,26 +6,10 @@
    [clojure.string :as str]
 
    [knode.state :refer [state]]
+   [knode.util :as util]
    [knode.server.template :as pg]
    [knode.server.util :as sutil]))
 
-(defn vector-compare [[value1 & rest1] [value2 & rest2]]
-  (let [result (compare value1 value2)]
-    (cond
-      (not (zero? result)) result
-      (nil? value1) 0
-      :else (recur rest1 rest2))))
-
-(defn prepare-string [s]
-  (let [s (or s "")
-        parts (vec (clojure.string/split s #"\d+"))
-        numbers (->> (re-seq #"\d+" s)
-                     (map #(Long/parseLong %))
-                     (vec))]
-    (vec (interleave (conj parts "") (conj numbers "")))))
-
-(defn natural-compare [a b]
-  (vector-compare (prepare-string a) (prepare-string b)))
 
 (defn read-tree! [tree-name]
   (try
@@ -45,7 +29,7 @@
 
 (defn tree->tsv2 [triples]
   (let [numbered (->> triples
-                      (sort-by #(get % 2) natural-compare)
+                      (sort-by #(get % 2) util/natural-compare)
                       (map (fn [n trip] (cons n trip)) (range)))
         parent-tbl (reduce
                     (fn [memo [line-num subject parent label]]
@@ -74,7 +58,7 @@
        (map (fn [[subject parent label]]
               {:text label :iri subject :id subject
                :children (some #(= subject (second %)) triples)}))
-       (sort-by :text natural-compare)
+       (sort-by :text util/natural-compare)
        vec))
 
 (defn render-tree-children

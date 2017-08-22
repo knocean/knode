@@ -1,5 +1,5 @@
 language: clojure
-sudo: false
+sudo: required
 install:
   - curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
   - chmod +x lein

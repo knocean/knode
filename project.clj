@@ -16,6 +16,8 @@
                  [me.raynes/fs "1.4.6"]
                  [me.raynes/conch "0.8.0"]
 
+                 [clucy "0.4.0"]
+
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]
                  [crate "0.2.4"]

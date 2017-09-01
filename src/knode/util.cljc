@@ -32,3 +32,22 @@
   (throw
    (#?(:clj Exception. :cljs js/Error.)
     (->> messages (map str) (clojure.string/join " ")))))
+
+
+(defn vector-compare [[value1 & rest1] [value2 & rest2]]
+  (let [result (compare value1 value2)]
+    (cond
+      (not (zero? result)) result
+      (nil? value1) 0
+      :else (recur rest1 rest2))))
+
+(defn -prepare-string [s]
+  (let [s (clojure.string/lower-case (or s ""))
+        parts (vec (clojure.string/split s #"\d+"))
+        numbers (->> (re-seq #"\d+" s)
+                     (map #(Long/parseLong %))
+                     (vec))]
+    (vec (interleave (conj parts "") (conj numbers "")))))
+
+(defn natural-compare [a b]
+  (vector-compare (-prepare-string a) (-prepare-string b)))

@@ -4,7 +4,7 @@
 
             [knode.state :refer [state]]))
 
-(def +max-search-results+ 25)
+(def +max-search-results+ 100)
 (def +search-index-dir+ "tmp/search-index")
 (def index (clucy/disk-index +search-index-dir+))
 
@@ -12,7 +12,6 @@
 (def alternative-term "http://purl.obolibrary.org/obo/IAO_0000118")
 (def indexed-predicates
   #{rdf-label alternative-term})
-
 
 (defn clear-index! []
   (fs/delete-dir +search-index-dir+))
@@ -32,7 +31,7 @@
                         (into {})))]
     (add! index-map)))
 
-(defn rebuild-index! []
+(defn populate-index! []
   (doseq [term (:terms @state)]
     (add-term! term)))
 

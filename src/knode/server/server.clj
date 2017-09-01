@@ -30,7 +30,8 @@
    [knode.server.template :refer [base-template]]
    [knode.server.authentication :as auth]
    [knode.server.upstream :as up]
-   [knode.server.query :as query])
+   [knode.server.query :as query]
+   [knode.server.search :as search])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
 
 ;; ## Ontology Term Rendering
@@ -869,6 +870,10 @@
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))
   (GET "/index.html" req (render-doc req "index"))
   (GET "/" req (render-doc req "index"))
+
+  ; search page
+  (GET "/api/search" [] search/render-search-results)
+  (GET "/search" [] search/render-search-interface)
 
   ; ## Dev Pages
   (GET "/dev/status" [] render-status)

@@ -31,7 +31,8 @@
    [knode.server.authentication :as auth]
    [knode.server.upstream :as up]
    [knode.server.query :as query]
-   [knode.server.search :as search])
+   [knode.server.search :as search]
+   [knode.server.tree-view :as tree])
   (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
 
 ;; ## Ontology Term Rendering
@@ -416,10 +417,6 @@
            :escape-slash false)}))
 
 ;; ### TSV
-(defn seq->tsv-string
-  [rows]
-  (with-out-str (csv/write-csv *out* rows :separator \tab)))
-
 (defn render-tsv-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
@@ -427,7 +424,7 @@
     table {:status (or status 200)
            :headers headers
            :body
-           (seq->tsv-string
+           (sutil/seq->tsv-string
             (concat
              (when-not
               (->> (get-in req [:params "show-headers"] "true")
@@ -505,25 +502,6 @@
     failure))
 
 ;; ## Ontology Term Methods
-(defn parse-request-output-format
-  [{:keys [params uri] :as req}]
-  (or
-   (when (find params "output-format")
-     (string/lower-case (get params "output-format")))
-   (when (find params "format")
-     (string/lower-case (get params "format")))
-   (case (get-in req [:headers "accept"])
-     "text/html" "html"
-     "text/turtle" "ttl"
-     "text/tab-separated-values" "tsv"
-     "application/json" "json"
-     nil)
-   (when-let [[_ extension]
-              (re-matches
-               #"^.*\.(html|ttl|json|tsv)$"
-               (string/lower-case (or uri "")))]
-     extension)))
-
 (defn parse-request-iri
   [state {:keys [params uri] :as req}]
   (or
@@ -579,12 +557,6 @@
        [(if (= "true" (get params "compact")) "CURIE" "IRI")
         (->> state :terms keys sort)]))))
 
-(defn parse-request-method
-  [{:keys [params request-method] :as req}]
-  (if (find params "method")
-    (-> (get params "method" "") string/lower-case keyword)
-    request-method))
-
 (defn parse-ontology-request
   "Given a state and a request map,
    return a map with :format and :iris keys."
@@ -606,9 +578,9 @@
 
     :else
     (merge
-     (when-let [method (parse-request-method req)]
+     (when-let [method (sutil/parse-request-method req)]
        {:method method})
-     (when-let [output-format (parse-request-output-format req)]
+     (when-let [output-format (sutil/parse-request-output-format req)]
        {:output-format output-format})
      (if-let [[style iri] (parse-request-iri state req)]
        {:style style :iri iri}
@@ -772,12 +744,11 @@
      state-atom
      (assoc new-state :last-modified (java.util.Date.)))))
 
-
 (defn query-request!
   [state-atom {:keys [params] :as req}]
-  (let [method (parse-request-method req)
+  (let [method (sutil/parse-request-method req)
         compact (= "true" (get params "compact"))
-        output-format (parse-request-output-format req)
+        output-format (sutil/parse-request-output-format req)
         sparql (query/sanitized-sparql
                 (get params "sparql")
                 :page (try
@@ -861,10 +832,16 @@
   ; ontology terms
   (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
+  ; queries
   (ANY "/api/query" [:as req] (query-request! state req))
   (GET "/query" [] query/render-query-interface)
   (GET "/query/default-queries" [:as req]
        query/render-default-queries)
+
+  ; tree view
+  (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
+  (GET "/api/tree/:name/children" [name :as req] (tree/render-tree-children req name))
+  (GET "/tree/:name" [name :as req] (tree/render-tree-view req name))
 
   ; doc directory
   (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))

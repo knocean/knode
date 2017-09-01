@@ -34,7 +34,8 @@
   {:status 200
    :headers {"Content-Type" "application/edn"}
    :body (try
-           (str (edn/read (java.io.PushbackReader. (io/reader (str (:ontology-dir @state))))))
+           (let [fname (str (:ontology-dir @state) "default-queries.edn")]
+             (str (edn/read (java.io.PushbackReader. (io/reader fname)))))
            (catch Exception e
              (str ["SELECT * WHERE { ?s ?p ?o }"])))})
 
@@ -50,4 +51,5 @@
                      [:button {:class "send-query btn btn-primary"} "Query"]
                      [:div {:id "result"}]
                      [:button {:class "more-results btn btn-primary"} "More"]
-                     [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]]})})
+                     [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]
+                     [:script {:src "/js/query_editor.js"}]]})})

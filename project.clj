@@ -40,6 +40,11 @@
                         :compiler {:output-to "resources/public/js/tree_view.js"
                                    :optimizations :whitespace
                                    :pretty-print true}
+                        :jar true}
+                       {:source-paths ["src/knode/front_end/text_search"]
+                        :compiler {:output-to "resources/public/js/text_search.js"
+                                   :optimizations :whitespace
+                                   :pretty-print true}
                         :jar true}]}
   :main knode.cli
   :aot [knode.cli])

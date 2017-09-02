@@ -52,4 +52,4 @@
                      [:div {:id "result"}]
                      [:button {:class "more-results btn btn-primary"} "More"]
                      [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]
-                     [:script {:src "/js/query_editor.js"}]]})})
+                     [:script {:src "/js/query_editor.js" :type "text/javascript" :charset "utf-8"}]]})})

@@ -1,5 +1,6 @@
 (ns knode.front-end.query-editor.pagination
-  (:require [cljs.reader :as reader]))
+  (:require [cljs.reader :as reader]
+            [knode.front-end.util :as util]))
 
 (def page (atom 0))
 (def query (atom nil))

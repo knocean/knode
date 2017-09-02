@@ -20,3 +20,15 @@
 
 (defn dom-loaded [fn]
   (.addEventListener js/document "DOMContentLoaded" fn))
+
+(defn $get
+  ([uri on-done] ($get uri {} on-done))
+  ([uri params on-done]
+   (-> js/$
+       (.get uri (clj->js params))
+       (.done on-done))))
+
+(defn $get-json
+  ([uri on-done] ($get-json uri {} on-done))
+  ([uri params on-done]
+   ($get uri params (fn [data] (on-done (js->clj (.parse js/JSON data)))))))

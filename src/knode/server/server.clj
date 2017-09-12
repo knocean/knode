@@ -899,15 +899,15 @@
 
 (defonce ts (atom nil))
 
-(do
-  (@ts :timeout 10)
-  (reset!
-   ts (httpkit/run-server
-       (->> test-routes-handler
-            wrap-session
-            wrap-params
-            wrap-head)
-       {:port 4445})))
+;; (do
+;;   (@ts :timeout 10)
+;;   (reset!
+;;    ts (httpkit/run-server
+;;        (->> test-routes-handler
+;;             wrap-session
+;;             wrap-params
+;;             wrap-head)
+;;        {:port 4445})))
 
 ;; ## Server
 

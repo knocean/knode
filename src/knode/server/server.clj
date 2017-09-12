@@ -7,6 +7,7 @@
 
    [org.httpkit.server :as httpkit]
    [compojure.route :as route]
+   [bidi.bidi :as bidi]
    [ring.util.response :refer [redirect]]
    [ring.middleware.session :refer [wrap-session]]
    [ring.middleware.params :refer [wrap-params]]
@@ -866,6 +867,47 @@
        [:h1 "Not Found"]
        [:p "Sorry, the page you requested was not found."]
        [:p [:a {:href "/"} "Return to home page."]]]})))
+
+(def handler-table
+  (atom
+   {:test-page (fn [req] (println "REQUEST FROM BIDI:" (str req)))
+    :static-resource (route/resources "")
+    :not-found (route/not-found
+                #(base-template
+                  (:session %)
+                  {:title "Not Found"
+                   :content
+                   [:div
+                    [:h1 "Not Found"]
+                    [:p "Sorry, the page you requested was not found."]
+                    [:p [:a {:href "/"} "Return to home page."]]]}))}))
+
+(def test-routes-data
+  (atom ["/" {"test" :test-page}]))
+
+;; Static assets map to resources/public/*
+;; You probably shouldn't work on caching them, in all honesty. Proxies do that better than the JVM.
+
+(defn test-routes-handler
+  [req]
+  (println
+   (if-let [res (bidi/match-route @test-routes-data (:uri req))]
+     [:handler (get @handler-table (:handler res))]
+     (if-let [static-resource :static-resource]
+       [:static static-resource]
+       :not-found))))
+
+(defonce ts (atom nil))
+
+(do
+  (@ts :timeout 10)
+  (reset!
+   ts (httpkit/run-server
+       (->> test-routes-handler
+            wrap-session
+            wrap-params
+            wrap-head)
+       {:port 4445})))
 
 ;; ## Server
 

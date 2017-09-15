@@ -868,34 +868,78 @@
        [:p "Sorry, the page you requested was not found."]
        [:p [:a {:href "/"} "Return to home page."]]]})))
 
+(defn error-template [name blurb]
+  #(base-template
+    (:session %)
+    {:title name
+     :content [:div [:h1 name]
+               [:p blurb]
+               [:p [:a {:href "/"} "Return to home page."]]]}))
+
 (def handler-table
   (atom
    {:test-page (fn [req] (println "REQUEST FROM BIDI:" (str req)))
+    :path-params-test-page (fn [req] (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req)))
+
     :static-resource (route/resources "")
+    :internal-error (error-template
+                     "Internal Error"
+                     "The server errored in some way. This isn't your fault, but we still can't process your request.")
     :not-found (route/not-found
-                #(base-template
-                  (:session %)
-                  {:title "Not Found"
-                   :content
-                   [:div
-                    [:h1 "Not Found"]
-                    [:p "Sorry, the page you requested was not found."]
-                    [:p [:a {:href "/"} "Return to home page."]]]}))}))
+                (error-template
+                 "Not Found"
+                 "Sorry, the page you requested was not found."))}))
 
 (def test-routes-data
-  (atom ["/" {"test" :test-page}]))
+  (atom ["/" {"test" :test-page
+              ["foo/" :bar "/baz"] :path-params-test-page}]))
+
+(defn intern-handler-fn!
+  ([path fn] (intern-handler-fn! path (keyword (gensym "HANDLER_")) fn))
+  ([path name fn]
+   ;; TODO - merge route data with the routing table
+   (swap! handler-table assoc name fn)))
+
+
+;; ;; EXAMPLE INVOCATION (and we can sugar this up with a macro or two if we feel like it :p)
+;; ;; This gets us away from a central routing table in code, and (thanks to bidi) helps the stale link problem
+;; (intern-handler-fn!
+;;  ["/" ["foo/" :bar "/baz"]]
+;;  :path-params-test-page
+;;  (fn [req]
+;;    (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))
+
 
 ;; Static assets map to resources/public/*
 ;; You probably shouldn't work on caching them, in all honesty. Proxies do that better than the JVM.
+(defn static-resource-exists?
+  [uri]
+  nil)
+
+(defn route-request
+  [req]
+  (if-let [res (bidi/match-route @test-routes-data (:uri req))]
+    res
+    (if (static-resource-exists? (:uri req))
+      {:handler :static-resource}
+      {:handler :not-found})))
 
 (defn test-routes-handler
   [req]
-  (println
-   (if-let [res (bidi/match-route @test-routes-data (:uri req))]
-     [:handler (get @handler-table (:handler res))]
-     (if-let [static-resource :static-resource]
-       [:static static-resource]
-       :not-found))))
+  (let [routed (route-request req)
+        route-params (->> routed ;; HTTP kit parses parameters out to string maps, not keyword maps. Lets be consistent.
+                          :route-params
+                          (map (fn [[k v]] [(name k) v]))
+                          (into {}))
+        routed-req (assoc req
+                          :route-params (or route-params {})
+                          :params (merge (:params req) route-params))]
+    (println "=== ROUTED:" (str routed))
+    (println "=== ROUTE PARAMS:" (str route-params))
+    (try
+      ((get @handler-table (:handler routed)) routed-req)
+      (catch Exception e
+        ((get @handler-table :internal-error) routed-req)))))
 
 (defonce ts (atom nil))
 
@@ -907,7 +951,7 @@
 ;;             wrap-session
 ;;             wrap-params
 ;;             wrap-head)
-;;        {:port 4445})))
+;;        {:port 4444})))
 
 ;; ## Server
 

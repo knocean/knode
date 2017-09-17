@@ -892,7 +892,7 @@
 
 (def test-routes-data
   (atom ["/" {"test" :test-page
-              ["foo/" :bar "/baz"] :path-params-test-page}]))
+              ["foo/" :bar] {"/baz" :path-params-test-page}}]))
 
 (defn intern-handler-fn!
   ([path fn] (intern-handler-fn! path (keyword (gensym "HANDLER_")) fn))
@@ -900,11 +900,31 @@
    ;; TODO - merge route data with the routing table
    (swap! handler-table assoc name fn)))
 
+(defn string->bidi-path
+  [s]
+  (let [raw (->> (string/split s #"/")
+                 (filter #(not (empty? %)))
+                 (map #(if (string/starts-with? % ":") (keyword (subs % 1)) %)))]
+    (loop [[a b & rem] raw
+           memo []]
+      (cond (nil? b) (conj memo (str "/" a))
+            (keyword? b) (recur rem (conj memo [(str a "/") b]))
+            (empty? memo) (recur (cons b rem) (conj memo a))
+            :else (recur (cons b rem) (conj memo (str "/" a)))))))
+
+(defn insert-new-handler
+  [path-map new-path handler-tag]
+  [(first path-map)
+   ((fn rec [map [a & path]]
+      (cond (contains? map a) (assoc map a (rec (get map a) path))
+            (nil? path) (assoc map a handler-tag)
+            :else (assoc map a (rec {} path))))
+    (second path-map) new-path)])
 
 ;; ;; EXAMPLE INVOCATION (and we can sugar this up with a macro or two if we feel like it :p)
 ;; ;; This gets us away from a central routing table in code, and (thanks to bidi) helps the stale link problem
 ;; (intern-handler-fn!
-;;  ["/" ["foo/" :bar "/baz"]]
+;;  ["/" ["foo/" :bar "/baz"]] ;; or "/foo/:bar/baz"
 ;;  :path-params-test-page
 ;;  (fn [req]
 ;;    (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))

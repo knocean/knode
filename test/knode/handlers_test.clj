@@ -1,5 +1,5 @@
 (ns knode.handlers-test
-  (:require [clojure.test :refer [deftest testing is thrown?]]
+  (:require [clojure.test :refer [deftest testing is]]
             [knode.server.handlers :refer [string->bidi-path insert-new-handler]]))
 
 (deftest insert-new-handler-test

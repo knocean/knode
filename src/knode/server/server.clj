@@ -807,7 +807,7 @@
           {:title (:title metadata)
            :content (md/md-to-html-string content)}))))})
 (handlers/intern-handler-fn!
- "/doc/:doc" :render-doc #(render-doc % (string/replace (get-in req [:params "doc"] "") #"\.htm?$" "")))
+ "/doc/:doc" :render-doc #(render-doc % (string/replace (get-in % [:params "doc"] "") #"\.htm?$" "")))
 (handlers/intern-handler-fn!
  "/index.html" :render-index #(render-doc % "index"))
 (handlers/intern-handler-fn!

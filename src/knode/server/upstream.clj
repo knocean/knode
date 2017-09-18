@@ -88,7 +88,7 @@
              :content [:div
                        [:h1 "Forbidden"]
                        [:p "You must be logged in to view an upstream ontology delta."]]})}))
-(handlers/intern-handler-fn! "/dev/upstream/delta" [:get :render-upstream-report] render-upstream-report)
+(handlers/intern-handler-fn! "/dev/upstream/delta" [:get :render-upstream-delta] render-upstream-delta)
 
 (defn render-upstream-report
   [req]

@@ -17,13 +17,18 @@
 (def handler-table
   (atom
    {:static-resource (route/resources "")
-    :internal-error (error-template
-                     "Internal Error"
-                     "The server errored in some way. This isn't your fault, but we still can't process your request.")
-    :not-found (route/not-found
-                (error-template
-                 "Not Found"
-                 "Sorry, the page you requested was not found."))}))
+    :internal-error (fn [req]
+                      {:status 500
+                       :headers {"Content-Type" "text/html; charset=utf-8"}
+                       :body (error-template
+                              "Internal Error"
+                              "The server errored in some way. This isn't your fault, but we still can't process your request.")})
+    :not-found (fn [req]
+                 {:status 404
+                  :heades {"Content-Type" "text/html; charset=utf-8"}
+                  :body (error-template
+                         "Not Found"
+                         "Sorry, the page you requested was not found.")})}))
 
 (def routes-data
   (atom ["/" {}]))
@@ -45,10 +50,11 @@
   [path-map new-path handler-tag]
   [(first path-map)
    ((fn rec [map [a & path]]
-      (cond (contains? map a) (let [res (get map a)
+      (cond (nil? path) (do (when (contains? map a) (println "WARNING: Overriding handler" (str (get map a))))
+                            (assoc map a handler-tag))
+            (contains? map a) (let [res (get map a)
                                     next (if (keyword? res) {"" res} res)]
                                 (assoc map a (rec next path)))
-            (nil? path) (assoc map a handler-tag)
             :else (assoc map a (rec {} path))))
     (second path-map) new-path)])
 
@@ -56,15 +62,8 @@
   ([path fn] (intern-handler-fn! path (keyword (gensym "HANDLER_")) fn))
   ([path name fn]
    (swap! routes-data #(insert-new-handler % (string->bidi-path path) name))
-   (swap! handler-table assoc name fn)))
-
-;; ;; EXAMPLE INVOCATION (and we can sugar this up with a macro or two if we feel like it :p)
-;; ;; This gets us away from a central routing table in code, and (thanks to bidi) helps the stale link problem
-;; (intern-handler-fn!
-;;  ["/" ["foo/" :bar "/baz"]] ;; or "/foo/:bar/baz"
-;;  :path-params-test-page
-;;  (fn [req]
-;;    (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))
+   (swap! handler-table assoc name fn)
+   nil))
 
 (intern-handler-fn!
  "/test" :test-page
@@ -76,13 +75,14 @@
  (fn [req]
    (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))
 
-
 ;; Static assets map to resources/public/*
 ;; You probably shouldn't work on caching them, in all honesty. Proxies do that better than the JVM.
 ;; Also, bidi seems to provide some static resource handling stuff at https://github.com/juxt/bidi#files
 (defn static-resource-exists?
   [uri]
   nil)
+
+(def link-to (partial bidi/path-for @routes-data))
 
 (defn route-request
   [req]
@@ -95,19 +95,23 @@
 (defn routes-handler
   [req]
   (let [routed (route-request req)
-        route-params (->> routed ;; HTTP kit parses parameters out to string maps, not keyword maps. Lets be consistent.
-                          :route-params
+        route-params (->> routed :route-params
+                          ; HTTP-kit parses parameters out to string maps, not keyword maps. Lets be consistent.
                           (map (fn [[k v]] [(name k) v]))
                           (into {}))
-        routed-req (assoc req
-                          :route-params (or route-params {})
-                          :params (merge (:params req) route-params))]
-    (println "=== ROUTED:" (str routed))
-    (println "=== ROUTE PARAMS:" (str route-params))
+        routed-req (assoc
+                    req
+                    :route-params (or route-params {})
+                    :params (merge (:params req) route-params))]
     (try
       ((get @handler-table (:handler routed)) routed-req)
       (catch Exception e
-        ((get @handler-table :internal-error) routed-req)))))
+        (try
+          ((get @handler-table :internal-error) routed-req)
+          (catch Exception e
+            {:status 500
+             :headers {"Content-Type" "text/plain"}
+             :body "Something went really, horrifically wrong with that request."}))))))
 
 (defonce ts (atom nil))
 

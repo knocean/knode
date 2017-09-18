@@ -32,8 +32,7 @@
    [knode.server.authentication :as auth]
    [knode.server.upstream :as up]
    [knode.server.tree-view :as tree]
-   [knode.server.query :as query])
-  (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
+   [knode.server.query :as query]))
 
 ;; ## Ontology Term Rendering
 ;; ### HTML
@@ -766,6 +765,7 @@
        (let [results (sparql/select-table @state-atom compact sparql)]
          {:column-headers (first results)
           :table (rest results)})))))
+(handlers/intern-handler-fn! "/api/query" :query-request! #(query-request! state %))
 
 (defn ontology-request!
   [state-atom req]
@@ -787,7 +787,7 @@
                   (http-time (:last-modified state)))
                  result)]
     (render-result state req result)))
-(intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
+(handlers/intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
 ;;  TODO - figure out specific behavior of the star there and replicate it in bidi (if it's a full wildcard match with no binding action, use catch-all handlers. Might get a bit more complicated otherwise
 ;;  (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
@@ -806,6 +806,12 @@
           req
           {:title (:title metadata)
            :content (md/md-to-html-string content)}))))})
+(handlers/intern-handler-fn!
+ "/doc/:doc" :render-doc #(render-doc % (string/replace (get-in req [:params "doc"] "") #"\.htm?$" "")))
+(handlers/intern-handler-fn!
+ "/index.html" :render-index #(render-doc % "index"))
+(handlers/intern-handler-fn!
+ "/" :render-index #(render-doc % "index"))
 
 ;; ## Status
 (defn render-status
@@ -822,43 +828,7 @@
              :else "All systems go")
        :content
        [:ul [:li [:b "Terms Count"] "-" term-count]]}))})
-
-;; ## Routes
-(defroutes knode-routes
-  ; ## Public Pages
-  ; queries
-  (ANY "/api/query" [:as req] (query-request! state req))
-
-  ; tree view
-  (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
-  (GET "/api/tree/:name/children" [name :as req] (tree/render-tree-children req name))
-  (GET "/tree/:name" [name :as req] (tree/render-tree-view req name))
-
-  ; doc directory
-  (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))
-  (GET "/index.html" req (render-doc req "index"))
-  (GET "/" req (render-doc req "index"))
-
-  ; ## Dev Pages
-  (GET "/dev/status" [] render-status)
-  (POST "/dev/upstream/delta" [] up/replace-upstream!)
-  (GET "/dev/upstream/delta" [] up/render-upstream-delta)
-  (GET "/dev/upstream" [] up/render-upstream-report)
-
-  ;; ; static resources
-  ;; (route/resources "")
-
-  ;; ; not found
-  ;; (route/not-found
-  ;;  #(base-template
-  ;;    (:session %)
-  ;;    {:title "Not Found"
-  ;;     :content
-  ;;     [:div
-  ;;      [:h1 "Not Found"]
-  ;;      [:p "Sorry, the page you requested was not found."]
-  ;;      [:p [:a {:href "/"} "Return to home page."]]]}))
-  )
+(handlers/intern-handler-fn! "/dev/status" :render-status render-status)
 
 ;; ## Server
 

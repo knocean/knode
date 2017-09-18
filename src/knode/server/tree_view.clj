@@ -7,6 +7,7 @@
 
    [knode.state :refer [state]]
    [knode.util :as util]
+   [knode.server.handlers :as handlers]
    [knode.server.template :as pg]
    [knode.server.util :as sutil]))
 
@@ -62,45 +63,49 @@
        vec))
 
 (defn render-tree-children
-  [req name]
+  [req]
   (let [format (sutil/parse-request-output-format req)]
     {:status 200
      :headers (sutil/format->content-type format)
-     :body (let [tree (read-tree! name)
+     :body (let [tree (read-tree! (get-in req [:params "name"]))
                  root (get-in req [:params "root"])
                  children (tree-children tree root)]
              (case format
                "json" (json/write-str children)
                "edn" (str children)
                (json/write-str children)))}))
+(handlers/intern-handler-fn! "/api/tree/:name/children" :render-tree-children render-tree-children)
 
 (defn render-tree-data
-  [req name]
+  [req]
   (let [format (sutil/parse-request-output-format req)]
     {:status 200
      :headers (sutil/format->content-type format "edn")
-     :body (let [tree (read-tree! name)]
+     :body (let [tree (read-tree! (get-in req [:params "name"]))]
              (case format
                "json" (json/write-str tree)
                "edn" (str tree)
                "tsv" (sutil/seq->tsv-string tree)
                "tsv2" (sutil/seq->tsv-string (tree->tsv2 tree))
                (str tree)))}))
+(handlers/intern-handler-fn! "/api/tree/:name/nodes" :render-tree-data render-tree-data)
 
 (defn render-tree-view
-  [req name]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :body
-   (pg/base-template
-    req
-    {:title (str name " - Tree View")
-     :content [:div
-               [:div {:class "tree"}]
-               [:link {:href "/assets/inspire-tree/inspire-tree.min.css" :rel "stylesheet"}]
-               [:script {:src "/assets/inspire-tree/lodash.min.js" :type "text/javascript" :charset "utf-8"}]
-               [:script {:src "/assets/inspire-tree/inspire-tree.min.js" :type "text/javascript" :charset "utf-8"}]
-               [:script {:src "/assets/inspire-tree/inspire-tree-dom.min.js" :type "text/javascript" :charset "utf-8"}]
-               [:script {:src "/js/tree_view.js" :type "text/javascript" :charset "utf-8"}]
-               [:script {:type "text/javascript" :charset "utf-8"}
-                (format "document.tree_name = \"%s\"" name)]]})})
+  [req]
+  (let [name (get-in req [:params "name"])]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body
+     (pg/base-template
+      req
+      {:title (str name " - Tree View")
+       :content [:div
+                 [:div {:class "tree"}]
+                 [:link {:href "/assets/inspire-tree/inspire-tree.min.css" :rel "stylesheet"}]
+                 [:script {:src "/assets/inspire-tree/lodash.min.js" :type "text/javascript" :charset "utf-8"}]
+                 [:script {:src "/assets/inspire-tree/inspire-tree.min.js" :type "text/javascript" :charset "utf-8"}]
+                 [:script {:src "/assets/inspire-tree/inspire-tree-dom.min.js" :type "text/javascript" :charset "utf-8"}]
+                 [:script {:src "/js/tree_view.js" :type "text/javascript" :charset "utf-8"}]
+                 [:script {:type "text/javascript" :charset "utf-8"}
+                  (format "document.tree_name = \"%s\"" name)]]})}))
+(handlers/intern-handler-fn! "/tree/:name" :render-tree-view render-tree-view)

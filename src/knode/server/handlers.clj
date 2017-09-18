@@ -65,21 +65,22 @@
    (swap! handler-table assoc name fn)
    nil))
 
-(intern-handler-fn!
- "/test" :test-page
- (fn [req]
-   (println "REQUEST FROM BIDI:" (str req))))
+;; (intern-handler-fn!
+;;  "/test" :test-page
+;;  (fn [req]
+;;    (println "REQUEST FROM BIDI:" (str req))))
 
-(intern-handler-fn!
- "/foo/:bar/baz" :path-params-test-page
- (fn [req]
-   (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))
+;; (intern-handler-fn!
+;;  "/foo/:bar/baz" :path-params-test-page
+;;  (fn [req]
+;;    (println "REQUEST FROM BIDI ... WITH PATH PARAMS:" (str req))))
 
 ;; Static assets map to resources/public/*
 ;; You probably shouldn't work on caching them, in all honesty. Proxies do that better than the JVM.
 ;; Also, bidi seems to provide some static resource handling stuff at https://github.com/juxt/bidi#files
 (defn static-resource-exists?
   [uri]
+  "TODO"
   nil)
 
 (def link-to (partial bidi/path-for @routes-data))

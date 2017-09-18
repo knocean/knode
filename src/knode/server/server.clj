@@ -6,8 +6,7 @@
    [clojure.data.csv :as csv]
 
    [org.httpkit.server :as httpkit]
-   [compojure.route :as route]
-   [bidi.bidi :as bidi]
+   ;; [compojure.route :as route]
    [ring.util.response :refer [redirect]]
    [ring.middleware.session :refer [wrap-session]]
    [ring.middleware.params :refer [wrap-params]]
@@ -20,6 +19,7 @@
    [clj-jgit.porcelain :as git]
    [me.raynes.conch :as sh]
 
+   [knode.server.handlers :as handlers]
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
@@ -787,6 +787,9 @@
                   (http-time (:last-modified state)))
                  result)]
     (render-result state req result)))
+(intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
+;;  TODO - figure out specific behavior of the star there and replicate it in bidi (if it's a full wildcard match with no binding action, use catch-all handlers. Might get a bit more complicated otherwise
+;;  (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
 ;; ## Render Documentation
 (defn render-doc
@@ -822,21 +825,9 @@
 
 ;; ## Routes
 (defroutes knode-routes
-  ; ## Authentication
-  (GET "/login" [] auth/login)
-  (GET "/login-google" [] auth/login-google)
-  (GET "/oauth2-callback-google" [] auth/oauth2-callback-google)
-  (GET "/logout" [] auth/logout)
-
   ; ## Public Pages
-  ; ontology terms
-  (ANY "/ontology/*" [:as req] (ontology-request! state req))
-
   ; queries
   (ANY "/api/query" [:as req] (query-request! state req))
-  (GET "/query" [] query/render-query-interface)
-  (GET "/query/default-queries" [:as req]
-       query/render-default-queries)
 
   ; tree view
   (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
@@ -854,19 +845,20 @@
   (GET "/dev/upstream/delta" [] up/render-upstream-delta)
   (GET "/dev/upstream" [] up/render-upstream-report)
 
-  ; static resources
-  (route/resources "")
+  ;; ; static resources
+  ;; (route/resources "")
 
-  ; not found
-  (route/not-found
-   #(base-template
-     (:session %)
-     {:title "Not Found"
-      :content
-      [:div
-       [:h1 "Not Found"]
-       [:p "Sorry, the page you requested was not found."]
-       [:p [:a {:href "/"} "Return to home page."]]]})))
+  ;; ; not found
+  ;; (route/not-found
+  ;;  #(base-template
+  ;;    (:session %)
+  ;;    {:title "Not Found"
+  ;;     :content
+  ;;     [:div
+  ;;      [:h1 "Not Found"]
+  ;;      [:p "Sorry, the page you requested was not found."]
+  ;;      [:p [:a {:href "/"} "Return to home page."]]]}))
+  )
 
 ;; ## Server
 
@@ -880,7 +872,7 @@
   (reset!
    server
    (httpkit/run-server
-    (->> knode-routes
+    (->> handlers/routes-handler
          wrap-session
          wrap-params
          wrap-head)

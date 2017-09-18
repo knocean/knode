@@ -38,6 +38,7 @@
              (str (edn/read (java.io.PushbackReader. (io/reader fname)))))
            (catch Exception e
              (str ["SELECT * WHERE { ?s ?p ?o }"])))})
+(intern-handler-fn! "/query/default-queries" :default-queries render-default-queries)
 
 (defn render-query-interface
   [req]
@@ -53,3 +54,4 @@
                      [:button {:class "more-results btn btn-primary"} "More"]
                      [:script {:src "/assets/ace/ace.js" :type "text/javascript" :charset "utf-8"}]
                      [:script {:src "/js/query_editor.js"}]]})})
+(intern-handler-fn! "/query" :query-interface render-query-interface)

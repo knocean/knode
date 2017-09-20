@@ -23,8 +23,10 @@
           {:title "Search Interface"
            :content [:div
                      [:div {:class "input-group"}
-                      [:input {:type "text" :placeholder "Search" :class "form-control search-text"}]
+                      [:input {:type "text" :placeholder "Search" :class "form-control search-text"
+                               :autocomplete "off" :autocorrect "off" :autocapitalize "off" :spellcheck "false"}]
                       [:span {:class "input-group-btn"}
-                       [:input {:type "button" :class "search-button btn btn-primary" :value "Search"}]]]
+                       [:input {:type "button" :class "search-button btn btn-primary" :value "Search"}]
+                       [:input {:type "button" :class "clear-button btn btn-primary" :value "Clear"}]]]
                      [:div {:class "results"}]
                      [:script {:src "/js/text_search.js" :type "text/javascript" :charset "utf-8"}]]})})

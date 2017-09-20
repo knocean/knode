@@ -5,11 +5,14 @@
 
             [knode.front-end.util :as util]))
 
+(defn clear-results!
+  []
+  (-> (js/$ ".results") (.empty)))
+
 (defn render-results!
   [data]
   (let [dat (reader/read-string data)
         $res (js/$ ".results")]
-    (util/log! "DATA:" dat)
     (-> $res
         (.empty)
         (.append
@@ -19,7 +22,6 @@
              (let [href (or (get entry "href") (get entry "iri"))
                    label (get entry "label")
                    alt (get entry "alternative term")]
-               (util/log! href label alt)
                [:li {:class "list-group-item"}
                 [:a {:href href :target "_blank"}
                  (get entry "label")]
@@ -27,18 +29,24 @@
 
 (defn run-search!
   [term]
-  (util/$get "/api/search" {:search-term term} render-results!))
+  (when (not (empty? term))
+    (util/$get "/api/search" {:search-term term} render-results!)))
 
 (defn initialize-search-interface!
-  [$search-text $search-button]
-
-  (.keyup
-   $search-text
-   #(when (= 13 (.-which %))
-      (run-search! (.val $search-text))))
-  (.click
-   $search-button
-   #(run-search! (.val $search-text))))
+  [$search-text $search-button $clear-button]
+  (let [clear! (fn []
+                 (clear-results!)
+                 (-> $search-text (.val "")))]
+    (.keyup
+     $search-text
+     #(if (= (.-which %) 27)
+        (clear!)
+        (run-search! (.val $search-text))))
+    (.click $search-button #(run-search! (.val $search-text)))
+    (.click $clear-button #(clear!))))
 
 (util/dom-loaded
- #(initialize-search-interface! (js/$ ".search-text") (js/$ ".search-button")))
+ #(initialize-search-interface!
+   (js/$ ".search-text")
+   (js/$ ".search-button")
+   (js/$ ".clear-button")))

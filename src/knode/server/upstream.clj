@@ -45,7 +45,6 @@
              :content [:div
                        [:h1 "Forbidden"]
                        [:p "You must be logged in to replace an upstream ontology."]]})}))
-(handlers/intern-handler-fn! "/dev/upstream/delta" [:post :replace-upstream!] replace-upstream!)
 
 (defn render-upstream-delta
   [req]
@@ -88,7 +87,9 @@
              :content [:div
                        [:h1 "Forbidden"]
                        [:p "You must be logged in to view an upstream ontology delta."]]})}))
-(handlers/intern-handler-fn! "/dev/upstream/delta" [:get :render-upstream-delta] render-upstream-delta)
+; FIXME
+; (handlers/intern-handler-fn! "/dev/upstream/delta" [:post :replace-upstream!] replace-upstream!)
+; (handlers/intern-handler-fn! "/dev/upstream/delta" [:get :render-upstream-delta] render-upstream-delta)
 
 (defn render-upstream-report
   [req]

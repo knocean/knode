@@ -788,7 +788,7 @@
                  result)]
     (render-result state req result)))
 (handlers/intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
-;;  TODO - figure out specific behavior of the star there and replicate it in bidi (if it's a full wildcard match with no binding action, use catch-all handlers. Might get a bit more complicated otherwise
+;;  FIXME - figure out specific behavior of the star there and replicate it in bidi (if it's a full wildcard match with no binding action, use catch-all handlers. Might get a bit more complicated otherwise
 ;;  (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
 ;; ## Render Documentation

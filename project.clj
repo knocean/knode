@@ -11,6 +11,7 @@
                  [org.clojure/data.csv "0.1.3"]
                  [org.clojure/data.xml "0.0.8"]
 
+                 [trivial-warning "1.0.3"]
                  [tempfile "0.2.0"]
                  [digest "1.4.5"]
                  [me.raynes/fs "1.4.6"]

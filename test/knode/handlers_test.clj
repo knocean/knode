@@ -14,12 +14,8 @@
            ["/" {"test" {"" :foo, "/one" {"/two" :bar}}}]))
     (is (= (insert-new-handler ["/" {["test/" :foo] :bar}] (string->bidi-path "/test/:foo/one/two") :mumble)
            ["/" {["test/" :foo] {"" :bar, "/one" {"/two" :mumble}}}])))
-  (testing "does clobber existing paths when colliding"
-    (is (= (insert-new-handler ["/" {"test" :foo}] (string->bidi-path "/test") :bar)
-           ["/" {"test" :bar}])))
-  ;; (testing "errors on perfectly conflicting paths"
-  ;;   (is (thrown? Exception (insert-new-handler ["/" {["test/" :foo] :bar}] (string->bidi-path "/test/:baz") :mumble))))
-  )
+  (testing "errors on perfecty conflicting paths"
+    (is (thrown? Exception (insert-new-handler ["/" {"test" :foo}] (string->bidi-path "/test") :bar)))))
 
 (deftest string->bidi-path-test
   (testing "prepends '/' to every path element other than the first")

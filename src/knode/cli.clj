@@ -9,6 +9,7 @@
    [knode.emit :as emit]
    [knode.sparql :as sparql]
    [knode.upstream :as up]
+   [knode.text-search :as search]
 
    [knode.server.server :as server])
   (:gen-class))
@@ -106,6 +107,7 @@
     "serve" (do (load!)
                 (sparql/init-dataset! state)
                 (sparql/load-terms! @state)
+                (when (not (search/index-exists?)) (search/populate-index!))
                 (server/serve))
     "reindex" (do (load!)
                   (spit

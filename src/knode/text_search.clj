@@ -1,5 +1,6 @@
 (ns knode.text-search
-  (:require [clucy.core :as clucy]
+  (:require [clojure.string :as string]
+            [clucy.core :as clucy]
             [me.raynes.fs :as fs]
 
             [knode.state :refer [state]]))
@@ -12,6 +13,9 @@
 (def alternative-term "http://purl.obolibrary.org/obo/IAO_0000118")
 (def indexed-predicates
   #{rdf-label alternative-term})
+
+(defn index-exists? []
+  (fs/exists? +search-index-dir+))
 
 (defn clear-index! []
   (fs/delete-dir +search-index-dir+))
@@ -35,11 +39,16 @@
   (doseq [term (:terms @state)]
     (add-term! term)))
 
-(defn search [term]
+(defn sanitize-input
+  [raw-term]
+  (string/replace raw-term #"\\*/" "\\\\/"))
+
+(defn search
+  [term]
   (map
    clojure.walk/stringify-keys
    (try
-     (clucy/search index term +max-search-results+)
+     (clucy/search index (sanitize-input term) +max-search-results+)
      (catch org.apache.lucene.store.NoSuchDirectoryException e
        []))))
 

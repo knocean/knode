@@ -41,6 +41,7 @@
            memo []]
       (cond (nil? a) (conj memo "")
             (and (nil? b) (empty? memo)) (conj memo a)
+            (and (nil? b) (= a "*")) (conj memo true)
             (nil? b) (conj memo (str "/" a))
             (keyword? b) (recur rem (conj memo [(str a "/") b]))
             (empty? memo) (recur (cons b rem) (conj memo a))

@@ -788,11 +788,6 @@
                  result)]
     (render-result state req result)))
 (handlers/intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
-;;  FIXME - figure out specific behavior of the star there and replicate it in bidi (if it's a full wildcard match with no binding action, use catch-all handlers. Might get a bit more complicated otherwise
-;; Having a route named /foo/test/* gets the following request on /foo/test/a/b/c/d/e/f/g/h
-;; {:cookies {"username-localhost-8888" {:value "2|1:0|10:1505912996|23:username-localhost-8888|44:YTJhYmZmODFhYTZjNGI4YWE5NmEzZjQwNDE1MmRjOTM=|6054b477e470bffc8f5ed76d7be2f160487c66f80f7da8d1f8fe5704fbdc2d6a"}, "_xsrf" {:value "2|8b5017be|e7c39cd81a67f5d76feda187999f6763|1504663548"}}, :remote-addr "0:0:0:0:0:0:0:1", :params {:* "a/b/c/d/e/f/g/h"}, :route-params {:* "a/b/c/d/e/f/g/h"}, :headers {"host" "localhost:3210", "user-agent" "Mozilla/5.0 (X11; Linux x86_64; rv:54.0) Gecko/20100101 Firefox/54.0", "cookie" "username-localhost-8888=\"2|1:0|10:1505912996|23:username-localhost-8888|44:YTJhYmZmODFhYTZjNGI4YWE5NmEzZjQwNDE1MmRjOTM=|6054b477e470bffc8f5ed76d7be2f160487c66f80f7da8d1f8fe5704fbdc2d6a\"; _xsrf=2|8b5017be|e7c39cd81a67f5d76feda187999f6763|1504663548", "connection" "keep-alive", "upgrade-insecure-requests" "1", "accept" "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "accept-language" "en-US,en;q=0.5", "accept-encoding" "gzip, deflate", "dnt" "1"}, :async-channel #object[org.httpkit.server.AsyncChannel 0x7f7afb13 "/0:0:0:0:0:0:0:1:3210<->/0:0:0:0:0:0:0:1:47076"], :server-port 3210, :content-length 0, :form-params {}, :compojure/route [:any "/foo/test/*"], :websocket? false, :session/key nil, :query-params {}, :content-type nil, :character-encoding "utf8", :uri "/foo/test/a/b/c/d/e/f/g/h", :server-name "localhost", :query-string nil, :body nil, :scheme :http, :request-method :get, :session {}}
-;; So, like, :params and :route-params get :* with the remainder of the path. We'll need to wrap some interned handlers to get that behavior, methinks.
-;;  (ANY "/ontology/*" [:as req] (ontology-request! state req))
 
 ;; ## Render Documentation
 (defn render-doc

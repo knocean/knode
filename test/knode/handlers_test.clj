@@ -25,7 +25,8 @@
 (deftest string->bidi-path-test
   (testing "prepends '/' to every path element other than the first")
   (testing "does not prepend '/' to the first path element")
-  (testing "treats colonized path components as variables, adds them to the preceding path element as a vector component"))
+  (testing "treats colonized path components as variables, adds them to the preceding path element as a vector component")
+  (testing "transforms * components into regex matches on the remainder"))
 
 (deftest routing-and-linking-test
   (testing "link-to returns the path to a given handler")

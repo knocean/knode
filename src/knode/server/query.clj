@@ -39,8 +39,7 @@
              (str (edn/read (java.io.PushbackReader. (io/reader fname)))))
            (catch Exception e
              (str ["SELECT * WHERE { ?s ?p ?o }"])))})
-; FIXME
-; (handlers/intern-handler-fn! "/query/default-queries" :default-queries render-default-queries)
+(handlers/intern-handler-fn! "/query/default-queries" :default-queries render-default-queries)
 
 (defn render-query-interface
   [req]

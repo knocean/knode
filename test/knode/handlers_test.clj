@@ -14,6 +14,11 @@
            ["/" {"test" {"" :foo, "/one" {"/two" :bar}}}]))
     (is (= (insert-new-handler ["/" {["test/" :foo] :bar}] (string->bidi-path "/test/:foo/one/two") :mumble)
            ["/" {["test/" :foo] {"" :bar, "/one" {"/two" :mumble}}}])))
+  (testing "doesn't clobber existing paths while defining overlapping, but non-extending paths"
+    (is (= (insert-new-handler
+            ["/" {"foo" {"/bar" {"/baz" :deep-handler}}}]
+            (string->bidi-path "/foo") :shallow-handler)
+           ["/" {"foo" {"/bar" {"/baz" :deep-handler}, "" :shallow-handler}}])))
   (testing "errors on perfecty conflicting paths"
     (is (thrown? Exception (insert-new-handler ["/" {"test" :foo}] (string->bidi-path "/test") :bar)))))
 

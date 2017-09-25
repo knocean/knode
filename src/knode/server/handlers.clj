@@ -7,29 +7,27 @@
 
             [knode.server.template :refer [base-template]]))
 
-(defn error-template [name blurb]
-  #(base-template
-    (:session %)
-    {:title name
-     :content [:div [:h1 name]
-               [:p blurb]
-               [:p [:a {:href "/"} "Return to home page."]]]}))
+(defn http-error [error-code name blurb]
+  (fn [req]
+    {:status error-code
+     :headers {"Content-Type" "text/html; charset=utf-8"}
+     :body (base-template
+            (:session req)
+            {:title name
+             :content [:div [:h1 name]
+                       [:p blurb]
+                       [:p [:a {:href "/"} "Return to home page."]]]})}))
 
 (def handler-table
   (atom
    {:static-resource (route/resources "")
-    :internal-error (fn [req]
-                      {:status 500
-                       :headers {"Content-Type" "text/html; charset=utf-8"}
-                       :body (error-template
-                              "Internal Error"
-                              "The server errored in some way. This isn't your fault, but we still can't process your request.")})
-    :not-found (fn [req]
-                 {:status 404
-                  :heades {"Content-Type" "text/html; charset=utf-8"}
-                  :body (error-template
-                         "Not Found"
-                         "Sorry, the page you requested was not found.")})}))
+    :internal-error (http-error
+                     500
+                     "Internal Error"
+                     "The server errored in some way. This isn't your fault, but we still can't process your request.")
+    :not-found (http-error
+                404 "Not Found"
+                "Sorry, the page you requested was not found.")}))
 
 (def routes-data
   (atom ["/" {}]))
@@ -52,11 +50,18 @@
   [path-map new-path handler-tag]
   [(first path-map)
    ((fn rec [map [a & path]]
-      (cond (nil? path) (do (when (contains? map a) (warn (str "Overriding handler " (get map a))))
-                            (assoc map a handler-tag))
+      (cond (and (contains? map a) (nil? path))
+            (let [binding (get map a)]
+              (when (or (keyword? binding)
+                        (and (map? binding) (contains? binding "")))
+                (warn (str "Overriding handler " (get map a))))
+              (if (keyword? binding)
+                (assoc map a handler-tag)
+                (assoc map a (assoc binding "" handler-tag))))
             (contains? map a) (let [res (get map a)
                                     next (if (keyword? res) {"" res} res)]
                                 (assoc map a (rec next path)))
+            (nil? path) (assoc map a handler-tag)
             :else (assoc map a (rec {} path))))
     (second path-map) new-path)])
 

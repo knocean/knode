@@ -64,17 +64,26 @@
            :else (assoc map a (rec {} path))))
    path-map new-path))
 
-(defn intern-handler-fn!
-  ([path name f] (intern-handler-fn! path name :get f))
-  ([path name method f]
-   (swap!
-    routes-data
-    (fn [dat]
-      [(first dat)
-       (insert-new-handler
-        (second dat)
-        (string->bidi-path path)
-        name)]))
+(defmulti intern-handler-fn! (fn [p & _] (class p)))
+
+(defmethod intern-handler-fn! java.lang.String
+  ([path name f] (intern-handler-fn! [path] name f))
+  ([path name method f] (intern-handler-fn! [path] name method f)))
+
+(defmethod intern-handler-fn! clojure.lang.PersistentVector
+  ([paths name f] (intern-handler-fn! paths name :get f))
+  ([paths name method f]
+   (when (contains? @handler-table name) (warn (str "Overriding handler name " name)))
+   (map
+    #(swap!
+      routes-data
+      (fn [dat]
+        [(first dat)
+         (insert-new-handler
+          (second dat)
+          (string->bidi-path %)
+          name)]))
+    paths)
    (swap! handler-table assoc name f)
    nil))
 

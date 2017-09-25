@@ -809,9 +809,7 @@
 (handlers/intern-handler-fn!
  "/doc/:doc" :render-doc #(render-doc % (string/replace (get-in % [:params "doc"] "") #"\.htm?$" "")))
 (handlers/intern-handler-fn!
- "/index.html" :render-index #(render-doc % "index"))
-(handlers/intern-handler-fn!
- "/" :render-index #(render-doc % "index"))
+ ["/" "/index.html"] :render-index #(render-doc % "index"))
 
 ;; ## Status
 (defn render-status

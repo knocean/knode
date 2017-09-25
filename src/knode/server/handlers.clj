@@ -50,7 +50,7 @@
 (defn bidi-method [method-name path]
   (if (= :any method-name)
     path
-    {method-name path}))
+    (vec (cons method-name path))))
 
 (defn insert-new-handler
   [path-map new-path handler-tag]
@@ -70,7 +70,7 @@
            :else (assoc map a (rec {} path))))
    path-map new-path))
 
-(defmulti intern-handler-fn! (fn [p & _] (class p)))
+(defmulti intern-handler-fn! (fn ([p _ _] (class p)) ([_ p _ _] (class p))))
 
 (defmethod intern-handler-fn! java.lang.String
   ([path name f] (intern-handler-fn! [path] name f))
@@ -80,16 +80,15 @@
   ([paths name f] (intern-handler-fn! :any paths name f))
   ([method paths name f]
    (when (contains? @handler-table name) (warn (str "Overriding handler name " name)))
-   (map
-    #(swap!
+   (doseq [p paths]
+     (swap!
       routes-data
       (fn [dat]
         [(first dat)
          (insert-new-handler
           (second dat)
-          (bidi-method method (string->bidi-path %))
-          name)]))
-    paths)
+          (bidi-method method (string->bidi-path p))
+          name)])))
    (swap! handler-table assoc name f)
    nil))
 

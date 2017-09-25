@@ -48,28 +48,34 @@
 
 (defn insert-new-handler
   [path-map new-path handler-tag]
-  [(first path-map)
-   ((fn rec [map [a & path]]
-      (cond (and (contains? map a) (nil? path))
-            (let [binding (get map a)]
-              (when (or (keyword? binding)
-                        (and (map? binding) (contains? binding "")))
-                (warn (str "Overriding handler " (get map a))))
-              (if (keyword? binding)
-                (assoc map a handler-tag)
-                (assoc map a (assoc binding "" handler-tag))))
-            (contains? map a) (let [res (get map a)
-                                    next (if (keyword? res) {"" res} res)]
-                                (assoc map a (rec next path)))
-            (nil? path) (assoc map a handler-tag)
-            :else (assoc map a (rec {} path))))
-    (second path-map) new-path)])
+  ((fn rec [map [a & path]]
+     (cond (and (contains? map a) (nil? path))
+           (let [binding (get map a)]
+             (when (or (keyword? binding)
+                       (and (map? binding) (contains? binding "")))
+               (warn (str "Overriding handler " (get map a))))
+             (if (keyword? binding)
+               (assoc map a handler-tag)
+               (assoc map a (assoc binding "" handler-tag))))
+           (contains? map a) (let [res (get map a)
+                                   next (if (keyword? res) {"" res} res)]
+                               (assoc map a (rec next path)))
+           (nil? path) (assoc map a handler-tag)
+           :else (assoc map a (rec {} path))))
+   path-map new-path))
 
 (defn intern-handler-fn!
-  ([path name fn] (intern-handler-fn! path name :get fn))
-  ([path name method fn]
-   (swap! routes-data #(insert-new-handler % (string->bidi-path path) name))
-   (swap! handler-table assoc name fn)
+  ([path name f] (intern-handler-fn! path name :get f))
+  ([path name method f]
+   (swap!
+    routes-data
+    (fn [dat]
+      [(first dat)
+       (insert-new-handler
+        (second dat)
+        (string->bidi-path path)
+        name)]))
+   (swap! handler-table assoc name f)
    nil))
 
 ;; (intern-handler-fn!

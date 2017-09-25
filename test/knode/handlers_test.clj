@@ -4,23 +4,23 @@
 
 (deftest insert-new-handler-test
   (testing "leaves the first component of a path slash-free"
-    (is (= (insert-new-handler ["/" {}] (string->bidi-path "/test") :blah)
-           ["/" {"test" :blah}])))
+    (is (= (insert-new-handler {} (string->bidi-path "/test") :blah)
+           {"test" :blah})))
   (testing "handles path parameters"
-    (is (= (insert-new-handler ["/" {}] (string->bidi-path "/foo/:bar/baz") :blah)
-           ["/" {["foo/" :bar] {"/baz" :blah}}])))
+    (is (= (insert-new-handler {} (string->bidi-path "/foo/:bar/baz") :blah)
+           {["foo/" :bar] {"/baz" :blah}})))
   (testing "doesn't clobber existing paths while extending"
-    (is (= (insert-new-handler ["/" {"test" :foo}] (string->bidi-path "/test/one/two") :bar)
-           ["/" {"test" {"" :foo, "/one" {"/two" :bar}}}]))
-    (is (= (insert-new-handler ["/" {["test/" :foo] :bar}] (string->bidi-path "/test/:foo/one/two") :mumble)
-           ["/" {["test/" :foo] {"" :bar, "/one" {"/two" :mumble}}}])))
+    (is (= (insert-new-handler {"test" :foo} (string->bidi-path "/test/one/two") :bar)
+           {"test" {"" :foo, "/one" {"/two" :bar}}}))
+    (is (= (insert-new-handler {["test/" :foo] :bar} (string->bidi-path "/test/:foo/one/two") :mumble)
+           {["test/" :foo] {"" :bar, "/one" {"/two" :mumble}}})))
   (testing "doesn't clobber existing paths while defining overlapping, but non-extending paths"
     (is (= (insert-new-handler
-            ["/" {"foo" {"/bar" {"/baz" :deep-handler}}}]
+            {"foo" {"/bar" {"/baz" :deep-handler}}}
             (string->bidi-path "/foo") :shallow-handler)
-           ["/" {"foo" {"/bar" {"/baz" :deep-handler}, "" :shallow-handler}}])))
+           {"foo" {"/bar" {"/baz" :deep-handler}, "" :shallow-handler}})))
   (testing "errors on perfecty conflicting paths"
-    (is (thrown? Exception (insert-new-handler ["/" {"test" :foo}] (string->bidi-path "/test") :bar)))))
+    (is (thrown? Exception (insert-new-handler {"test" :foo} (string->bidi-path "/test") :bar)))))
 
 (deftest string->bidi-path-test
   (testing "prepends '/' to every path element other than the first")

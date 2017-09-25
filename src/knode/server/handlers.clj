@@ -47,6 +47,11 @@
             (empty? memo) (recur (cons b rem) (conj memo a))
             :else (recur (cons b rem) (conj memo (str "/" a)))))))
 
+(defn bidi-method [method-name path]
+  (if (= :any method-name)
+    path
+    {method-name path}))
+
 (defn insert-new-handler
   [path-map new-path handler-tag]
   ((fn rec [map [a & path]]
@@ -69,11 +74,11 @@
 
 (defmethod intern-handler-fn! java.lang.String
   ([path name f] (intern-handler-fn! [path] name f))
-  ([path name method f] (intern-handler-fn! [path] name method f)))
+  ([method path name f] (intern-handler-fn! method [path] name f)))
 
 (defmethod intern-handler-fn! clojure.lang.PersistentVector
-  ([paths name f] (intern-handler-fn! paths name :get f))
-  ([paths name method f]
+  ([paths name f] (intern-handler-fn! :any paths name f))
+  ([method paths name f]
    (when (contains? @handler-table name) (warn (str "Overriding handler name " name)))
    (map
     #(swap!
@@ -82,7 +87,7 @@
         [(first dat)
          (insert-new-handler
           (second dat)
-          (string->bidi-path %)
+          (bidi-method method (string->bidi-path %))
           name)]))
     paths)
    (swap! handler-table assoc name f)
@@ -114,7 +119,7 @@
 
 (defn route-request
   [req]
-  (if-let [res (bidi/match-route @routes-data (:uri req))]
+  (if-let [res (bidi/match-route @routes-data (:uri req) :request-method (:request-method req))]
     res
     (if (static-resource-exists? (:uri req))
       {:handler :static-resource}

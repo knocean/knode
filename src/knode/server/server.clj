@@ -31,8 +31,9 @@
    [knode.server.template :refer [base-template]]
    [knode.server.authentication :as auth]
    [knode.server.upstream :as up]
-   [knode.server.tree-view :as tree]
-   [knode.server.query :as query]))
+   [knode.server.query :as query]
+   [knode.server.search :as search]
+   [knode.server.tree-view :as tree]))
 
 ;; ## Ontology Term Rendering
 ;; ### HTML

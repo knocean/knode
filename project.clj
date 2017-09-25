@@ -17,6 +17,8 @@
                  [me.raynes/fs "1.4.6"]
                  [me.raynes/conch "0.8.0"]
 
+                 [clucy "0.4.0"]
+
                  [environ "1.1.0"]
                  [hiccup "1.0.5"]
                  [crate "0.2.4"]
@@ -38,6 +40,11 @@
                         :jar true}
                        {:source-paths ["src/knode/front_end/tree_view"]
                         :compiler {:output-to "resources/public/js/tree_view.js"
+                                   :optimizations :whitespace
+                                   :pretty-print true}
+                        :jar true}
+                       {:source-paths ["src/knode/front_end/text_search"]
+                        :compiler {:output-to "resources/public/js/text_search.js"
                                    :optimizations :whitespace
                                    :pretty-print true}
                         :jar true}]}

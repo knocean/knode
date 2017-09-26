@@ -3,6 +3,7 @@
 
             [compojure.route :as route]
             [bidi.bidi :as bidi]
+            [bidi.ring :as ring]
             [trivial-warning.core :refer [warn]]
 
             [knode.server.template :refer [base-template]]))
@@ -20,8 +21,7 @@
 
 (def handler-table
   (atom
-   {:static-resource (route/resources "")
-    :internal-error (http-error
+   {:internal-error (http-error
                      500
                      "Internal Error"
                      "The server errored in some way. This isn't your fault, but we still can't process your request.")
@@ -30,7 +30,7 @@
                 "Sorry, the page you requested was not found.")}))
 
 (def routes-data
-  (atom ["/" {}]))
+  (atom ["/" {"" (ring/->ResourcesMaybe {:prefix "public/"})}]))
 
 (defn string->bidi-path
   [s]
@@ -109,20 +109,13 @@
 ;; Static assets map to resources/public/*
 ;; You probably shouldn't work on caching them, in all honesty. Proxies do that better than the JVM.
 ;; Also, bidi seems to provide some static resource handling stuff at https://github.com/juxt/bidi#files
-(defn static-resource-exists?
-  [uri]
-  "TODO"
-  nil)
-
 (def link-to (partial bidi/path-for @routes-data))
 
 (defn route-request
   [req]
   (if-let [res (bidi/match-route @routes-data (:uri req) :request-method (:request-method req))]
     res
-    (if (static-resource-exists? (:uri req))
-      {:handler :static-resource}
-      {:handler :not-found})))
+    {:handler :not-found}))
 
 (defn routes-handler
   [req]
@@ -136,7 +129,9 @@
                     :route-params (or route-params {})
                     :params (merge (:params req) route-params))]
     (try
-      ((get @handler-table (:handler routed)) routed-req)
+      (if (keyword? (:handler routed))
+        ((get @handler-table (:handler routed)) routed-req)
+        ((:handler routed) routed-req))
       (catch Exception e
         (try
           ((get @handler-table :internal-error) routed-req)

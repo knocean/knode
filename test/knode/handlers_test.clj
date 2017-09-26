@@ -23,10 +23,19 @@
     (is (thrown? Exception (insert-new-handler {"test" :foo} (string->bidi-path "/test") :bar)))))
 
 (deftest string->bidi-path-test
-  (testing "prepends '/' to every path element other than the first")
-  (testing "does not prepend '/' to the first path element")
-  (testing "treats colonized path components as variables, adds them to the preceding path element as a vector component")
-  (testing "transforms * components into regex matches on the remainder"))
+  (testing "prepends '/' to every path element other than the first"
+    (is (= (string->bidi-path "/foo/bar") ["foo" "/bar"]))
+    (is (= (string->bidi-path "foo/bar") ["foo" "/bar"]))
+    (is (= (string->bidi-path "foo/bar/baz/mumble/blah/bleeh/bluh")
+           ["foo" "/bar" "/baz" "/mumble" "/blah" "/bleeh" "/bluh"])))
+  (testing "does not prepend '/' to the first path element"
+    (is (= (string->bidi-path "/foo") ["foo"]))
+    (is (= (string->bidi-path "foo") ["foo"])))
+  (testing "treats colonized path components as variables, adds them to the preceding path element as a vector component"
+    (is (= (string->bidi-path "/foo/:bar/baz") [["foo/" :bar] "/baz"])))
+  (testing "transforms * components into regex matches on the remainder"
+    (is (= (str (string->bidi-path "/foo/*")) ;; comparing stringified because regexes don't equal themselves
+           (str ["foo" [[#"(.*)" :*] ""]])))))
 
 (deftest routing-and-linking-test
   (testing "link-to returns the path to a given handler")

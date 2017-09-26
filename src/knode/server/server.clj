@@ -788,7 +788,7 @@
                   (http-time (:last-modified state)))
                  result)]
     (render-result state req result)))
-(handlers/intern-handler-fn! "/ontology" :ontology-request! #(ontology-request! state %))
+(handlers/intern-handler-fn! "/ontology/*" :ontology-request! #(ontology-request! state %))
 
 ;; ## Render Documentation
 (defn render-doc

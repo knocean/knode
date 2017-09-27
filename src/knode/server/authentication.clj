@@ -6,6 +6,7 @@
 
    [knode.state :refer [state]]
 
+   [knode.server.handlers :as handlers]
    [knode.server.util :as sutil]
    [knode.server.template :as pg]))
 
@@ -27,6 +28,7 @@
           "Log in with your Google account."]}
         {:title "Cannot Log In"
          :error "No login options have been configured for this project."}))}))
+(handlers/intern-handler-fn! "/login" :login login)
 
 (defn login-google
   [req]
@@ -48,6 +50,7 @@
        (google/oauth-authorization-url
         google-id
         (str "https://" host "/oauth2-callback-google"))))))
+(handlers/intern-handler-fn! "/login-google" :login-google login-google)
 
 (defn oauth2-callback-google
   [req]
@@ -69,6 +72,7 @@
       (assoc req :session session)
       {:title "Logged In"
        :message "You have logged in."})}))
+(handlers/intern-handler-fn! "/oauth2-callback-google" :oauth2-callback-google oauth2-callback-google)
 
 (defn logout
   [req]
@@ -80,3 +84,4 @@
     (dissoc req :session)
     {:title "Log Out"
      :message "You have logged out."})})
+(handlers/intern-handler-fn! "/logout" :logout logout)

@@ -4,6 +4,7 @@
    [knode.state :as state]
    [knode.sparql :as sparql]
 
+   [knode.server.handlers :as handlers]
    [knode.server.template :as pg]
    [knode.server.util :as util]))
 
@@ -86,6 +87,8 @@
              :content [:div
                        [:h1 "Forbidden"]
                        [:p "You must be logged in to view an upstream ontology delta."]]})}))
+(handlers/intern-handler-fn! :post "/dev/upstream/delta" :replace-upstream! replace-upstream!)
+(handlers/intern-handler-fn! :get "/dev/upstream/delta" :render-upstream-delta render-upstream-delta)
 
 (defn render-upstream-report
   [req]
@@ -104,3 +107,4 @@
                                     "/dev/upstream/delta" "Refresh"
                                     :hidden {"ontology" iri}))])
                               (up/upstream-report!))]})})
+(handlers/intern-handler-fn! "/dev/upstream" :render-upstream-report render-upstream-report)

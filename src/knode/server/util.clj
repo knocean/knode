@@ -80,12 +80,12 @@
           (string/lower-case (get params "output-format")))
         (when (find params "format")
           (string/lower-case (get params "format")))
-        (first (drop-while nil? (map #(get mimetype-table %) accept)))
         (when-let [[_ extension]
                    (re-matches
                     #"^.*\.(html|ttl|json|tsv)$"
                     (string/lower-case (or uri "")))]
-          extension))))
+          extension)
+        (first (drop-while nil? (map #(get mimetype-table %) accept))))))
 
 (defn parse-request-method
   [{:keys [params request-method] :as req}]

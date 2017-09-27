@@ -11,6 +11,7 @@
                  [org.clojure/data.csv "0.1.3"]
                  [org.clojure/data.xml "0.0.8"]
 
+                 [trivial-warning "1.0.3"]
                  [tempfile "0.2.0"]
                  [digest "1.4.5"]
                  [me.raynes/fs "1.4.6"]
@@ -25,6 +26,7 @@
                  [io.forward/yaml "1.0.6"]
                  [http-kit "2.1.18"]
                  [ring/ring-mock "0.3.0"]
+                 [bidi "2.1.2"]
                  [compojure "1.5.1"]
                  [oauth-clj "0.1.15"]
                  [clj-jgit "0.8.9"]

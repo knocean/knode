@@ -3,6 +3,7 @@
    [knode.text-search :as search]
    [knode.state :refer [state]]
 
+   [knode.server.handlers :as handlers]
    [knode.server.template :as pg]
    [knode.server.util :as sutil]))
 
@@ -14,6 +15,7 @@
            (map
             #(assoc % "href" (sutil/re-root @state req (get % "iri")))
             (search/search (get-in req [:params "search-term"] "")))))})
+(handlers/intern-handler-fn! "/api/search" :search-results render-search-results)
 
 (defn render-search-interface [req]
   {:status 200
@@ -30,3 +32,4 @@
                        [:input {:type "button" :class "clear-button btn btn-primary" :value "Clear"}]]]
                      [:div {:class "results"}]
                      [:script {:src "/js/text_search.js" :type "text/javascript" :charset "utf-8"}]]})})
+(handlers/intern-handler-fn! "/search" :search-interface render-search-interface)

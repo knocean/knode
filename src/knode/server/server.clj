@@ -6,7 +6,7 @@
    [clojure.data.csv :as csv]
 
    [org.httpkit.server :as httpkit]
-   [compojure.route :as route]
+   ;; [compojure.route :as route]
    [ring.util.response :refer [redirect]]
    [ring.middleware.session :refer [wrap-session]]
    [ring.middleware.params :refer [wrap-params]]
@@ -19,6 +19,7 @@
    [clj-jgit.porcelain :as git]
    [me.raynes.conch :as sh]
 
+   [knode.server.handlers :as handlers]
    [knode.state :refer [state]]
    [knode.core :as core]
    [knode.emit :as emit]
@@ -32,8 +33,7 @@
    [knode.server.upstream :as up]
    [knode.server.query :as query]
    [knode.server.search :as search]
-   [knode.server.tree-view :as tree])
-  (:use [compojure.core :only [defroutes ANY GET POST PUT]]))
+   [knode.server.tree-view :as tree]))
 
 ;; ## Ontology Term Rendering
 ;; ### HTML
@@ -766,6 +766,7 @@
        (let [results (sparql/select-table @state-atom compact sparql)]
          {:column-headers (first results)
           :table (rest results)})))))
+(handlers/intern-handler-fn! "/api/query" :query-request! #(query-request! state %))
 
 (defn ontology-request!
   [state-atom req]
@@ -787,6 +788,7 @@
                   (http-time (:last-modified state)))
                  result)]
     (render-result state req result)))
+(handlers/intern-handler-fn! "/ontology/*" :ontology-request! #(ontology-request! state %))
 
 ;; ## Render Documentation
 (defn render-doc
@@ -803,6 +805,10 @@
           req
           {:title (:title metadata)
            :content (md/md-to-html-string content)}))))})
+(handlers/intern-handler-fn!
+ "/doc/:doc" :render-doc #(render-doc % (string/replace (get-in % [:params "doc"] "") #"\.htm?$" "")))
+(handlers/intern-handler-fn!
+ ["/" "/index.html"] :render-index #(render-doc % "index"))
 
 ;; ## Status
 (defn render-status
@@ -819,58 +825,7 @@
              :else "All systems go")
        :content
        [:ul [:li [:b "Terms Count"] "-" term-count]]}))})
-
-;; ## Routes
-(defroutes knode-routes
-  ; ## Authentication
-  (GET "/login" [] auth/login)
-  (GET "/login-google" [] auth/login-google)
-  (GET "/oauth2-callback-google" [] auth/oauth2-callback-google)
-  (GET "/logout" [] auth/logout)
-
-  ; ## Public Pages
-  ; ontology terms
-  (ANY "/ontology/*" [:as req] (ontology-request! state req))
-
-  ; queries
-  (ANY "/api/query" [:as req] (query-request! state req))
-  (GET "/query" [] query/render-query-interface)
-  (GET "/query/default-queries" [:as req]
-       query/render-default-queries)
-
-  ; tree view
-  (GET "/api/tree/:name/nodes" [name :as req] (tree/render-tree-data req name))
-  (GET "/api/tree/:name/children" [name :as req] (tree/render-tree-children req name))
-  (GET "/tree/:name" [name :as req] (tree/render-tree-view req name))
-
-  ; doc directory
-  (GET "/doc/:doc.html" [doc :as req] (render-doc req doc))
-  (GET "/index.html" req (render-doc req "index"))
-  (GET "/" req (render-doc req "index"))
-
-  ; search page
-  (GET "/api/search" [] search/render-search-results)
-  (GET "/search" [] search/render-search-interface)
-
-  ; ## Dev Pages
-  (GET "/dev/status" [] render-status)
-  (POST "/dev/upstream/delta" [] up/replace-upstream!)
-  (GET "/dev/upstream/delta" [] up/render-upstream-delta)
-  (GET "/dev/upstream" [] up/render-upstream-report)
-
-  ; static resources
-  (route/resources "")
-
-  ; not found
-  (route/not-found
-   #(base-template
-     (:session %)
-     {:title "Not Found"
-      :content
-      [:div
-       [:h1 "Not Found"]
-       [:p "Sorry, the page you requested was not found."]
-       [:p [:a {:href "/"} "Return to home page."]]]})))
+(handlers/intern-handler-fn! "/dev/status" :render-status render-status)
 
 ;; ## Server
 
@@ -884,7 +839,7 @@
   (reset!
    server
    (httpkit/run-server
-    (->> knode-routes
+    (->> handlers/routes-handler
          wrap-session
          wrap-params
          wrap-head)

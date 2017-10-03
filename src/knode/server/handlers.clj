@@ -43,7 +43,8 @@
             (and (nil? b) (empty? memo)) (conj memo a)
             (and (nil? b) (= a "*")) (conj memo [[#"(.*)" :*] ""])
             (nil? b) (conj memo (str "/" a))
-            (keyword? b) (recur rem (conj memo [(str a "/") b]))
+            (and (keyword? b) (empty? memo)) (recur rem (conj memo [(str a "/") b]))
+            (keyword? b) (recur rem (conj memo [(str "/" a "/") b]))
             (empty? memo) (recur (cons b rem) (conj memo a))
             :else (recur (cons b rem) (conj memo (str "/" a)))))))
 

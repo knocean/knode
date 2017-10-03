@@ -27,10 +27,14 @@
     (is (= (string->bidi-path "/foo/bar") ["foo" "/bar"]))
     (is (= (string->bidi-path "foo/bar") ["foo" "/bar"]))
     (is (= (string->bidi-path "foo/bar/baz/mumble/blah/bleeh/bluh")
-           ["foo" "/bar" "/baz" "/mumble" "/blah" "/bleeh" "/bluh"])))
+           ["foo" "/bar" "/baz" "/mumble" "/blah" "/bleeh" "/bluh"]))
+    (is (= (string->bidi-path "/foo/bar/:baz/mumble")
+           ["foo" ["/bar/" :baz] "/mumble"])))
   (testing "does not prepend '/' to the first path element"
     (is (= (string->bidi-path "/foo") ["foo"]))
-    (is (= (string->bidi-path "foo") ["foo"])))
+    (is (= (string->bidi-path "foo") ["foo"]))
+    (is (= (string->bidi-path "/foo/:bar/baz")
+           [["foo/" :bar] "/baz"])))
   (testing "treats colonized path components as variables, adds them to the preceding path element as a vector component"
     (is (= (string->bidi-path "/foo/:bar/baz") [["foo/" :bar] "/baz"])))
   (testing "transforms * components into regex matches on the remainder"

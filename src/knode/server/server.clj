@@ -832,6 +832,11 @@
 ; Start/Restart http://www.http-kit.org/server.html#stop-server
 (defonce server (atom nil))
 
+(defn handle-ontology-docs!
+  []
+  (handlers/intern-static!
+   "/doc-static" (handlers/files (str (:root-dir @state) "doc"))))
+
 (defn serve
   "Load data and serve pages on a given port."
   []

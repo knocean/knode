@@ -108,6 +108,7 @@
                 (sparql/init-dataset! state)
                 (sparql/load-terms! @state)
                 (when (not (search/index-exists?)) (search/populate-index!))
+                (server/handle-ontology-docs!)
                 (server/serve))
     "reindex" (do (load!)
                   (spit

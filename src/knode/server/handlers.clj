@@ -71,6 +71,27 @@
            :else (assoc map a (rec {} path))))
    path-map new-path))
 
+(defn resources
+  [prefix]
+  (ring/->ResourcesMaybe {:prefix prefix}))
+
+(defn files
+  [path]
+  (ring/->Files {:dir path}))
+
+(def file files)
+
+(defn intern-static!
+  [path handler]
+  (swap!
+   routes-data
+   (fn [dat]
+     [(first dat)
+      (insert-new-handler
+       (second dat)
+       (bidi-method :any (string->bidi-path path))
+       handler)])))
+
 (defmulti intern-handler-fn! (fn ([p _ _] (class p)) ([_ p _ _] (class p))))
 
 (defmethod intern-handler-fn! java.lang.String

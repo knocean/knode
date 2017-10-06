@@ -77,7 +77,7 @@
 
 (defn files
   [path]
-  (ring/->Files {:dir path}))
+  (ring/->Files {:dir (string/replace path #"/+$" "")}))
 
 (def file files)
 

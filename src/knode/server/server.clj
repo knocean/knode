@@ -6,7 +6,6 @@
    [clojure.data.csv :as csv]
 
    [org.httpkit.server :as httpkit]
-   ;; [compojure.route :as route]
    [ring.util.response :refer [redirect]]
    [ring.middleware.session :refer [wrap-session]]
    [ring.middleware.params :refer [wrap-params]]
@@ -763,9 +762,15 @@
        (nil? sparql)
        {:table []}
        :else
-       (let [results (sparql/select-table @state-atom compact sparql)]
-         {:column-headers (first results)
-          :table (rest results)})))))
+       (try
+         (let [results (sparql/select-table @state-atom compact sparql)]
+           {:column-headers (first results)
+            :table (rest results)})
+         (catch org.openrdf.query.MalformedQueryException e
+           (let [cause (get (Throwable->map e) :cause)
+                 [m col ln] (re-find #"line (\d+), column (\d+)" cause)]
+             {:error (str "Malformed query. " cause)
+              :location {:column col :line ln}})))))))
 (handlers/intern-handler-fn! "/api/query" :query-request! #(query-request! state %))
 
 (defn ontology-request!

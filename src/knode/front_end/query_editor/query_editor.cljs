@@ -7,10 +7,10 @@
             [knode.front-end.query-editor.pagination :as pg]))
 
 (defn render-error!
-  [target-div xhr]
+  [target-div error-text]
   (-> target-div
       (.empty)
-      (.append (crate/html [:pre {:class "error"} (.-responseText xhr)]))))
+      (.append (crate/html [:pre {:class "error"} error-text]))))
 
 (defn render-result!
   [target-div dat]
@@ -38,8 +38,10 @@
       (.then (fn [data]
                (let [dat (js->clj (.parse js/JSON data))]
                  (when (empty? (get dat "result")) (.hide more-button))
-                 (render-result! result-div dat))))
-      (.fail (partial render-error! result-div))))
+                 (if (get dat "error")
+                   (render-error! result-div (get dat "error"))
+                   (render-result! result-div dat)))))
+      (.fail #(render-error! result-div (.-responseText %)))))
 
 (defn new-query!
   [result-div more-button query]
@@ -51,7 +53,7 @@
                  (.show more-button)
                  (.empty result-div)
                  (render-result! result-div dat))))
-      (.fail (partial render-error! result-div))))
+      (.fail #(render-error! result-div (.-responseText %)))))
 
 (defn add-command!
   [ed name keys fn]

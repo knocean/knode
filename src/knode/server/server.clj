@@ -378,30 +378,44 @@
 
 ;; ### JSON-LD
 (defn result->edn
-  [{:keys [column-headers error table] :as result} & {:keys [link-fn] :or {link-fn identity}}]
+  [{:keys [column-headers error table] :as result} & {:keys [transform] :or {transform identity}}]
   {:error error
    :headers column-headers
    :result (vec
             (for [row table]
               (into {} (map (fn [k vs]
-                              [k (map (fn [res]
-                                        (if-let [iri (:iri res)]
-                                          (assoc res :href (link-fn iri))
-                                          res))
-                                      vs)])
+                              [k (map transform vs)])
                             column-headers row))))})
 
+(defn ensure-edn-href
+  [state req {:keys [iri href] :as edn}]
+  (cond
+    href edn
+    iri (assoc edn :href (sutil/re-root state req iri))
+    :else edn))
+
+(defn ensure-edn-label
+  [state req {:keys [label iri] :as edn}]
+  (cond
+    label edn
+    iri (assoc edn :label (get-in state [:env :iri-labels iri]))
+    :else edn))
+
 (defn render-jsonld-table
-  [{:keys [status] :as result} & {:keys [link-fn] :or {link-fn identity}}]
+  [{:keys [status] :as result} & {:keys [transform] :or {transform identity}}]
   ; TODO: render multiple terms in JSON-LD
   {:status (or status 200)
-   :body (json/write-str (result->edn result :link-fn link-fn))})
+   :body (json/write-str (result->edn result :transform transform))})
 
 (defn render-jsonld-result
   [state req {:keys [status headers error term terms table] :as result}]
   (cond
     error {:status (or status 400) :body error}
-    table (render-jsonld-table result :link-fn (partial sutil/re-root state req))
+    table (render-jsonld-table result
+                               :transform (fn [res]
+                                            (ensure-edn-label
+                                             state req
+                                             (ensure-edn-href state req res))))
     terms {:status (or status 400)
            :body "Cannot render multiple term to JSON-LD format"}
     term {:status (or status 200)

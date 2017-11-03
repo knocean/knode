@@ -389,8 +389,8 @@ PREFIX obo: <http://purl.obolibrary.org/obo/>
 
 SELECT ?subject ?label
 WHERE {
-  ?subject rdfs:label ?label .
-  FILTER (?subject IN (~{<~a>~^, ~}))
+  VALUES ?subject { ~{<~a>~^ ~} }
+  ?subject rdfs:label ?label
 }" iris))]
     (into {} (map (fn [[subject label]]
                     (let [s (first subject)]

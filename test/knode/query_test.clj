@@ -27,7 +27,20 @@
         (is (= "Hello there <www.foo.com/bar>!"
                (q/-substitute-single-quotes
                 (atom {:env {:labels {"keyword" {:iri "www.foo.com/bar"}}}})
-                "Hello there 'keyword'!")))))))
+                "Hello there 'keyword'!")))))
+    (testing "Handles labels with escaped single quotes"
+      (is (= "Hello there <www.foo.com/bar>!"
+             (q/-substitute-single-quotes
+              (atom {:env {:labels {"keyw'rd" {:iri "www.foo.com/bar"}}}})
+              "Hello there 'keyw\\'rd'!")))
+      (is (= "Hello there <www.foo.com/bar>!"
+             (q/-substitute-single-quotes
+              (atom {:env {:labels {"k'yw'rd" {:iri "www.foo.com/bar"}}}})
+              "Hello there 'k\\'yw\\'rd'!")))
+      (is (= "Hello there <www.foo.com/bar>!"
+             (q/-substitute-single-quotes
+              (atom {:env {:labels {"k''w'rd" {:iri "www.foo.com/bar"}}}})
+              "Hello there 'k\\'\\'w\\'rd'!"))))))
 
 (deftest sanitized-sparql
   (testing "Adds limits to queries without limit"

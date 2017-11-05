@@ -2,6 +2,33 @@
   (:require [clojure.test :refer [deftest testing is]]
             [knode.server.query :as q]))
 
+(deftest test--substitute-single-quotes
+  (testing "Don't mess with double-quoted strings regardless of label contents"
+    (is (= "Hello there \"keyword\"!"
+           (q/-substitute-single-quotes
+            (atom {:env {:labels {"keyword" {:curie "foo:bar" :iri "www.foo.com/bar"}}}})
+            "Hello there \"keyword\"!")))
+    (is (= "Hello there \"keyword\"!"
+           (q/-substitute-single-quotes (atom {}) "Hello there \"keyword\"!"))))
+  (testing "When no label found"
+    (testing "Leaves in single quoted term"
+      (is (= "Hello there 'keyword'!"
+             (q/-substitute-single-quotes
+              (atom {}) "Hello there 'keyword'!")))))
+  (testing "When appropriate label found"
+    (testing "When curie is present"
+      (testing "Substitute curie for single-quoted string"
+        (is (= "Hello there foo:bar!"
+               (q/-substitute-single-quotes
+                (atom {:env {:labels {"keyword" {:curie "foo:bar" :iri "www.foo.com/bar"}}}})
+                "Hello there 'keyword'!")))))
+    (testing "When curie is absent"
+      (testing "Substitute pointied iri for single-quoted string"
+        (is (= "Hello there <www.foo.com/bar>!"
+               (q/-substitute-single-quotes
+                (atom {:env {:labels {"keyword" {:iri "www.foo.com/bar"}}}})
+                "Hello there 'keyword'!")))))))
+
 (deftest sanitized-sparql
   (testing "Adds limits to queries without limit"
     (is (= (str "SELECT DISTINCT ?s WHERE { ?s ?property ?object . }

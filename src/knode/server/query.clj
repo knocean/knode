@@ -20,6 +20,17 @@
         [query given-limit]))
     [(str query "\nLIMIT " +default-limit+) +default-limit+]))
 
+(defn -substitute-single-quotes
+  ([query] (-substitute-single-quotes state query))
+  ([state query]
+   (string/replace
+    query #"'([^'\"\\]*(?:\\.[^'\"\\]*)*)'(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"
+    (fn [in]
+      (let [res (get-in @state [:env :labels (string/replace (second in) #"\\+'" "'")])]
+        (or (:curie res)
+            (and (:iri res) (str "<" (:iri res) ">"))
+            (first in)))))))
+
 (defn -ensure-offset [query limit page]
   (if (or (= 0 page) (re-find #"(?i)OFFSET (\d+)" query))
     query
@@ -28,7 +39,7 @@
 (defn sanitized-sparql
   [query & {:keys [page]}]
   (let [[query limit] (-ensure-limit query)]
-    (-ensure-offset query limit (or page 0))))
+    (-substitute-single-quotes (-ensure-offset query limit (or page 0)))))
 
 (defn render-default-queries
   [req]

@@ -23,7 +23,7 @@
                           [:td (interpose
                                 " | "
                                 (map (fn [val]
-                                       (let [v (or (get val "lexical") (get val "curie") (get val "iri"))]
+                                       (let [v (or (get val "lexical") (get val "label") (get val "curie") (get val "iri"))]
                                          (if-let [href (get val "href")]
                                            [:a {:href href :target "_blank"} v]
                                            v)))

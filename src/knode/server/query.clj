@@ -24,7 +24,7 @@
   ([query] (-substitute-single-quotes state query))
   ([state query]
    (string/replace
-    query #"'([^'\\]*(?:\\.[^'\\]*)*)'"
+    query #"'([^'\"\\]*(?:\\.[^'\"\\]*)*)'(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"
     (fn [in]
       (let [res (get-in @state [:env :labels (string/replace (second in) #"\\+'" "'")])]
         (or (:curie res)

@@ -9,7 +9,11 @@
             (atom {:env {:labels {"keyword" {:curie "foo:bar" :iri "www.foo.com/bar"}}}})
             "Hello there \"keyword\"!")))
     (is (= "Hello there \"keyword\"!"
-           (q/-substitute-single-quotes (atom {}) "Hello there \"keyword\"!"))))
+           (q/-substitute-single-quotes (atom {}) "Hello there \"keyword\"!")))
+    (is (= "\"Leave this 'keyword' alone\""
+           (q/-substitute-single-quotes
+            (atom {:env {:labels {"keyword" {:curie "foo:bar" :iri "www.foo.com/bar"}}}})
+            "\"Leave this 'keyword' alone\""))))
   (testing "When no label found"
     (testing "Leaves in single quoted term"
       (is (= "Hello there 'keyword'!"

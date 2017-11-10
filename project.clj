@@ -1,8 +1,8 @@
 (defproject knode "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :description "Knowledge Development Environment"
+  :url "https://github.com/knocean/knode"
+  :license {:name "BSD 3-Clause License"
+            :url "https://opensource.org/licenses/BSD-3-Clause"}
   :plugins [[lein-cljsbuild "1.1.6"]]
   :hooks [leiningen.cljsbuild]
   :dependencies [[org.clojure/clojure "1.8.0"]

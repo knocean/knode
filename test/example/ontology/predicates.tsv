@@ -1,9 +1,0 @@
-label	CURIE	datatype	cardinality
-obsolete	owl:deprecated	xsd:boolean	zero or one
-replacement	obo:IAO_0100001	link	zero or one
-type	rdf:type	link	one or more
-label	rdfs:label	plain	one
-alternative term	obo:IAO_0000118	plain	zero or more
-subclass of	rdfs:subClassOf	link	zero or more
-template	kn:apply-template	link	zero or more
-name	EXAMPLE:name	plain	zero or one

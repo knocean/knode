@@ -1,9 +1,0 @@
-[{"label": "example class",
-  "iri": "http://example.com/template-1",
-  "required-predicates": ["name"],
-  "statements":
-  [{"predicate": {"label": "type"},
-    "content": "owl:Class"},
-   {"predicate": {"label": "label"},
-    "content": "Example {name}"}]}
-]

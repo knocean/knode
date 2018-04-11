@@ -1,9 +1,0 @@
-label	target	type
-label	rdfs:label	owl:AnnotationProperty
-type	rdf:type	rdf:Property
-subclass of	rdfs:subClassOf	rdf:Property
-obsolete	owl:deprecated	owl:DatatypeProperty
-replacement	obo:IAO_0100001	owl:AnnotationProperty
-alternative term	obo:IAO_0000118	owl:AnnotationProperty
-template	kn:apply-template	owl:AnnotationProperty
-name	EXAMPLE:name	owl:AnnotationProperty

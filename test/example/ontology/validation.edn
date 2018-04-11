@@ -1,9 +1,0 @@
-[{:label "Duplicate labels"
-  :iri "http://example.com/validation_1"
-  :select "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?label ?term1 ?term2
-WHERE {
-  ?term1 rdfs:label ?label .
-  ?term2 rdfs:label ?label .
-  FILTER (?term1 != ?term2)
-}"}]

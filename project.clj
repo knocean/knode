@@ -21,8 +21,8 @@
 
                  [clj-jgit "0.8.10"]
 
-                 [org.knotation/knotation-cljc "0.1.0-SNAPSHOT"]
-                 [org.knotation/knotation-editor "1.0.0-SNAPSHOT"]]
+                 [org.knotation/knotation-cljc "0.1.1-SNAPSHOT"]
+                 [org.knotation/knotation-editor "1.0.1-SNAPSHOT"]]
   :cljsbuild {:builds [{:source-paths ["src/com/knocean/knode/front_end"]
                         :compiler {:output-to "resources/public/js/knode.js"
                                    :optimizations :whitespace

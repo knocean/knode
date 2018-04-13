@@ -3,5 +3,6 @@ sudo: required
 install:
   - curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
   - chmod +x lein
+  - git clone https://github.com/knocean/knode-example.git
 script:
-  - ./lein test
+  - ROOT_DIR=knode-example ./lein test

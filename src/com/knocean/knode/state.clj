@@ -18,13 +18,14 @@
     :default (constantly "~/projects/knode-example")}
    {:key :absolute-dir
     :label "Absolute directory"
-    :default #(->> (:root-dir %) fs/expand-home io/file .getAbsolutePath)}
+    :default #(->> % :root-dir fs/expand-home io/file .getAbsolutePath)}
    {:key :repo
     :label "Git repository"
-    :default #(->> % :absolute-dir git/discover-repo git/load-repo)}
+    :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
+                (git/load-repo r))}
    {:key :project-name
     :label "Project name"
-    :default #(->> (:absolute-dir %)
+    :default #(->> % :absolute-dir
                    io/file
                    .getName
                    string/lower-case)}
@@ -59,12 +60,11 @@
    {:key :write-file
     :label "Write file"
     :default #(->> % :build-files last)}
-   {:key :build
-    :label "Build string"
-    :default #(string/join " " (map (fn [f] (str (:absolute-dir %) "/" f)) (:build-files %)))}
    {:key :states
     :label "Create state"
-    :default #(kn/run-string (:build %))}])
+    :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (:build-files %))]
+                (when (every? identity (map (fn [f] (.exists (io/file f))) fs))
+                  (kn/run-string (string/join " " fs))))}])
 
 (defn init
   "Given a base map, apply the configurators (in order)

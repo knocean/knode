@@ -53,28 +53,6 @@
        (map #(string/split % #": "))
        (into {})))
 
-;; ;;;; If we wanted to validate for presence of subjects
-;;;  (Not enabling it yet, 'cause it's unclear to me how
-;;    we would handle lexical values this way)
-
-;; (defn valid-application?
-;;   ([template content] (valid-application? (st/latest-env) template content))
-;;   ([env template content]
-;;    (and (= (:predicates template) (set (keys content)))
-;;         (every? #(ln/subject->iri env %) (vals content)))))
-
-;; (defn validate-application
-;;   ([template content]
-;;    (validate-application (st/latest-env) template content))
-;;   ([env template content]
-;;    (if (valid-application? template content)
-;;      {}
-;;      {:extra-predicates (set/difference (set (keys content)) (:predicates template))
-;;       :missing-predicates (set/difference (:predicates template) (set (keys content)))
-;;       :unknown-values (->> content
-;;                            (filter #(nil? (ln/subject->iri env (second %))))
-;;                            (into {}))})))
-
 (defn valid-application?
   [template content]
   (= (:predicates template) (set (keys content))))

@@ -17,7 +17,7 @@
 (defmulti ldf-result mime/req->output-format)
 
 (defmethod ldf-result "html"
-  [{:keys [ldf-query session] :as req}]
+  [{:keys [ldf-query session env] :as req}]
   (html
    {:session session
     :title "Linked Data Fragments Result"
@@ -27,12 +27,19 @@
                  [:span "Not enough results..."]
                  [:span
                   [:p "Showing results " (inc ix) " to " (+ ix (count (:items res))) " of " (:total res) " with " (:per-page res) " per page."]
-                  [:ul (map (fn [entry] [:li (str entry)]) (:items res))]]))}))
+                  [:ul
+                   (map
+                    (fn [entry]
+                      [:li
+                       [:a {:href (str "?subject=" (:si entry))} (:si entry)] " "
+                       [:a {:href (str "?predicate=" (:pi entry))} (:pi entry)] " "
+                       [:a {:href (str "?object=" (:ol entry))} "\"" (:ol entry) "\""]])
+                    (:items res))]]))}))
 
 (defn with-ldf-query
   [f]
   (fn [req]
-    (f (assoc req :ldf-query (ldf/req->query req)))))
+    (f (assoc req :ldf-query (ldf/req->query req) :env (st/latest-env)))))
 
 (def routes
   [["/ldf" (with-ldf-query ldf-result)]])

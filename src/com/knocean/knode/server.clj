@@ -15,6 +15,7 @@
    [com.knocean.knode.pages.authentication :as auth]
    [com.knocean.knode.pages.ontology.core :as ontology]
    [com.knocean.knode.pages.term-status :as stat]
+   [com.knocean.knode.pages.linked-data-fragments.core :as ldf]
    [com.knocean.knode.pages.subject :as subject]))
 
 (defn not-found
@@ -37,6 +38,7 @@
     subject/routes
     ontology/routes
     stat/routes
+    ldf/routes
     [["" (bring/redirect index)]
      ["/" index]
      ["/index.html" (bring/redirect index)]

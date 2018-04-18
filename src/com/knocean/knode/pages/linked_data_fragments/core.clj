@@ -1,5 +1,12 @@
 (ns com.knocean.knode.pages.linked-data-fragments.core
-  (:require [com.knocean.knode.pages.mimetypes :as mime]
+  (:require [clojure.string :as string]
+            [cemerick.url :as url]
+
+            [org.knotation.object :as ob]
+            [org.knotation.rdf :as rdf]
+            [org.knotation.link :as ln]
+
+            [com.knocean.knode.pages.mimetypes :as mime]
             
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
@@ -18,6 +25,7 @@
 
 (defmethod ldf-result "html"
   [{:keys [ldf-query session env] :as req}]
+  (println "ENV" env)
   (html
    {:session session
     :title "Linked Data Fragments Result"
@@ -30,10 +38,18 @@
                   [:ul
                    (map
                     (fn [entry]
-                      [:li
-                       [:a {:href (str "?subject=" (:si entry))} (:si entry)] " "
-                       [:a {:href (str "?predicate=" (:pi entry))} (:pi entry)] " "
-                       [:a {:href (str "?object=" (:ol entry))} "\"" (:ol entry) "\""]])
+                      (let [obj (string/replace
+                                 (string/replace
+                                  (ob/object->nquads-object
+                                   {::rdf/lexical (:ol entry)
+                                    ::rdf/language (:ln entry)
+                                    ::rdf/datatype (:di entry)})
+                                  #"<" "&lt;")
+                                 #">" "&gt;")]
+                        [:li
+                         [:a {:href (str "?subject=" (url/url-encode (:si entry)))} (ln/iri->name env (:si entry))] " "
+                         [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (ln/iri->name env (:pi entry))] " "
+                         [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))
 
 (defn with-ldf-query

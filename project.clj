@@ -11,6 +11,7 @@
 
                  [environ "1.1.0"]
                  [http-kit "2.1.18"]
+                 [com.cemerick/url "0.1.1"]
                  [bidi "2.1.3"]
                  [hiccup "1.0.5"]
 

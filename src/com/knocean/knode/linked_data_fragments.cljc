@@ -36,14 +36,18 @@
 
 (defn req->query
   [req]
-  (updates
-   (clojure.walk/keywordize-keys
-    (select-keys
-     (:params req)
-     ["graph" "subject" "predicate" "object" "per-page" "pg"]))
-   :object string->object
-   :per-page #(or (edn/read-string %) 100)
-   :pg #(or (edn/read-string %) 0)))
+  (merge
+   {:graph nil :subject nil :predicate nil
+    :object nil
+    :per-page 100 :pg 0}
+   (updates
+    (clojure.walk/keywordize-keys
+     (select-keys
+      (:params req)
+      ["graph" "subject" "predicate" "object" "per-page" "pg"]))
+    :object #(when % (string->object %))
+    :per-page #(or (edn/read-string %) 100)
+    :pg #(or (edn/read-string %) 0))))
 
 ;;;;; Query handling
 (defn ?= [a b] (or (nil? a) (= a b)))

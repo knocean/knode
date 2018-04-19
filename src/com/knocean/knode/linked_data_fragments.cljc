@@ -22,6 +22,13 @@
      (update memo k f))
    m k-f-map))
 
+(defn str->int
+  ([str] (str->int str 0))
+  ([str default]
+   (util/handler-case
+    (Integer/parseInt str)
+    (:default e default))))
+
 ;;;;; Query parsing
 (defn string->object
   [s]
@@ -37,17 +44,15 @@
 (defn req->query
   [req]
   (merge
-   {:graph nil :subject nil :predicate nil
-    :object nil
-    :per-page 100 :pg 0}
+   {:per-page 100 :pg 0}
    (updates
     (clojure.walk/keywordize-keys
      (select-keys
       (:params req)
       ["graph" "subject" "predicate" "object" "per-page" "pg"]))
     :object #(when % (string->object %))
-    :per-page #(or (edn/read-string %) 100)
-    :pg #(or (edn/read-string %) 0))))
+    :per-page #(max 1 (str->int % 100))
+    :pg #(max 0 (str->int % 0)))))
 
 ;;;;; Query handling
 (defn ?= [a b] (or (nil? a) (= a b)))

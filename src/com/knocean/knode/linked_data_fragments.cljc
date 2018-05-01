@@ -1,11 +1,14 @@
 (ns com.knocean.knode.linked-data-fragments
   (:require [clojure.edn :as edn]
+            [clojure.string :as string]
             [clojure.set :as set]
             [clojure.java.jdbc :as sql]
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
             [org.knotation.object :as ob]))
+
+(def +per-page+ 100)
 
 (defn tap!
   ([v] (tap! "TAPPED" v))
@@ -46,14 +49,14 @@
 (defn req->query
   [req]
   (merge
-   {:per-page 100 :pg 0}
+   {:per-page +per-page+ :pg 0}
    (updates
     (clojure.walk/keywordize-keys
      (select-keys
       (:params req)
       ["graph" "subject" "predicate" "object" "per-page" "pg"]))
     :object #(when % (string->object %))
-    :per-page #(max 1 (str->int % 100))
+    :per-page #(min +per-page+ (max 1 (str->int % +per-page+)))
     :pg #(max 0 (str->int % 0)))))
 
 ;;;;; Query handling
@@ -90,9 +93,45 @@
 
 (defmethod query :default ;; default is an in-memory sequence, which we just filter.
   [query data]
-  (paginated (get query :per-page 10) (get query :pg 0)
+  (paginated (get query :per-page +per-page+) (get query :pg 0)
              (filter (partial matches-query? query) data)))
 
-(defmethod query :database
+(defn -query->where-clause
+  [query]
+  (let [obj (:object query)
+        slots [[query :graph :gi]
+               [query :subject :si]
+               [query :predicate :pi]
+               [obj :iri :oi]
+               [obj :label :ol]
+               [obj :language :ln]
+               [obj :datatype :di]]
+        no-nil (fn [seq] (remove nil? seq))
+        where-seq (map (fn [[o k label]] (when (get o k) (str (name label) "=?"))) slots)]
+    (when (not (empty? where-seq))
+      (no-nil
+       (cons
+        (str " " (string/join " AND " (no-nil where-seq)))
+        (map (fn [[o k _]] (get o k)) slots))))))
+
+(defn -query->sql-pagination [{:keys [per-page pg]}]
+  (str " " (string/join
+            " "
+            (remove
+             nil? [(str "LIMIT=" per-page)
+                   (when (> pg 0) (str "OFFSET=" (* pg per-page)))]))))
+
+(defn query->sql
+  [query]
+  (let [base "SELECT * FROM ontology"
+        [where & params] (-query->where-clause query)
+        pagination (-query->sql-pagination query)]
+    (vec
+     (cons
+      (string/join [base where pagination])
+      params))))
+
+(defmethod query :database ;; if we've got a database, we need to query it for matching entries
   [query data]
-   nil)
+  (sql/with-db-connection [db data]
+    (sql/query db (query->sql query))))

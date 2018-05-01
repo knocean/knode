@@ -19,6 +19,9 @@
                  [org.apache.jena/jena-iri "3.7.0"]
                  [org.apache.jena/jena-tdb "3.7.0"]
 
+                 [org.clojure/java.jdbc "0.7.6"]
+                 [org.xerial/sqlite-jdbc "3.21.0"]
+
                  [markdown-clj "0.9.89"]
                  [cheshire "5.8.0"]
                  [me.raynes/fs "1.4.6"]

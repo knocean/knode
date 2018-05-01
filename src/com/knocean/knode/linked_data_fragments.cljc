@@ -1,5 +1,7 @@
 (ns com.knocean.knode.linked-data-fragments
   (:require [clojure.edn :as edn]
+            [clojure.set :as set]
+            [clojure.java.jdbc :as sql]
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
@@ -74,8 +76,23 @@
    :page pg
    :items (vec (take per-page (drop (* per-page pg) seq)))})
 
-(defmulti query #(type %2)) ;; we'll want to expand this to SQL datastores from the sound of it
+(defmulti query
+  #(cond
+     (or (vector? %2) (list? %2)) :default
+
+     (and (map? %2)
+          (set/subset?
+           (set (keys %2))
+           #{:classname :subprotocol :subname :connection}))
+     :database
+
+     :else :default))
+
 (defmethod query :default ;; default is an in-memory sequence, which we just filter.
   [query data]
   (paginated (get query :per-page 10) (get query :pg 0)
              (filter (partial matches-query? query) data)))
+
+(defmethod query :database
+  [query data]
+   nil)

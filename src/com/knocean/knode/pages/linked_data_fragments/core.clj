@@ -10,7 +10,7 @@
             
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
-            [com.knocean.knode.linked-data-fragments :as ldf]))
+            [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
 (defn slurps
   [resource]

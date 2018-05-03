@@ -9,6 +9,15 @@
             [org.knotation.cli :as kn]
             [org.knotation.environment :as en]))
 
+(defn slurps
+  [resource]
+  (let [s (java.io.PushbackReader. (clojure.java.io/reader (clojure.java.io/resource resource)))]
+    (loop [ln (clojure.edn/read {:eof nil} s)
+           lines []]
+      (if (not (nil? ln))
+        (recur (clojure.edn/read {:eof nil} s) (conj lines ln))
+        lines))))
+
 ; This is a set of map describing configuration options.
 ; They are in a specific order.
 ; The :default key is a function from an ENV map to a default value.
@@ -41,6 +50,13 @@
    {:key :ssh-passphrase
     :label "SSH passphrase"
     :default (constantly nil)}
+
+   {:key :maps-file
+    :label "Maps Source File"
+    :default (constantly "obi_core.edn")}
+   {:key :maps
+    :label "Maps Data"
+    :default #(slurps (:maps-file %))}
 
    {:key :google-client-id
     :label "Google Client ID"

@@ -12,15 +12,6 @@
             [com.knocean.knode.pages.html :refer [html]]
             [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
-(defn slurps
-  [resource]
-  (let [s (java.io.PushbackReader. (clojure.java.io/reader (clojure.java.io/resource resource)))]
-    (loop [ln (clojure.edn/read {:eof nil} s)
-           lines []]
-      (if (not (nil? ln))
-        (recur (clojure.edn/read {:eof nil} s) (conj lines ln))
-        lines))))
-
 (defmulti ldf-result mime/req->output-format)
 
 (defmethod ldf-result "html"
@@ -29,7 +20,7 @@
   (html
    {:session session
     :title "Linked Data Fragments Result"
-    :content (let [res (ldf/query ldf-query (slurps "obi_core.edn"))
+    :content (let [res (ldf/query ldf-query (:maps @st/state))
                    ix (* (:page res) (:per-page res))]
                (if (empty? (:items res))
                  [:span "Not enough results..."]

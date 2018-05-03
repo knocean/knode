@@ -11,29 +11,19 @@
             [com.knocean.knode.linked-data-fragments.core :refer [query remove-falsies]]))
 
 ;;; DUMMY DATA
-(defn slurps
-  [resource]
-  (let [s (java.io.PushbackReader. (clojure.java.io/reader (clojure.java.io/resource resource)))]
-    (loop [ln (clojure.edn/read {:eof nil} s)
-           lines []]
-      (if (not (nil? ln))
-        (recur (clojure.edn/read {:eof nil} s) (conj lines ln))
-        lines))))
-
-(def dat (slurps "obi_core.edn"))
-(def db
-  {:classname "org.sqlite.JDBC"
-   :subprotocol "sqlite"
-   :subname "resources/obi_core.db"})
-(defn dummy-db!
-  [db]
-  (sql/with-db-connection [handle db]
-    (sql/execute! handle ["drop table if exists ontology"])
-    (sql/execute! handle [(sql/create-table-ddl
-                           :ontology
-                           (map (fn [name] [name :string])
-                                [:gi :si :sb :pi :oi :ob :ol :di :ln]))])
-    (doseq [d dat] (sql/insert! handle :ontology d))))
+;; (def db
+;;   {:classname "org.sqlite.JDBC"
+;;    :subprotocol "sqlite"
+;;    :subname "resources/obi_core.db"})
+;; (defn dummy-db!
+;;   [db]
+;;   (sql/with-db-connection [handle db]
+;;     (sql/execute! handle ["drop table if exists ontology"])
+;;     (sql/execute! handle [(sql/create-table-ddl
+;;                            :ontology
+;;                            (map (fn [name] [name :string])
+;;                                 [:gi :si :sb :pi :oi :ob :ol :di :ln]))])
+;;     (doseq [d (:maps @st/state)] (sql/insert! handle :ontology d))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn -query->sql-where-clause

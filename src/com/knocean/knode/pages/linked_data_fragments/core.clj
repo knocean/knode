@@ -16,7 +16,6 @@
 
 (defmethod ldf-result "html"
   [{:keys [ldf-query session env] :as req}]
-  (println "ENV" env)
   (html
    {:session session
     :title "Linked Data Fragments Result"

@@ -89,18 +89,14 @@
     :page #(max 0 (str->int % 0)))))
 
 ;;;;; Query handling
-(defn ?= [a b] (or (nil? a) (= a b)))
-
 (defn matches-query?
-  [{:keys [graph subject predicate object] :as query} entry]
-  (and (?= graph (:gi entry))
-       (?= subject (:si entry))
-       (?= predicate (:pi entry))
-       (or (nil? object)
-           (and (:iri object) (= (:iri object) (:oi entry)))
-           (and (= (:label object) (:ol entry))
-                (?= (:language object) (:ln entry))
-                (?= (:datatype object) (:di entry))))))
+  [query entry]
+  (every?
+   identity
+   (map (fn [k]
+          (or (nil? (get query k))
+              (= (get query k) (get entry k))))
+        [:gi :si :pi :oi :ol :ln :di])))
 
 (defn paginated [per-page pg seq]
   {:total (count seq)
@@ -127,28 +123,18 @@
 
 (defn -query->sql-where-clause
   [query]
-  (let [obj (:object query)
-        slots [[query :graph :gi]
-               [query :subject :si]
-               [query :predicate :pi]
-               [obj :iri :oi]
-               [obj :label :ol]
-               [obj :language :ln]
-               [obj :datatype :di]]
-        no-nil (fn [seq] (remove nil? seq))
-        where-seq (no-nil (map (fn [[o k label]] (when (get o k) (str (name label) "=?"))) slots))]
-    (when (not (empty? where-seq))
-      (no-nil
-       (cons
-        (str " " (string/join " AND " (no-nil where-seq)))
-        (map (fn [[o k _]] (get o k)) slots))))))
+  (let [relevant (remove-falsies (select-keys query [:gi :si :pi :oi :ol :ln :di]))]
+    (when (not (empty? relevant))
+      (cons
+       (str " WHERE " (string/join " AND " (remove nil? (map #(str (name %) "=?") (keys relevant)))))
+       (vals relevant)))))
 
-(defn -query->sql-pagination [{:keys [per-page pg]}]
+(defn -query->sql-pagination [{:keys [per-page page]}]
   (str " " (string/join
             " "
             (remove
              nil? [(str "LIMIT " per-page)
-                   (when (> pg 0) (str "OFFSET " (* pg per-page)))]))))
+                   (when (> page 0) (str "OFFSET " (* page per-page)))]))))
 
 (defn query->sql
   [query & {:keys [count?] :or {count false}}]
@@ -165,4 +151,4 @@
   (sql/with-db-connection [db data]
     (let [ct (second (first (first (sql/query db (query->sql query :count? true)))))]
       {:total ct :per-page (:per-page query) :page (:page query)
-       :items (map #(into {} (filter second %)) (sql/query db (query->sql query)))})))
+       :items (vec (map #(into {} (filter second %)) (sql/query db (query->sql query))))})))

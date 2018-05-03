@@ -78,7 +78,8 @@
 
 (deftest test-matches-query?
   (testing "Nonexistent slots match anything")
-  (testing "Slots with values match literally") )
+  (testing "Slots with values match literally")
+  (testing "Supports blank node queries"))
 
 (s/def ::total (s/and integer? #(> % 0)))
 (s/def ::per-page (s/and integer? #(> % 0)))

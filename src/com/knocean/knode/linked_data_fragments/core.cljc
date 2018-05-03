@@ -34,7 +34,7 @@
     (doseq [d dat] (sql/insert! handle :ontology d))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def +per-page+ 100)
+(def +per-page+ 1000)
 
 (defn tap!
   ([v] (tap! "TAPPED" v))
@@ -66,24 +66,27 @@
   (util/handler-case
    (let [res (ob/nquads-object->object s)]
      (remove-falsies
-      [[:iri (::rdf/iri res)]
-       [:label (::rdf/lexical res)]
-       [:language (::rdf/language res)]
-       [:datatype (::rdf/datatype res)]]))
-   (:default e {:iri s})))
+      [[:oi (::rdf/iri res)]
+       [:ol (::rdf/lexical res)]
+       [:ln (::rdf/language res)]
+       [:di (::rdf/datatype res)]]))
+   (:default e {:oi s})))
 
 (defn req->query
   [req]
   (merge
-   {:per-page +per-page+ :pg 0}
+   {:per-page +per-page+ :page 0}
+   (if-let [obj (get-in req [:params "object"])]
+     (string->object obj))
    (updates
-    (clojure.walk/keywordize-keys
-     (select-keys
-      (:params req)
-      ["graph" "subject" "predicate" "object" "per-page" "pg"]))
-    :object #(when % (string->object %))
+    (set/rename-keys
+     (clojure.walk/keywordize-keys
+      (select-keys
+       (:params req)
+       ["graph" "subject" "predicate" "per-page" "page"]))
+     {:graph :gi :subject :si :predicate :pi})
     :per-page #(min +per-page+ (max 1 (str->int % +per-page+)))
-    :pg #(max 0 (str->int % 0)))))
+    :page #(max 0 (str->int % 0)))))
 
 ;;;;; Query handling
 (defn ?= [a b] (or (nil? a) (= a b)))
@@ -119,7 +122,7 @@
 
 (defmethod query :default ;; default is an in-memory sequence, which we just filter.
   [query data]
-  (paginated (get query :per-page +per-page+) (get query :pg 0)
+  (paginated (get query :per-page +per-page+) (get query :page 0)
              (filter (partial matches-query? query) data)))
 
 (defn -query->sql-where-clause
@@ -161,5 +164,5 @@
   [query data]
   (sql/with-db-connection [db data]
     (let [ct (second (first (first (sql/query db (query->sql query :count? true)))))]
-      {:total ct :per-page (:per-page query) :page (:pg query)
+      {:total ct :per-page (:per-page query) :page (:page query)
        :items (map #(into {} (filter second %)) (sql/query db (query->sql query)))})))

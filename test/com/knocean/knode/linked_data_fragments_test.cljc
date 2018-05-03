@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [clojure.string :as string]
+            [clojure.set :as set]
 
             [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
@@ -11,14 +12,14 @@
 
 (s/def ::full-string (s/and string? #(> (count %) 0)))
 
-(s/def ::iri ::full-string)
-(s/def ::label ::full-string)
-(s/def ::language ::full-string)
-(s/def ::datatype ::full-string)
+(s/def ::oi ::full-string)
+(s/def ::ol ::full-string)
+(s/def ::ln ::full-string)
+(s/def ::di ::full-string)
 
 (s/def ::object
-  (s/or :iri (s/keys :req-un [::iri])
-        :parsed (s/keys :req-un [::iri ::label] :opt-un [::language ::datatype])))
+  (s/or :iri (s/keys :req-un [::oi])
+        :parsed (s/keys :req-un [::oi ::ol] :opt-un [::ln ::di])))
 
 (s/fdef ldf/string->object
         :args string?
@@ -26,55 +27,54 @@
 
 (deftest test-string->object
   (testing "Defaults to assuming IRI"
-    (is (= {:iri "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
-    (is (= {:iri "Foo"} (ldf/string->object "Foo"))))
+    (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
+    (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
   (testing "Deals with pointied IRIs"
-    (is (= {:iri "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
+    (is (= {:oi "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
   (testing "Deals with quoted strings"
-    (is (= {:label "Foo"} (ldf/string->object "\"Foo\"")))
-    (is (= {:label "Foo" :language "en"} (ldf/string->object "\"Foo\"@en")))
-    (is (= {:label "Foo" :datatype "http://example.com/string"}
+    (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
+    (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
+    (is (= {:ol "Foo" :di "http://example.com/string"}
            (ldf/string->object "\"Foo\"^^<http://example.com/string>")))))
 
-(s/def ::graph ::full-string)
-(s/def ::subject ::full-string)
-(s/def ::predicate ::full-string)
+(s/def ::gi ::full-string) (s/def ::si ::full-string) (s/def ::pi ::full-string)
 (s/def ::per-page (s/and integer? #(> % 0)))
-(s/def ::pg (s/and integer? #(>= % 0)))
-(s/def ::query (s/keys :req-un [::per-page ::pg]
-                       :opt-un [::graph ::subject ::predicate ::object]))
+(s/def ::page (s/and integer? #(>= % 0)))
+(s/def ::query (s/keys :req-un [::per-page ::page]
+                       :opt-un [::gi ::si ::pi ::oi ::ol ::ln ::di]))
 
 (s/fdef ldf/req->query
         :args map?
         :ret ::query)
 
 (deftest test-req->query
-  (testing "Defaults to 100 per-page, page 0, with nils everywhere else"
-    (is (= {:object nil :per-page 100 :pg 0} (ldf/req->query nil))))
+  (testing "Defaults to 100 per-page, page 0"
+    (is (= {:per-page ldf/+per-page+ :page 0} (ldf/req->query nil))))
   (testing "When provided :params"
-    (testing "Takes the value of graph, subject, predicate at face value, gets the numeric value of per-page and pg"
-      (is (= {:graph "foo" :subject "bar" :predicate "baz" :object nil
-              :per-page 37 :pg 12}
-             (ldf/req->query {:params {"graph" "foo" "subject" "bar" "predicate" "baz" "per-page" "37" "pg" "12"}}))))
-    (testing "Doesn't take junk in the :per-page or :pg slots"
+    (testing "Takes the value of graph, subject, predicate at face value, gets the numeric value of per-page and page"
+      (is (= {:gi "foo" :si "bar" :pi "baz"
+              :per-page 37 :page 12}
+             (ldf/req->query {:params {"graph" "foo" "subject" "bar" "predicate" "baz" "per-page" "37" "page" "12"}}))))
+    (testing "Doesn't take junk in the :per-page or :page slots"
       (doseq [junk (gen/sample (s/gen string?))]
-        (let [res (ldf/req->query {:params {"per-page" junk "pg" junk}})]
+        (let [res (ldf/req->query {:params {"per-page" junk "page" junk}})]
           (is (and (integer? (:per-page res))
-                   (integer? (:pg res)))))))
+                   (integer? (:page res)))))))
     (testing "Disregards arbitrary other keys"
       (doseq [junk (gen/sample (s/gen map?))]
-        (is (= #{:graph :subject :predicate :object :per-page :pg}
-               (set
-                (keys
-                 (ldf/req->query
-                  {:params
-                   (merge
-                    junk
-                    {"graph" "foo"
-                     "subject" "bar"
-                     "predicate" "baz"
-                     "per-page" "37"
-                     "pg" "12"})})))))))))
+        (is (set/subset?
+             (set
+              (keys
+               (ldf/req->query
+                {:params
+                 (merge
+                  junk
+                  {"graph" "foo"
+                   "subject" "bar"
+                   "predicate" "baz"
+                   "per-page" "37"
+                   "page" "12"})})))
+             #{:gi :si :pi :oi :ol :ln :di :per-page :page}))))))
 
 (deftest test-matches-query?
   (testing "Nonexistent slots match anything")
@@ -87,7 +87,7 @@
 (s/def ::paginated (s/keys :req-un [::total ::per-page ::page ::items]))
 
 (s/fdef ldf/paginated 
-        :args (s/cat :per-page ::per-page :pg ::page :seq ::items)
+        :args (s/cat :per-page ::per-page :page ::page :seq ::items)
         :ret ::object)
 
 (deftest test-paginated

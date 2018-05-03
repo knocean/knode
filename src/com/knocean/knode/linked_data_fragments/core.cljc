@@ -64,12 +64,15 @@
 ;;;;; Query handling
 (defn matches-query?
   [query entry]
-  (every?
-   identity
-   (map (fn [k]
-          (or (nil? (get query k))
-              (= (get query k) (get entry k))))
-        [:gi :si :pi :oi :ol :ln :di])))
+  (let [blanks {:si :sb :oi :ob}]
+    (every?
+     identity
+     (map (fn [k]
+            (let [q (get query k)]
+              (or (nil? q)
+                  (= q (get entry k))
+                  (and (= ":blank" q) (get entry (get blanks k))))))
+          [:gi :si :pi :oi :ol :ln :di]))))
 
 (defn paginated [per-page pg seq]
   {:total (count seq)

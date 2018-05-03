@@ -39,6 +39,7 @@
            (ldf/string->object "\"Foo\"^^<http://example.com/string>")))))
 
 (s/def ::gi ::full-string) (s/def ::si ::full-string) (s/def ::pi ::full-string)
+(s/def ::sb ::full-string) (s/def ::ob ::full-string)
 (s/def ::per-page (s/and integer? #(> % 0)))
 (s/def ::page (s/and integer? #(>= % 0)))
 (s/def ::query (s/keys :req-un [::per-page ::page]
@@ -77,10 +78,32 @@
                    "page" "12"})})))
              #{:gi :si :pi :oi :ol :ln :di :per-page :page}))))))
 
+(s/def ::entry
+  (s/or :default (s/keys :req-un [::gi ::si ::pi ::oi]
+                         :opt-un [::ln ::di])
+        :blank-sub (s/keys :req-un [::gi ::sb ::pi ::oi]
+                           :opt-un [::ln ::di])
+        :label-obj (s/keys :req-un [::gi ::si ::pi ::ol]
+                           :opt-un [::ln ::di])
+        :blank-obj (s/keys :req-un [::gi ::si ::pi ::oi]
+                           :opt-un [::sb ::ob ::ol ::ln ::di])))
+
 (deftest test-matches-query?
-  (testing "Nonexistent slots match anything")
-  (testing "Slots with values match literally")
-  (testing "Supports blank node queries"))
+  (testing "Nonexistent slots match anything"
+    (doseq [e (gen/sample (s/gen ::entry))]
+      (is (ldf/matches-query? {} e) )))
+  (testing "Slots with values match literally"
+    (is (ldf/matches-query?
+         {:gi "foo" :si "bar"}
+         {:gi "foo" :si "bar" :pi "baz" :oi "mumble"})))
+  (testing "Supports blank node queries"
+    (is (ldf/matches-query?
+         {:oi ":blank"}
+         {:gi "foo" :si "bar" :pi "baz" :ob "_:mumble"}))
+    (is (not
+         (ldf/matches-query?
+          {:oi ":blank"}
+          {:gi "foo" :si "bar" :pi "baz" :oi "mumble"})))))
 
 (s/def ::total (s/and integer? #(> % 0)))
 (s/def ::per-page (s/and integer? #(> % 0)))

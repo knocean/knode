@@ -1,4 +1,4 @@
-(ns com.knocean.knode.linked-data-fragments
+(ns com.knocean.knode.linked-data-fragments.core
   (:require [clojure.edn :as edn]
             [clojure.string :as string]
             [clojure.set :as set]

@@ -7,7 +7,7 @@
             [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
 
-            [com.knocean.knode.linked-data-fragments :as ldf]))
+            [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
 (s/def ::full-string (s/and string? #(> (count %) 0)))
 

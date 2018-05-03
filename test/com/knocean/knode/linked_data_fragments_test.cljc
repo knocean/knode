@@ -8,7 +8,8 @@
             [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
 
-            [com.knocean.knode.linked-data-fragments.core :as ldf]))
+            [com.knocean.knode.linked-data-fragments.core :as ldf]
+            [com.knocean.knode.linked-data-fragments.sql :as sql]))
 
 (s/def ::full-string (s/and string? #(> (count %) 0)))
 
@@ -107,7 +108,7 @@
 
 (deftest test-query->where-clause
   (testing "Returns nil when no clauses present"
-    (is (nil? (ldf/-query->sql-where-clause {}))))
+    (is (nil? (sql/-query->sql-where-clause {}))))
   (testing "Applies WHERE clause for all present slots"))
 (deftest test-query->sql-pagination
   (testing "Applies LIMIT and OFFSET for "))

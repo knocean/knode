@@ -21,6 +21,7 @@
 
                  [org.clojure/java.jdbc "0.7.6"]
                  [org.xerial/sqlite-jdbc "3.21.0"]
+                 [org.postgresql/postgresql "42.2.2"]
 
                  [markdown-clj "0.9.89"]
                  [cheshire "5.8.0"]

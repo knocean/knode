@@ -8,6 +8,32 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.object :as ob]))
 
+;;; DUMMY DATA
+(defn slurps
+  [resource]
+  (let [s (java.io.PushbackReader. (clojure.java.io/reader (clojure.java.io/resource resource)))]
+    (loop [ln (clojure.edn/read {:eof nil} s)
+           lines []]
+      (if (not (nil? ln))
+        (recur (clojure.edn/read {:eof nil} s) (conj lines ln))
+        lines))))
+
+(def dat (slurps "obi_core.edn"))
+(def db
+  {:classname "org.sqlite.JDBC"
+   :subprotocol "sqlite"
+   :subname "resources/obi_core.db"})
+(defn dummy-db!
+  [db]
+  (sql/with-db-connection [handle db]
+    (sql/execute! handle ["drop table if exists ontology"])
+    (sql/execute! handle [(sql/create-table-ddl
+                           :ontology
+                           (map (fn [name] [name :string])
+                                [:gi :si :sb :pi :oi :ob :ol :di :ln]))])
+    (doseq [d dat] (sql/insert! handle :ontology d))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (def +per-page+ 100)
 
 (defn tap!
@@ -96,7 +122,7 @@
   (paginated (get query :per-page +per-page+) (get query :pg 0)
              (filter (partial matches-query? query) data)))
 
-(defn -query->where-clause
+(defn -query->sql-where-clause
   [query]
   (let [obj (:object query)
         slots [[query :graph :gi]
@@ -107,7 +133,7 @@
                [obj :language :ln]
                [obj :datatype :di]]
         no-nil (fn [seq] (remove nil? seq))
-        where-seq (map (fn [[o k label]] (when (get o k) (str (name label) "=?"))) slots)]
+        where-seq (no-nil (map (fn [[o k label]] (when (get o k) (str (name label) "=?"))) slots))]
     (when (not (empty? where-seq))
       (no-nil
        (cons
@@ -118,13 +144,13 @@
   (str " " (string/join
             " "
             (remove
-             nil? [(str "LIMIT=" per-page)
-                   (when (> pg 0) (str "OFFSET=" (* pg per-page)))]))))
+             nil? [(str "LIMIT " per-page)
+                   (when (> pg 0) (str "OFFSET " (* pg per-page)))]))))
 
 (defn query->sql
-  [query]
-  (let [base "SELECT * FROM ontology"
-        [where & params] (-query->where-clause query)
+  [query & {:keys [count?] :or {count false}}]
+  (let [base (if count? "SELECT COUNT(*) FROM ontology" "SELECT * FROM ontology")
+        [where & params] (-query->sql-where-clause query)
         pagination (-query->sql-pagination query)]
     (vec
      (cons
@@ -134,4 +160,6 @@
 (defmethod query :database ;; if we've got a database, we need to query it for matching entries
   [query data]
   (sql/with-db-connection [db data]
-    (sql/query db (query->sql query))))
+    (let [ct (second (first (first (sql/query db (query->sql query :count? true)))))]
+      {:total ct :per-page (:per-page query) :page (:pg query)
+       :items (map #(into {} (filter second %)) (sql/query db (query->sql query)))})))

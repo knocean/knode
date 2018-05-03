@@ -76,5 +76,37 @@
                      "per-page" "37"
                      "pg" "12"})})))))))))
 
-(deftest test-matches-query?)
-(deftest test-paginated)
+(deftest test-matches-query?
+  (testing "Nonexistent slots match anything")
+  (testing "Slots with values match literally") )
+
+(s/def ::total (s/and integer? #(> % 0)))
+(s/def ::per-page (s/and integer? #(> % 0)))
+(s/def ::page (s/and integer? #(> % 0)))
+(s/def ::items coll?)
+(s/def ::paginated (s/keys :req-un [::total ::per-page ::page ::items]))
+
+(s/fdef ldf/paginated 
+        :args (s/cat :per-page ::per-page :pg ::page :seq ::items)
+        :ret ::object)
+
+(deftest test-paginated
+  (testing "If there are enough items to fill out the page, show them"
+    (is (= {:total 10, :per-page 10, :page 0, :items [1 2 3 4 5 6 7 8 9 10]}
+           (ldf/paginated 10 0 [1 2 3 4 5 6 7 8 9 10]))))
+  (testing "If there are not enough items to fill out a page, show a full page"
+    (is (= {:total 12, :per-page 10, :page 0, :items [1 2 3 4 5 6 7 8 9 10]}
+           (ldf/paginated 10 0 [1 2 3 4 5 6 7 8 9 10 11 12]))))
+  (testing "If there are fewer items than a page-worth, show partial page"
+    (is (= {:total 5, :per-page 10, :page 0, :items [1 2 3 4 5]}
+           (ldf/paginated 10 0 [1 2 3 4 5]))))
+  (testing "If we paginate past the first page, drop the appropriate number of items"
+    (is (= {:total 12, :per-page 5, :page 1, :items [6 7 8 9 10]}
+           (ldf/paginated 5 1 [1 2 3 4 5 6 7 8 9 10 11 12])))))
+
+(deftest test-query->where-clause
+  (testing "Returns nil when no clauses present"
+    (is (nil? (ldf/-query->sql-where-clause {}))))
+  (testing "Applies WHERE clause for all present slots"))
+(deftest test-query->sql-pagination
+  (testing "Applies LIMIT and OFFSET for "))

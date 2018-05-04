@@ -30,10 +30,13 @@
                     (fn [entry]
                       (let [obj (string/replace
                                  (string/replace
-                                  (ob/object->nquads-object
-                                   {::rdf/lexical (:ol entry)
-                                    ::rdf/language (:ln entry)
-                                    ::rdf/datatype (:di entry)})
+                                  (try
+                                    (ob/object->nquads-object
+                                     {::rdf/lexical (:ol entry)
+                                      ::rdf/language (:ln entry)
+                                      ::rdf/datatype (:di entry)})
+                                    (catch Exception e
+                                      ""))
                                   #"<" "&lt;")
                                  #">" "&gt;")]
                         [:li

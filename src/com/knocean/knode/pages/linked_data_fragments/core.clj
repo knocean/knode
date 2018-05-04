@@ -36,7 +36,7 @@
                                       ::rdf/language (:ln entry)
                                       ::rdf/datatype (:di entry)})
                                     (catch Exception e
-                                      ""))
+                                      (or (:oi entry) "")))
                                   #"<" "&lt;")
                                  #">" "&gt;")]
                         [:li

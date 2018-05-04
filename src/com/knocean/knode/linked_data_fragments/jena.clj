@@ -1,5 +1,8 @@
 (ns com.knocean.knode.linked-data-fragments.jena
-  (:require [clojure.java.jdbc :as sql])
+  (:require [com.knocean.knode.linked-data-fragments.sql :as sql]
+
+            [clojure.reflect :as r]
+            [clojure.pprint :as pp])
   (:import (org.apache.jena.riot RDFDataMgr)
            (org.apache.jena.rdf.model ModelFactory)
            (org.apache.jena.query QueryFactory QueryExecutionFactory)
@@ -7,14 +10,18 @@
            (org.apache.jena.graph.impl GraphBase)
            (org.apache.jena.sparql.core DatasetGraphBase Quad)))
 
+(defn reflect [thing]
+  (pp/print-table (sort-by :name (filter :exception-types (:members (r/reflect thing))))))
+
 (defn map->subj
   [{:keys [si sb]}]
   (or (and si (NodeFactory/createURI si))
       (and sb (NodeFactory/createBlankNode sb))))
 (defn map->obj
-  [{:keys [oi ob ol]}]
+  [{:keys [oi ob ol ln]}]
   (or (and oi (NodeFactory/createURI oi))
       (and ob (NodeFactory/createBlankNode ob))
+      (and ol ln (NodeFactory/createLiteral ol ln))
       (and ol (NodeFactory/createLiteral ol))))
 
 (defn map->triple
@@ -60,16 +67,46 @@
     :pi "http://example.com/p"
     :ol "1"}))
 
+(def gs
+  (proxy [DatasetGraphBase] []
+    (find
+      ([g s p o]
+       (println "FOUR" g s p o)
+       (wrapped-iterator [(make-quad)])))))
+
+(defn ->query-val
+  [thing]
+  (let [c (class thing)]
+    (cond ;; case DOES NOT work here, despite the equivalence comparison
+      (= c org.apache.jena.graph.Node_ANY) nil
+      (= c org.apache.jena.graph.Node_Blank) :blank
+      (= c org.apache.jena.graph.Node_URI) (.toString thing))))
+
+(defn ->query-obj
+  [thing]
+  ;; TODO
+  (->query-val thing))
+
+(defn spo->query
+  [s p o]
+  (into {} (filter second {:s (->query-val s)
+                           :p (->query-val p)
+                           :o (->query-obj o)})))
+
 (def g
   (proxy [GraphBase] []
-    ;; (find
-    ;;   ([g s p o]
-    ;;    (println "FOUR" g s p o)
-    ;;    (wrapped-iterator [(make-quad)])))
     (graphBaseFind
       ([s p o]
-       (println "THREE" s p o)
-       (wrapped-iterator [(make-triple)])))))
+       (println "SPO->QUERY :: " (spo->query s p o))
+       (wrapped-iterator
+        [(map->triple
+          {:si "http://example.com/s"
+           :pi "http://example.com/p"
+           :ol "1"})
+         (map->triple
+          {:si "http://example.com/s2"
+           :pi "http://example.com/p"
+           :ol "2"})])))))
 
 (def m (ModelFactory/createModelForGraph g))
 (def q (QueryFactory/create "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}"))

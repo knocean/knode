@@ -11,8 +11,17 @@
 
                  [environ "1.1.0"]
                  [http-kit "2.1.18"]
+                 [com.cemerick/url "0.1.1"]
                  [bidi "2.1.3"]
                  [hiccup "1.0.5"]
+                 [org.apache.jena/jena-core "3.7.0"]
+                 [org.apache.jena/jena-arq "3.7.0"]
+                 [org.apache.jena/jena-iri "3.7.0"]
+                 [org.apache.jena/jena-tdb "3.7.0"]
+
+                 [org.clojure/java.jdbc "0.7.6"]
+                 [org.xerial/sqlite-jdbc "3.21.0"]
+                 [org.postgresql/postgresql "42.2.2"]
 
                  [markdown-clj "0.9.89"]
                  [cheshire "5.8.0"]

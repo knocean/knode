@@ -85,19 +85,24 @@
 (defn ->query-obj
   [thing]
   ;; TODO
-  (->query-val thing))
+  (if (= (class thing) org.apache.jena.graph.Node_Literal)
+    {:o (.getLiteralLexicalForm thing)
+     :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
+     :di (.getLiteralDatatypeURI thing)}
+    {:o (->query-val thing)}))
 
 (defn spo->query
   [s p o]
-  (into {} (filter second {:s (->query-val s)
-                           :p (->query-val p)
-                           :o (->query-obj o)})))
+  (into {} (filter second (merge
+                           {:s (->query-val s)
+                            :p (->query-val p)}
+                           (->query-obj o)))))
 
 (def g
   (proxy [GraphBase] []
     (graphBaseFind
       ([s p o]
-       (println "SPO->QUERY :: " (spo->query s p o))
+       (println "SPO->QUERY :: " (str (spo->query s p o)))
        (wrapped-iterator
         [(map->triple
           {:si "http://example.com/s"

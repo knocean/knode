@@ -2,7 +2,10 @@
   (:require [com.knocean.knode.linked-data-fragments.sql :as sql]
 
             [clojure.reflect :as r]
-            [clojure.pprint :as pp])
+            [clojure.pprint :as pp]
+
+            [com.knocean.knode.state :refer [state] :as st]
+            [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]])
   (:import (org.apache.jena.riot RDFDataMgr)
            (org.apache.jena.rdf.model ModelFactory)
            (org.apache.jena.query QueryFactory QueryExecutionFactory)
@@ -52,27 +55,12 @@
   [xs]
   (org.apache.jena.util.iterator.WrappedIterator/create (seq->iterator xs)))
 
-(defn make-triple
-  []
-  (map->triple
-   {:si "http://example.com/s"
-    :pi "http://example.com/p"
-    :ol "1"}))
-
-(defn make-quad
-  []
-  (map->quad
-   {:gi "http://example.com/g"
-    :si "http://example.com/s"
-    :pi "http://example.com/p"
-    :ol "1"}))
-
-(def gs
-  (proxy [DatasetGraphBase] []
-    (find
-      ([g s p o]
-       (println "FOUR" g s p o)
-       (wrapped-iterator [(make-quad)])))))
+;; (def gs
+;;   (proxy [DatasetGraphBase] []
+;;     (find
+;;       ([g s p o]
+;;        (println "FOUR" g s p o)
+;;        (wrapped-iterator [(make-quad)])))))
 
 (defn ->query-val
   [thing]
@@ -88,7 +76,11 @@
   (if (= (class thing) org.apache.jena.graph.Node_Literal)
     {:o (.getLiteralLexicalForm thing)
      :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
-     :di (.getLiteralDatatypeURI thing)}
+     ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
+     ;; whether the original input to Node_Literal had a datatype or not.
+     ;; I guess that means #string needs to match either itself or the
+     ;; empty datatype?
+     :di (.getLiteralDatatypeURI thing)} 
     {:o (->query-val thing)}))
 
 (defn spo->query
@@ -104,14 +96,12 @@
       ([s p o]
        (println "SPO->QUERY :: " (str (spo->query s p o)))
        (wrapped-iterator
-        [(map->triple
-          {:si "http://example.com/s"
-           :pi "http://example.com/p"
-           :ol "1"})
-         (map->triple
-          {:si "http://example.com/s2"
-           :pi "http://example.com/p"
-           :ol "2"})])))))
+        (map (fn [m]
+               (println "  CONVERTING" (str m))
+               (map->triple m))
+             (query-stream
+              (spo->query s p o)
+              (:maps @st/state))))))))
 
 (def m (ModelFactory/createModelForGraph g))
 (def q (QueryFactory/create "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}"))

@@ -31,17 +31,17 @@
 
 (defn req->output-format
   [{:keys [params uri headers] :as req}]
-  (let [accept (string/split (get headers "accept" "") #", ?")]
-    (or (when (find params "output-format")
-          (string/lower-case (get params "output-format")))
-        (when (find params "format")
-          (string/lower-case (get params "format")))
-        (when-let [[_ extension]
-                   (re-matches
-                    #"^.*\.(html|ttl|json|tsv)$"
-                    (string/lower-case (or uri "")))]
-          extension)
-        (first (drop-while nil? (map #(get mimetype-table %) accept))))))
+  (or (when (find params "output-format")
+        (string/lower-case (get params "output-format")))
+      (when (find params "format")
+        (string/lower-case (get params "format")))
+      (when-let [[_ extension]
+                 (re-matches
+                  #"^.*\.(html|ttl|json|tsv)$"
+                  (string/lower-case (or uri "")))]
+        extension)
+      (let [accept (string/split (get headers "accept" "") #", ?")]
+        (first (drop-while nil? (map #(get mimetype-table (first (string/split % #";"))) accept))))))
 
 (defn req->content-type
   [req]

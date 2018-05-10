@@ -8,6 +8,7 @@
             [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
 
+            [com.knocean.knode.linked-data-fragments.base :as base]
             [com.knocean.knode.linked-data-fragments.core :as ldf]
             [com.knocean.knode.linked-data-fragments.sql :as sql]))
 
@@ -51,7 +52,7 @@
 
 (deftest test-req->query
   (testing "Defaults to 100 per-page, page 0"
-    (is (= {:per-page ldf/+per-page+ :page 0} (ldf/req->query nil))))
+    (is (= {:per-page base/+per-page+ :page 0} (ldf/req->query nil))))
   (testing "When provided :params"
     (testing "Takes the value of graph, subject, predicate at face value, gets the numeric value of per-page and page"
       (is (= {:gi "foo" :si "bar" :pi "baz"

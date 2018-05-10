@@ -17,9 +17,6 @@
 
 (defmethod ldf-result :default
   [{:keys [ldf-query session env] :as req}]
-  (println "GOT LDF-RESULT REQUEST..."
-           (mime/req->output-format req)
-           (str (dissoc req :env :session)))
   (html
    {:session session
     :title "Linked Data Fragments Result"
@@ -57,10 +54,18 @@
                          [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))
 
+(defmethod ldf-result "ttl"
+  [{:keys [ldf-query session env] :as req}]
+  (println "GOT LDF RESULT REQUEST in TTL format...")
+  (println (str (dissoc req :env :session :async-channel)))
+  {:status 200
+   :headers {"Content-Type" (mime/req->content-type req)}
+   :body ""})
+
 (defn with-ldf-query
   [f]
   (fn [req]
     (f (assoc req :ldf-query (ldf/req->query req) :env (st/latest-env)))))
 
 (def routes
-  [["/ldf" (with-ldf-query ldf-result)]])
+  [["/ldf" (mime/with-content-header (with-ldf-query ldf-result))]])

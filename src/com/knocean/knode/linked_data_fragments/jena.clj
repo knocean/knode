@@ -55,13 +55,6 @@
   [xs]
   (org.apache.jena.util.iterator.WrappedIterator/create (seq->iterator xs)))
 
-;; (def gs
-;;   (proxy [DatasetGraphBase] []
-;;     (find
-;;       ([g s p o]
-;;        (println "FOUR" g s p o)
-;;        (wrapped-iterator [(make-quad)])))))
-
 (defn ->query-val
   [thing]
   (let [c (class thing)]
@@ -90,23 +83,43 @@
                             :p (->query-val p)}
                            (->query-obj o)))))
 
-(def g
+;; (def gs
+;;   (proxy [DatasetGraphBase] []
+;;     (find
+;;       ([g s p o]
+;;        (println "FOUR" g s p o)
+;;        (wrapped-iterator [(make-quad)])))))
+
+(defn data [source]
   (proxy [GraphBase] []
     (graphBaseFind
       ([s p o]
-       (println "SPO->QUERY :: " (str (spo->query s p o)))
        (wrapped-iterator
-        (map (fn [m]
-               (println "  CONVERTING" (str m))
-               (map->triple m))
+        (map map->triple
              (query-stream
               (spo->query s p o)
-              (:maps @st/state))))))))
+              source)))))))
 
-(def m (ModelFactory/createModelForGraph g))
-(def q (QueryFactory/create "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}"))
+(def source #(:maps @st/state))
 
-(->> (QueryExecutionFactory/create q m)
-     (.execSelect)
-     iterator-seq
-     first)
+(def g (atom (data (source))))
+(def m (atom (ModelFactory/createModelForGraph @g)))
+
+(do
+  (add-watch
+   st/state :jena-base-recompute
+   (fn [k atom old new]
+     (when (= k :jena-base-recompute)
+       (println "Recomputing Jena graph on @state change...")
+       (reset! g (data (source)))
+       (reset! m (atom (ModelFactory/createModelForGraph @g))))
+     nil))
+  nil)
+
+(defn query-jena [sparql-string]
+  (->> (QueryExecutionFactory/create (QueryFactory/create sparql-string) @m)
+       (.execSelect)
+       iterator-seq
+       first))
+
+(query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")

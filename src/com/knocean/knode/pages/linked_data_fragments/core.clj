@@ -15,8 +15,11 @@
 
 (defmulti ldf-result mime/req->output-format)
 
-(defmethod ldf-result "html"
+(defmethod ldf-result :default
   [{:keys [ldf-query session env] :as req}]
+  (println "GOT LDF-RESULT REQUEST..."
+           (mime/req->output-format req)
+           (str (dissoc req :env :session)))
   (html
    {:session session
     :title "Linked Data Fragments Result"
@@ -39,9 +42,17 @@
                                     (catch Exception e
                                       (or (:oi entry) "")))
                                   #"<" "&lt;")
-                                 #">" "&gt;")]
+                                 #">" "&gt;")
+                            s (or (:si entry) (:sb entry))]
                         [:li
-                         [:a {:href (str "?subject=" (url/url-encode (:si entry)))} (ln/iri->name env (:si entry))] " "
+                         (cond
+                           (:si entry)
+                           [:a {:href (str "?subject=" (url/url-encode (:si entry)))}
+                            (ln/iri->name env (:si entry))]
+
+                           (:sb entry)
+                           [:a {:href (str "?subject=" (url/url-encode (:sb entry)))}
+                            (:sb entry)]) " "
                          [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (ln/iri->name env (:pi entry))] " "
                          [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))

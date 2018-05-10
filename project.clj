@@ -27,11 +27,11 @@
                  [cheshire "5.8.0"]
                  [me.raynes/fs "1.4.6"]
                  [oauth-clj "0.1.15"]
+                 [io.forward/yaml "1.0.6"]
 
                  [clj-jgit "0.8.10"]
 
-                 [org.knotation/knotation-cljc "0.1.1-SNAPSHOT"]
-                 [org.knotation/knotation-editor "1.0.1-SNAPSHOT"]]
+                 [org.knotation/knotation-cljc "0.2.0-SNAPSHOT"]]
   :cljsbuild {:builds [{:source-paths ["src/com/knocean/knode/front_end"]
                         :compiler {:output-to "resources/public/js/knode.js"
                                    :optimizations :whitespace

@@ -2,7 +2,6 @@
   (:require [clojure.string :as string]
             [cemerick.url :as url]
 
-            [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
             [org.knotation.link :as ln]
 
@@ -11,6 +10,10 @@
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
             [com.knocean.knode.linked-data-fragments.core :as ldf]))
+
+(defn object->nquads-object
+  [object]
+  (throw (Exception. "TODO: object->nquads-object")))
 
 (defmulti ldf-result mime/req->output-format)
 
@@ -31,7 +34,7 @@
                       (let [obj (string/replace
                                  (string/replace
                                   (try
-                                    (ob/object->nquads-object
+                                    (object->nquads-object
                                      {::rdf/lexical (:ol entry)
                                       ::rdf/language (:ln entry)
                                       ::rdf/datatype (:di entry)})

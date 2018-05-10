@@ -3,6 +3,7 @@
 
             [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
+            [org.knotation.clj-api :as kn]
 
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.mimetypes :as mime]
@@ -15,20 +16,21 @@
             [com.knocean.knode.pages.ontology.tsv]
             [com.knocean.knode.pages.ontology.edit :as edit]))
 
-(defn with-name [env node]
-  (assoc node ::rdf/name (ln/node->name env node)))
+; TODO: What does this do?
+(defn with-name [env iri]
+  (ln/iri->name env iri))
 
 (defn subject-by-iri
   [iri]
   (let [env (st/latest-env)
         relevant (->> @state :states
-                      (filter #(= (get-in % [::rdf/subject ::rdf/iri]) iri))
-                      (filter #(not (= :or.knotation.state/subject-end (:org.knotation.state/event %)))))]
+                      (filter #(= (:si %) iri))
+                      (filter #(not= :org.knotation.state/subject-end (:org.knotation.state/event %))))]
     (map (fn [statement]
-           (if-let [pred (::rdf/predicate statement)]
-             [(with-name env pred)
-              (with-name env (::rdf/object statement))]
-             [:subject (::rdf/subject statement)]))
+           (if-let [pi (:pi statement)]
+             [(with-name env pi)
+              (with-name env (:oi statement))]
+             [:subject (:si statement)]))
          relevant)))
 
 (defmethod ontology-result :default
@@ -48,6 +50,19 @@
           (if (first requested-iris)
             (subject-by-iri (first requested-iris))
             (base/all-subjects)))})
+
+(defmethod ontology-result "ttl"
+  [{:keys [requested-iris env] :as req}]
+  {:status 200
+   :body
+   (let [iri (first requested-iris)
+         _ (println "IRI" iri)
+         states (if iri
+                  (->> @state
+                       :states
+                       (filter (fn [{:keys [si]}] (if si (= iri si) true))))
+                  (:states @state))]
+     (kn/render-string :ttl (st/latest-env) states))})
 
 (def routes
   [["/ontology/add-term" (auth/logged-in-only (base/with-requested-terms #(edit/add-term %)))]

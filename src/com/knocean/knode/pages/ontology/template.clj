@@ -4,7 +4,6 @@
 
             [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
-            [org.knotation.rdfa :as rdfa]
             [org.knotation.environment :as en]
             [org.knotation.state :as s]
 

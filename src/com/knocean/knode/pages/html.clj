@@ -46,17 +46,18 @@
         [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
         [:ul {:class "nav navbar-nav"}
-         [:li [:a {:href "/doc/"} "Documentation"]]
-         [:li [:a {:href "/resource/"} "Resources"]]
-         [:li [:a {:href "/ontology"} "Ontology"]]]
-        [:ul {:class "nav navbar-nav navbar-right"}
-         (if (empty? session)
-           [:li [:a {:href "/login"} "Login"]]
-           [:li [:a {:href "/logout"} "Log Out"]])]
-        (when (not (empty? session))
-          [:p {:class "navbar-text navbar-right"}
-           "Logged in as " (:name session)
-           [:img {:src (:picture session) :style "max-height: 20px; margin-left: 5px;"}]])]]]
+         ;[:li [:a {:href "/doc/"} "Documentation"]]
+         ;[:li [:a {:href "/resource/"} "Resources"]]
+         ;[:li [:a {:href "/ontology"} "Ontology"]]]
+         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]]]]
+        ;[:ul {:class "nav navbar-nav navbar-right"}
+        ; (if (empty? session)
+        ;   [:li [:a {:href "/login"} "Login"]]
+        ;   [:li [:a {:href "/logout"} "Log Out"]])]
+        ;(when (not (empty? session))
+        ;  [:p {:class "navbar-text navbar-right"}
+        ;   "Logged in as " (:name session)
+        ;   [:img {:src (:picture session) :style "max-height: 20px; margin-left: 5px;"}]])]]]
 
      (when error
        [:p {:id "error"} error])

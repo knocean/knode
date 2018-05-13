@@ -51,6 +51,7 @@
 (defn with-content-header
   [f]
   (fn [req]
-    (assoc-in
-     (f req) [:headers "Content-Type"]
-     (str (req->content-type req) "; charset=utf-8"))))
+    (let [res (f req)]
+      (assoc-in
+       res [:headers "Content-Type"]
+       (or (get-in res [:headers "Content-Type"]) (str (req->content-type req) "; charset=utf-8"))))))

@@ -59,14 +59,14 @@
 (defn ->query-val
   [thing]
   (let [c (class thing)]
-    (cond ;; case DOES NOT work here, despite the equivalence comparison
+    (cond ;; NOTE - case DOES NOT work here, despite the equivalence comparison
       (= c org.apache.jena.graph.Node_ANY) nil
       (= c org.apache.jena.graph.Node_Blank) :blank
       (= c org.apache.jena.graph.Node_URI) (.toString thing))))
 
 (defn ->query-obj
   [thing]
-  ;; TODO
+  ;; TODO FIXME
   (if (= (class thing) org.apache.jena.graph.Node_Literal)
     {:o (.getLiteralLexicalForm thing)
      :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
@@ -84,22 +84,6 @@
                             :p (->query-val p)}
                            (->query-obj o)))))
 
-(defn dataset-graph [source]
-  (proxy [DatasetGraphBase] []
-    (find
-      ([g s p o]
-       (println "FOUR" g s p o)
-       (wrapped-iterator
-        (map map->quad)
-        (query-stream
-         (spo->query s p o)
-         source))))
-    (getGraph
-      ([] (println "GET GRAPH...") org.apache.jena.graph.Node_NULL))
-    (getDefaultGraph ([] (println "GET DEFAULT GRAPH...") org.apache.jena.graph.Node_NULL))
-
-    (supportsTransactions ([] false))))
-
 (defn graph [source]
   (proxy [GraphBase] []
     (graphBaseFind
@@ -110,10 +94,34 @@
               (spo->query s p o)
               source)))))))
 
+(defn dataset-graph [source]
+  (proxy [DatasetGraphBase] []
+    ;; NOTE - it looks like this is never actually used; the queries run against
+    ;;        whatever is returned by getDefaultGraph
+    (find
+      ([g s p o]
+       (wrapped-iterator
+        (map map->quad)
+        (query-stream
+         (spo->query s p o)
+         source))))
+    
+    (getGraph ([] (graph source)))
+    (getDefaultGraph ([] (graph source)))
+
+    ;; NOTE - leaving this out causes errors when calling DatasetFactory/wrap on this proxy
+    ;;        based on
+    ;;          https://jena.apache.org/documentation/javadoc/arq/org/apache/jena/sparql/core/DatasetGraph.html#supportsTransactions--
+    ;;        it looks like we shouldn't have to worry about returning false for read-only datasets
+    (supportsTransactions ([] false))))
+
+(defn model [graph]
+  (DatasetFactory/wrap graph))
+
 (def source #(:maps @st/state))
 
 (def g (atom (dataset-graph (source))))
-(def m (atom (DatasetFactory/wrap @g)))
+(def m (atom (model @g)))
 
 (do
   (add-watch
@@ -122,7 +130,7 @@
      (when (= k :jena-base-recompute)
        (println "Recomputing Jena graph on @state change...")
        (reset! g (graph (source)))
-       (reset! m (atom (DatasetFactory/wrap @g))))
+       (reset! m (model @g)))
      nil))
   nil)
 

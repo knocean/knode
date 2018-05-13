@@ -11,7 +11,8 @@
            (org.apache.jena.query QueryFactory QueryExecutionFactory)
            (org.apache.jena.graph NodeFactory Triple)
            (org.apache.jena.graph.impl GraphBase)
-           (org.apache.jena.sparql.core DatasetGraphBase Quad)))
+           (org.apache.jena.sparql.core DatasetGraphBase Quad)
+           (org.apache.jena.query DatasetFactory)))
 
 (defn reflect [thing]
   (pp/print-table (sort-by :name (filter :exception-types (:members (r/reflect thing))))))
@@ -83,14 +84,23 @@
                             :p (->query-val p)}
                            (->query-obj o)))))
 
-;; (def gs
-;;   (proxy [DatasetGraphBase] []
-;;     (find
-;;       ([g s p o]
-;;        (println "FOUR" g s p o)
-;;        (wrapped-iterator [(make-quad)])))))
+(defn dataset-graph [source]
+  (proxy [DatasetGraphBase] []
+    (find
+      ([g s p o]
+       (println "FOUR" g s p o)
+       (wrapped-iterator
+        (map map->quad)
+        (query-stream
+         (spo->query s p o)
+         source))))
+    (getGraph
+      ([] (println "GET GRAPH...") org.apache.jena.graph.Node_NULL))
+    (getDefaultGraph ([] (println "GET DEFAULT GRAPH...") org.apache.jena.graph.Node_NULL))
 
-(defn data [source]
+    (supportsTransactions ([] false))))
+
+(defn graph [source]
   (proxy [GraphBase] []
     (graphBaseFind
       ([s p o]
@@ -102,8 +112,8 @@
 
 (def source #(:maps @st/state))
 
-(def g (atom (data (source))))
-(def m (atom (ModelFactory/createModelForGraph @g)))
+(def g (atom (dataset-graph (source))))
+(def m (atom (DatasetFactory/wrap @g)))
 
 (do
   (add-watch
@@ -111,8 +121,8 @@
    (fn [k atom old new]
      (when (= k :jena-base-recompute)
        (println "Recomputing Jena graph on @state change...")
-       (reset! g (data (source)))
-       (reset! m (atom (ModelFactory/createModelForGraph @g))))
+       (reset! g (graph (source)))
+       (reset! m (atom (DatasetFactory/wrap @g))))
      nil))
   nil)
 

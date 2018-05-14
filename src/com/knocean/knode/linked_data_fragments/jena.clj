@@ -125,8 +125,10 @@
          (gspo->query s p o)
          source))))
     
-    (getGraph ([] (graph source)))
-    (getDefaultGraph ([] (graph source)))
+    (getGraph
+      ([] (println "GETTING PLAIN GRAPH...") (graph source))
+      ([node] (println "GETTING GRAPH BY NODE..." node) (graph source)))
+    (getDefaultGraph ([] (println "GETTING DEFAULT GRAPH...") (graph source)))
 
     ;; NOTE - leaving this out causes errors when calling DatasetFactory/wrap on this proxy
     ;;        based on
@@ -148,9 +150,13 @@
    (fn [k atom old new]
      (when (= k :jena-base-recompute)
        (println "Recomputing Jena graph on @state change...")
-       (reset! g (graph (source)))
-       (reset! m (model @g)))
+       (reset! g (graph (source))))
      nil))
+  (add-watch
+   g :jena-model-recompute
+   (fn [k atom old new]
+     (println "  Recomputing Jena graph model...")
+     (reset! m (model new))))
   nil)
 
 (defn query-jena [sparql-string]

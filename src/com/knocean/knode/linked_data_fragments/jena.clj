@@ -56,33 +56,51 @@
   [xs]
   (org.apache.jena.util.iterator.WrappedIterator/create (seq->iterator xs)))
 
-(defn ->query-val
+(defn node-type
   [thing]
   (let [c (class thing)]
     (cond ;; NOTE - case DOES NOT work here, despite the equivalence comparison
-      (= c org.apache.jena.graph.Node_ANY) nil
+      (= c org.apache.jena.graph.Node_ANY) :any
       (= c org.apache.jena.graph.Node_Blank) :blank
-      (= c org.apache.jena.graph.Node_URI) (.toString thing))))
+      (= c org.apache.jena.graph.Node_URI) :uri
+      (= c org.apache.jena.graph.Node_Literal) :literal)))
+
+(defn ->query-val
+  [thing]
+  (case (node-type thing)
+    :any nil
+    :blank :blank
+    :uri (.toString thing)))
 
 (defn ->query-obj
   [thing]
   ;; TODO FIXME
-  (if (= (class thing) org.apache.jena.graph.Node_Literal)
-    {:o (.getLiteralLexicalForm thing)
-     :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
-     ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
-     ;; whether the original input to Node_Literal had a datatype or not.
-     ;; I guess that means #string needs to match either itself or the
-     ;; empty datatype?
-     :di (.getLiteralDatatypeURI thing)} 
-    {:o (->query-val thing)}))
+  (case (node-type thing)
+    :literal {:ol (.getLiteralLexicalForm thing)
+              :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
+              ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
+              ;; whether the original input to Node_Literal had a datatype or not.
+              ;; I guess that means #string needs to match either itself or the
+              ;; empty datatype?
+              :di (.getLiteralDatatypeURI thing)}
+    :uri {:oi (->query-val thing)}
+    :blank {:ob (->query-val thing)}
+    :any nil))
 
 (defn spo->query
   [s p o]
   (into {} (filter second (merge
-                           {:s (->query-val s)
-                            :p (->query-val p)}
+                           (if (= :uri (node-type s))
+                             {:si (->query-val s)}
+                             {:sb (->query-val s)})
+                           {:pi (->query-val p)}
                            (->query-obj o)))))
+
+(defn gspo->query
+  [g s p o]
+  (merge
+   {:gi (->query-val g)}
+   (spo->query s p o)))
 
 (defn graph [source]
   (proxy [GraphBase] []
@@ -97,13 +115,14 @@
 (defn dataset-graph [source]
   (proxy [DatasetGraphBase] []
     ;; NOTE - it looks like this is never actually used; the queries run against
-    ;;        whatever is returned by getDefaultGraph
+    ;;        whatever is returned by getDefaultGraph (even when specifying GRAPH)
     (find
       ([g s p o]
+       (println "FINDING...")
        (wrapped-iterator
         (map map->quad)
         (query-stream
-         (spo->query s p o)
+         (gspo->query s p o)
          source))))
     
     (getGraph ([] (graph source)))
@@ -141,3 +160,5 @@
        first))
 
 (query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")
+(query-jena "select * where {?s <http://protege.stanford.edu/plugins/owl/protege#defaultLanguage> ?o }")
+(query-jena "select ?g ?s ?p ?o where { {?s ?p ?o} union { GRAPH ?g {?s ?p ?o} } }")

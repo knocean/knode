@@ -9,6 +9,7 @@
             
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
+            [com.knocean.knode.linked-data-fragments.base :refer [query]]
             [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
 (defn object->nquads-object
@@ -17,12 +18,12 @@
 
 (defmulti ldf-result mime/req->output-format)
 
-(defmethod ldf-result "html"
+(defmethod ldf-result :default
   [{:keys [ldf-query session env] :as req}]
   (html
    {:session session
     :title "Linked Data Fragments Result"
-    :content (let [res (ldf/query ldf-query (:maps @st/state))
+    :content (let [res (query ldf-query (:maps @st/state))
                    ix (* (:page res) (:per-page res))]
                (if (empty? (:items res))
                  [:span "Not enough results..."]
@@ -41,12 +42,28 @@
                                     (catch Exception e
                                       (or (:oi entry) "")))
                                   #"<" "&lt;")
-                                 #">" "&gt;")]
+                                 #">" "&gt;")
+                            s (or (:si entry) (:sb entry))]
                         [:li
-                         [:a {:href (str "?subject=" (url/url-encode (:si entry)))} (ln/iri->name env (:si entry))] " "
+                         (cond
+                           (:si entry)
+                           [:a {:href (str "?subject=" (url/url-encode (:si entry)))}
+                            (ln/iri->name env (:si entry))]
+
+                           (:sb entry)
+                           [:a {:href (str "?subject=" (url/url-encode (:sb entry)))}
+                            (:sb entry)]) " "
                          [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (ln/iri->name env (:pi entry))] " "
                          [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))
+
+(defmethod ldf-result "ttl"
+  [{:keys [ldf-query session env] :as req}]
+  (println "GOT LDF RESULT REQUEST in TTL format...")
+  (println (str (dissoc req :env :session :async-channel)))
+  {:status 200
+   :headers {"Content-Type" (mime/req->content-type req)}
+   :body ""})
 
 (defn with-ldf-query
   [f]
@@ -54,4 +71,4 @@
     (f (assoc req :ldf-query (ldf/req->query req) :env (st/latest-env)))))
 
 (def routes
-  [["/ldf" (with-ldf-query ldf-result)]])
+  [["/ldf" (mime/with-content-header (with-ldf-query ldf-result))]])

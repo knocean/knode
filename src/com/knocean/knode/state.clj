@@ -6,7 +6,7 @@
             [clj-jgit.porcelain :as git]
             [me.raynes.fs :as fs]
 
-            [org.knotation.cli :as kn]
+            [org.knotation.clj-api :as kn]
             [org.knotation.environment :as en]))
 
 (defn slurps
@@ -25,6 +25,12 @@
   [{:key :root-dir
     :label "Root directory"
     :default (constantly "~/projects/knode-example")}
+   {:key :port
+    :label "Port"
+    :default (constantly "3210")}
+   {:key :root-iri
+    :label "Root IRI"
+    :default #(str "http://localhost:" (:port %) "/")}
    {:key :absolute-dir
     :label "Absolute directory"
     :default #(->> % :root-dir fs/expand-home io/file .getAbsolutePath)}
@@ -38,6 +44,9 @@
                    io/file
                    .getName
                    string/lower-case)}
+   {:key :project-iri
+    :label "Project IRI"
+    :default #(str (:root-iri %) "/ontology/" (:project-name %) "_")}
    {:key :readme
     :label "README file"
     :default #(io/file (str (:absolute-dir %) "/README.md"))}
@@ -64,23 +73,20 @@
    {:key :google-client-secret
     :label "Google Client Secret"
     :default (constantly "")}
-   {:key :port
-    :label "Port"
-    :default (constantly "3210")}
-   {:key :root-iri
-    :label "Root IRI"
-    :default #(str "http://localhost:" (:port %) "/")}
    {:key :build-files
     :label "Build files"
-    :default (constantly ["ontology/context.kn" "ontology/content.kn"])}
+    :default (constantly "ontology/context.kn ontology/content.kn")}
    {:key :write-file
     :label "Write file"
     :default #(->> % :build-files last)}
    {:key :states
     :label "Create state"
-    :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (:build-files %))]
+    :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (string/split (:build-files %) #" "))]
                 (when (every? identity (map (fn [f] (.exists (io/file f))) fs))
-                  (kn/run-string (string/join " " fs))))}])
+                  (vec (kn/read-paths nil nil fs))))}
+   {:key :grouped
+    :label "Group states by subject"
+    :default #(group-by :si (:states %))}])
 
 (defn init
   "Given a base map, apply the configurators (in order)

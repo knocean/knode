@@ -4,8 +4,7 @@
             [clojure.set :as set]
 
             [org.knotation.util :as util]
-            [org.knotation.rdf :as rdf]
-            [org.knotation.object :as ob]))
+            [org.knotation.rdf :as rdf]))
 
 (def +per-page+ 1000)
 

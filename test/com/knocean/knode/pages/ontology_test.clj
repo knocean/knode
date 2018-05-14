@@ -85,14 +85,18 @@
          #(= (get-in % [:headers "Content-Type"]) "application/json; charset=utf-8")
          #(not (empty? (:body %)))
          #(any? (json/decode (:body %)))))
-(deftest test-JSON-result-basics (basic-format-test "application/json" "json" ::json-success))
+(comment
+ (deftest test-JSON-result-basics (basic-format-test "application/json" "json" ::json-success)))
 
 (s/def ::tsv-success
   (s/and
    ::successful-response
    #(= (get-in % [:headers "Content-Type"]) "text/tab-separated-values; charset=utf-8")))
+
 (deftest test-TSV-result-basics (basic-format-test "text/tab-separated-values" "tsv" ::tsv-success))
-(deftest test-TSV-result-specifics
+
+(comment
+ (deftest test-TSV-result-specifics
   (testing "the SELECT option can restrict/expand default fields in the result"
     (is (= "CURIE\tlabel\nex:0033333\tsample feather 33333"
            (:body
@@ -106,7 +110,8 @@
             (->result
              (assoc
               dummy-req :params {"format" "tsv" "select" "CURIE,label" "compact" "true"}
-              :requested-iris ["https://example.com/0033333"])))))))
+              :requested-iris ["https://example.com/0033333"]))))))))
+
 (deftest test-TSV-multiple-results
   (testing "Baic multi-result level test for TSV format"
     (let [iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
@@ -127,7 +132,8 @@
         :args (s/cat :env ::env :req (s/keys :req-un [::params ::uri]))
         :ret seq?)
 
-(deftest test-term-parsing
+(comment
+ (deftest test-term-parsing
   (testing "Parses main term"
     (testing "Gets main term from `iri` parameter"
       (is (= ["https://example.com/0033333"]
@@ -163,7 +169,7 @@
                 env {:params {"IRI" (str "eq." (first iris))} :uri "/ontology"})))
         (is (= iris
                (parse-request-terms
-                env {:params {"IRI" (str "in." (string/join " " iris))} :uri "/ontology"})))))))
+                env {:params {"IRI" (str "in." (string/join " " iris))} :uri "/ontology"}))))))))
 
 (s/fdef parse-body-terms
         :args (s/keys :req-un [::request-method ::params ::body])

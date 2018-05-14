@@ -6,7 +6,6 @@
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
-            [org.knotation.object :as ob]
             
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]))
 

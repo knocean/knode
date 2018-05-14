@@ -3,7 +3,6 @@
             [clj-jgit.porcelain :as git]
 
             [org.knotation.rdf :as rdf]
-            [org.knotation.rdfa :as rdfa]
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
 
@@ -15,10 +14,7 @@
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
 (defn update-state! [valid-kn]
-  (let [states (->> valid-kn
-                    string/split-lines
-                    (assoc {:org.knotation.state/line-number 1} :org.knotation.state/lines)
-                    (org.knotation.kn/read-input (st/latest-env)))]
+  (let [states (org.knotation.clj-api/read-string :kn (st/latest-env) valid-kn)]
     (swap! state (fn [st] (update st :states #(concat % states))))
     nil))
 

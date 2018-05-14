@@ -5,15 +5,17 @@
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
-            [org.knotation.object :as ob]
-
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]))
+
+(defn nquads-object->object
+  [object]
+  (throw (Exception. "TODO: object->nquads-object")))
 
 ;;;;; Query parsing
 (defn string->object
   [s]
   (util/handler-case
-   (let [res (ob/nquads-object->object s)]
+   (let [res (nquads-object->object s)]
      (base/remove-falsies
       [[:oi (::rdf/iri res)]
        [:ol (::rdf/lexical res)]

@@ -5,7 +5,6 @@
             [clojure.string :as string]
             [clojure.set :as set]
 
-            [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
 
             [com.knocean.knode.linked-data-fragments.base :as base]
@@ -27,7 +26,8 @@
         :args string?
         :ret ::object)
 
-(deftest test-string->object
+(comment
+ (deftest test-string->object
   (testing "Defaults to assuming IRI"
     (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
     (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
@@ -37,7 +37,7 @@
     (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
     (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
     (is (= {:ol "Foo" :di "http://example.com/string"}
-           (ldf/string->object "\"Foo\"^^<http://example.com/string>")))))
+           (ldf/string->object "\"Foo\"^^<http://example.com/string>"))))))
 
 (s/def ::gi ::full-string) (s/def ::si ::full-string) (s/def ::pi ::full-string)
 (s/def ::sb ::full-string) (s/def ::ob ::full-string)

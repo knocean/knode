@@ -1,24 +1,48 @@
 (ns com.knocean.knode.pages.subject
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
-            [bidi.ring :as bring]
             [cheshire.core :as json]
 
-            [org.knotation.api :as kn]
             [org.knotation.rdf :as rdf]
-            [org.knotation.rdfa :as rdfa]
             [org.knotation.environment :as en]
+            [org.knotation.link :as ln]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]))
 
+(defn escape
+  [iri]
+  (java.net.URLEncoder/encode iri))
+
+(defn render-link
+  [env iri]
+  [:a {:href (str "/subject?iri=" (escape iri))} (ln/iri->name env iri)])
+
+(defn render-object
+  [env {:keys [oi ob ol dt ln] :as state}]
+  (cond
+    oi (render-link env oi)
+    ob ob
+    ol ol))
+
+(defn render-pair-row
+  [env {:keys [pi] :as state}]
+  [:tr
+   [:td (render-link env pi)]
+   [:td (render-object env state)]])
+
+(defn render-triple-row
+  [env {:keys [si sb pi] :as state}]
+  [:tr
+   [:td (if si (render-link env si) sb)]
+   [:td (render-link env pi)]
+   [:td (render-object env state)]])
+
 (defn subject-by-iri
   [iri]
-  (let [env (st/latest-env)
-        relevant (->> @state :states
-                      (filter #(= (get-in % [::rdf/subject ::rdf/iri]) iri)))]
-    (->> relevant
-         (filter #(= :org.knotation.state/statement (:org.knotation.state/event %)))
-         (map (fn [statement] [(::rdf/predicate statement) (::rdf/object statement)])))))
+  (->> @state
+       :states
+       (filter #(= (:si %) iri))
+       (filter #(= :statement (:event %)))))
 
 (defn subject
   [{:keys [query-params] :as req}]
@@ -26,56 +50,66 @@
    :headers {"Content-Type" "application/json"}
    :body (json/encode (subject-by-iri (get query-params "iri")))})
 
+(defn render-subject-html
+  [iri]
+  [:div
+   [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
+   [:div
+    "Download as "
+    [:a {:href (str "/subject/?iri=" (escape iri) "&format=ttl")} "Turtle (ttl)"]
+    ", JSON, TSV."]
+   (into
+    [:table.table
+     {:resource iri}
+     [:tr
+      [:th "Predicate"]
+      [:th "Object"]]]
+    (concat
+     (->> @state
+          :states
+          (filter #(= (:si %) iri))
+          (filter :pi)
+          (map #(render-pair-row (::en/env %) %)))))])
+     ;(let [env (st/latest-env)
+     ;      objects
+     ;      (->> @state
+     ;           :states
+     ;           (filter #(= (:oi %) iri)))
+     ;      predicates
+     ;      (->> objects
+     ;           (map :pi)
+     ;           distinct))
+     ;  (for [predicate predicates]
+     ;    [:tr
+     ;     [:td
+     ;      (render-link env predicate)
+     ;      " THIS"]
+     ;     (->> objects
+     ;          (filter #(= (:pi %) predicate))
+     ;          (map (fn [q] [:li (render-link (::en/env q) (:si q))]))
+     ;          (into [:ul])
+     ;          (conj [:td]))]))))])
+   ;(let [env (st/latest-env)
+   ;      usage
+   ;      (->> @state
+   ;           :states
+   ;           (filter #(= (:pi %) iri))
+   ;           (map #(render-triple-row env %)))))
+   ;  (when (first usage)
+   ;    [:div
+   ;     [:h3 "Usage"]
+   ;     (into
+   ;      [:table.table
+   ;       [:tr
+   ;        [:th "Subject"]
+   ;        [:th "Predicate"]
+   ;        [:th "Object"]]]
+   ;      usage)])))])
+
 (defn render-subject
   [iri]
   {:title "Subject"
-   :content
-   [:div
-    [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
-    (into
-     [:table.table
-      {:resource iri}
-      [:tr
-       [:th "Predicate"]
-       [:th "Object"]]
-      (->> @state
-           :states
-           (filter #(= (::rdf/subject %) {::rdf/iri iri}))
-           (filter ::rdf/predicate)
-           (map #(rdfa/render-pair-row (::en/env %) %))
-           (string/join "\n"))]
-     (let [env (st/latest-env)
-           objects
-           (->> @state
-                :states
-                (filter #(= (::rdf/object %) {::rdf/iri iri})))
-           predicates
-           (->> objects
-                (map ::rdf/predicate)
-                distinct)]
-       (for [predicate predicates]
-         [:tr
-          [:td
-           (rdfa/render-link env predicate)
-           " THIS"]
-          (->> objects
-               (filter #(= (::rdf/predicate %) predicate))
-               (map (fn [q] [:li (rdfa/render-subject (::en/env q) q)]))
-               (into [:ul])
-               (conj [:td]))])))
-    (let [usage
-          (->> @state
-               :states
-               (filter #(= (::rdf/predicate %) {::rdf/iri iri}))
-               (map #(rdfa/render-triple-row (::en/env %) %)))]
-      (when (first usage)
-        [:div
-         [:table.table
-          [:tr
-           [:th "Subject"]
-           [:th "Predicate"]
-           [:th "Object"]]
-          (string/join "\n" usage)]]))]})
+   :content (render-subject-html iri)})
 
 (defn subject-page
   [{:keys [query-params session] :as req}]

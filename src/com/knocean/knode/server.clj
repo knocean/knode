@@ -9,6 +9,7 @@
    [ring.middleware.params :refer [wrap-params]]
 
    [markdown.core :as md]
+   [yaml.core :as yaml]
 
    [com.knocean.knode.state :refer [state]]
    [com.knocean.knode.pages.html :refer [html]]
@@ -25,25 +26,34 @@
     :title "404 Page not found"
     :content "404 Page not found"}))
 
+(defn render-doc
+  [req path]
+  (let [file (io/file path)]
+    (when (.exists file)
+      (let [[_ _ header content] (re-find #"(?s)(---(.*?)---)(.*)" (slurp file))
+            metadata (yaml/parse-string header)]
+        (html
+         {:title (:title metadata)
+          :content (md/md-to-html-string content)})))))
+
 (defn index
   [request]
-  (html
-   {:title "DOC"
-    :content (md/md-to-html-string (slurp (:readme @state)))}))
+  (render-doc request (:readme @state)))
 
 (def routes
   [""
    (concat
-    auth/routes
-    subject/routes
+    ;auth/routes
+    ;subject/routes
     ontology/routes
-    stat/routes
-    ldf/routes
+    ;stat/routes
+    ;ldf/routes
     [["" (bring/redirect index)]
      ["/" index]
      ["/index.html" (bring/redirect index)]
      ["/doc/" (bring/redirect index)]
      ["/doc/index.html" index]
+     ["/doc/api.html" #(render-doc % (str (:root-dir @state) "/doc/api.md"))]
      ["/" (bring/->ResourcesMaybe {:prefix "public/"})]
      [true not-found]])])
 

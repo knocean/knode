@@ -10,13 +10,12 @@
 
 (defn all-subjects
   []
-  (->> @state
-       :states
-       (map :si)
-       (remove nil?)
-       (filter #(.startsWith % (:project-iri @state)))
-       set
-       sort))
+  (map
+   :si
+   (st/query
+    (format "SELECT DISTINCT si FROM %s WHERE si LIKE '%s%%' ORDER BY si"
+            (:database-table @state)
+            (:project-iri @state)))))
 
 (defn parse-body-terms
   [req]

@@ -39,10 +39,7 @@
 
 (defn subject-by-iri
   [iri]
-  (->> @state
-       :states
-       (filter #(= (:si %) iri))
-       (filter #(= :statement (:event %)))))
+  (st/select (format "si='%s'" iri)))
 
 (defn subject
   [{:keys [query-params] :as req}]
@@ -52,59 +49,57 @@
 
 (defn render-subject-html
   [iri]
-  [:div
-   [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
-   [:div
-    "Download as "
-    [:a {:href (str "/subject/?iri=" (escape iri) "&format=ttl")} "Turtle (ttl)"]
-    ", JSON, TSV."]
-   (into
-    [:table.table
-     {:resource iri}
-     [:tr
-      [:th "Predicate"]
-      [:th "Object"]]]
-    (concat
-     (->> @state
-          :states
-          (filter #(= (:si %) iri))
-          (filter :pi)
-          (map #(render-pair-row (::en/env %) %)))))])
+  (let [states (st/select (format "si='%s'" iri))]
+    [:div
+     [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
+     [:div
+      "Download as "
+      [:a {:href (str "/subject/?iri=" (escape iri) "&format=ttl")} "Turtle (ttl)"]
+      ", JSON, TSV."]
+     (into
+      [:table.table
+       {:resource iri}
+       [:tr
+        [:th "Predicate"]
+        [:th "Object"]]]
+      (concat
+       (->> states
+            (filter #(= (:si %) iri))
+            (filter :pi)
+            (map #(render-pair-row (::en/env %) %)))))]))
+       ;(let [env (st/latest-env)
+       ;      objects
+       ;      (->> states
+       ;           (filter #(= (:oi %) iri)))
+       ;      predicates
+       ;      (->> objects
+       ;           (map :pi)
+       ;           distinct))
+       ;  (for [predicate predicates]
+       ;    [:tr
+       ;     [:td
+       ;      (render-link env predicate)
+       ;      " THIS"]
+       ;     (->> objects
+       ;          (filter #(= (:pi %) predicate))
+       ;          (map (fn [q] [:li (render-link (::en/env q) (:si q))]))
+       ;          (into [:ul])
+       ;          (conj [:td]))]))))])
      ;(let [env (st/latest-env)
-     ;      objects
-     ;      (->> @state
-     ;           :states
-     ;           (filter #(= (:oi %) iri)))
-     ;      predicates
-     ;      (->> objects
-     ;           (map :pi)
-     ;           distinct))
-     ;  (for [predicate predicates]
-     ;    [:tr
-     ;     [:td
-     ;      (render-link env predicate)
-     ;      " THIS"]
-     ;     (->> objects
-     ;          (filter #(= (:pi %) predicate))
-     ;          (map (fn [q] [:li (render-link (::en/env q) (:si q))]))
-     ;          (into [:ul])
-     ;          (conj [:td]))]))))])
-   ;(let [env (st/latest-env)
-   ;      usage
-   ;      (->> @state
-   ;           :states
-   ;           (filter #(= (:pi %) iri))
-   ;           (map #(render-triple-row env %)))))
-   ;  (when (first usage)
-   ;    [:div
-   ;     [:h3 "Usage"]
-   ;     (into
-   ;      [:table.table
-   ;       [:tr
-   ;        [:th "Subject"]
-   ;        [:th "Predicate"]
-   ;        [:th "Object"]]]
-   ;      usage)])))])
+     ;      usage
+     ;      (->> states
+     ;           (filter #(= (:pi %) iri))
+     ;           (map #(render-triple-row env %)))))
+     ;  (when (first usage)
+     ;    [:div
+     ;     [:h3 "Usage"]
+     ;     (into
+     ;      [:table.table
+     ;       [:tr
+     ;        [:th "Subject"]
+     ;        [:th "Predicate"]
+     ;        [:th "Object"]]]
+     ;      usage)])))])
 
 (defn render-subject
   [iri]

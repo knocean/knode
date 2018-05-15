@@ -23,9 +23,7 @@
 (defn subject-by-iri
   [iri]
   (let [env (st/latest-env)
-        relevant (->> @state :states
-                      (filter #(= (:si %) iri))
-                      (filter #(not= :org.knotation.state/subject-end (:org.knotation.state/event %))))]
+        relevant (st/select (format "si='%s'" iri))]
     (map (fn [statement]
            (if-let [pi (:pi statement)]
              [(with-name env pi)
@@ -58,9 +56,8 @@
    (let [iri (first requested-iris)
          _ (println "IRI" iri)
          states (if iri
-                  (->> @state
-                       :states
-                       (filter (fn [{:keys [si]}] (if si (= iri si) true))))
+                  (st/select (format "si='%s'" iri))
+                  ; TODO
                   (:states @state))]
      (kn/render-string :ttl (st/latest-env) states))})
 

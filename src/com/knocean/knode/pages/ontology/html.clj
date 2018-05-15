@@ -55,13 +55,12 @@
 
 (defn render-subject-html
   [iri]
-  (let [env (st/latest-env)]
+  (let [env (st/latest-env)
+        states (st/select (format "si='%s'" iri))]
     [:div
      [:h2 (ln/iri->curie env iri) " " (ln/iri->name env iri)]
      [:p [:a {:href iri} iri]]
-     (->> @state
-          :states
-          (filter #(= iri (:si %)))
+     (->> states
           (map :pi)
           (remove nil?)
           distinct
@@ -69,9 +68,7 @@
           (into predicates)
           (mapcat
            (fn [predicate]
-             (->> @state
-                  :states
-                  (filter #(= iri (:si %)))
+             (->> states
                   (filter #(= predicate (:pi %)))
                   (map (partial render-pair env)))))
           (into [:ul]))
@@ -91,9 +88,7 @@
      ;   [:th "Predicate"]
      ;   [:th "Object"]]]
      ; (concat
-     ;  (->> @state
-     ;       :states
-     ;       (filter #(= (:si %) iri))
+     ;  (->> states
      ;       (filter :pi)
      ;       (map #(render-pair-row (::en/env %) %))))]]))
 

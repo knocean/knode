@@ -6,6 +6,8 @@
             [clj-jgit.porcelain :as git]
             [me.raynes.fs :as fs]
 
+            [clojure.java.jdbc :as jdbc]
+
             [org.knotation.clj-api :as kn]
             [org.knotation.environment :as en]))
 
@@ -34,6 +36,9 @@
    {:key :absolute-dir
     :label "Absolute directory"
     :default #(->> % :root-dir fs/expand-home io/file .getAbsolutePath)}
+   {:key :connection-url
+    :label "Database connection URL"
+    :default #(constantly "jdbc:postgresql://localhost/james")}
    {:key :repo
     :label "Git repository"
     :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
@@ -53,6 +58,9 @@
    {:key :idspace
     :label "IDSPACE"
     :default #(string/upper-case (:project-name %))}
+   {:key :database-table
+    :label "Database table"
+    :default #(:idspace %)}
    {:key :ssh-identity
     :label "SSH identity"
     :default (constantly "~/.ssh/id_rsa")}
@@ -84,9 +92,9 @@
     :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (string/split (:build-files %) #" "))]
                 (when (every? identity (map (fn [f] (.exists (io/file f))) fs))
                   (vec (kn/read-paths nil nil fs))))}
-   {:key :grouped
-    :label "Group states by subject"
-    :default #(group-by :si (:states %))}])
+   {:key :connection
+    :label "Connect to database"
+    :default #(jdbc/get-connection (:connection-url %))}])
 
 (defn init
   "Given a base map, apply the configurators (in order)
@@ -124,6 +132,28 @@
   (-> env
       init
       atom))
+
+;(swap! state assoc :connection (jdbc/get-connection "jdbc:postgresql://localhost/james"))
+;(jdbc/query @state "SELECT * FROM ontie LIMIT 2")
+;(jdbc/query @state "TRUNCATE ontie")
+;(jdbc/insert-multi! @state "ontie" (->> @state :states (map #(select-keys % [:gi :zi :si :sb :pi :oi :ob :ol :dt :ln])) (filter :pi))
+
+;(->> "/Users/james/Repositories/github/knotation/knotation-cljc/junk/ncbitaxon.owl"
+;     (kn/read-path nil nil)
+;     (map #(select-keys % [:gi :zi :si :sb :pi :oi :ob :ol :dt :ln]))
+;     (filter :pi)
+;     (partition-all 2000)
+;     (map (partial jdbc/insert-multi! @state "ontie"))
+;     doall)
+
+(defn query
+  [& args]
+  (println "QUERY" args)
+  (apply jdbc/query @state args))
+
+(defn select
+  [s]
+  (query (str "SELECT * FROM " (:database-table @state) " WHERE " s)))
 
 (defn latest-env []
   (->> @state :states last ::en/env))

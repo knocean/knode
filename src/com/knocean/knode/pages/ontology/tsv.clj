@@ -1,11 +1,10 @@
 (ns com.knocean.knode.pages.ontology.tsv
   (:require [clojure.string :as string]
+            [clojure.java.jdbc :as jdbc]
 
             [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
-            [org.knotation.environment :as en]
-
-            [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
+            [org.knotation.environment :as en] [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.state :refer [state] :as st]))
 
 (defn tsv-join
@@ -27,7 +26,7 @@
 
 (defn iri->seq
   [env headers iri]
-  (let [states (get-in @state [:grouped iri])]
+  (let [states (st/select (format "si='%s'" iri))]
     (for [[column pi format] headers]
       (case column
         "IRI" iri
@@ -36,6 +35,7 @@
         (->> states
              (filter #(= pi (:pi %)))
              (map (partial render-object env format))
+             distinct
              (string/join "|"))))))
 
 (defn parse-tsv-select

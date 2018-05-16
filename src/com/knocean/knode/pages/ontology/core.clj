@@ -3,6 +3,7 @@
 
             [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
+            [org.knotation.json-ld :as json-ld]
             [org.knotation.clj-api :as kn]
 
             [com.knocean.knode.state :refer [state] :as st]
@@ -44,19 +45,31 @@
 (defmethod ontology-result "json"
   [{:keys [requested-iris env] :as req}]
   {:status 200
-   :body (json/encode
-          (if (first requested-iris)
-            (subject-by-iri (first requested-iris))
-            (base/all-subjects)))})
+   :body
+   (json-ld/render-stanza
+    (st/latest-env)
+    (first requested-iris)
+    (concat
+     (->> @state
+          :states
+          (filter :prefix))
+     (st/select (format "si='%s'" (first requested-iris)))))})
 
 (defmethod ontology-result "ttl"
   [{:keys [requested-iris env] :as req}]
   {:status 200
    :body
    (let [iri (first requested-iris)
-         _ (println "IRI" iri)
          states (if iri
-                  (st/select (format "si='%s'" iri))
+                  (concat
+                   (->> @state
+                        :states
+                        (filter :prefix)
+                        (map #(select-keys % [:prefix :iri])))
+                   (->> iri
+                        (format "si='%s'")
+                        st/select
+                        rdf/assign-stanzas))
                   ; TODO
                   (:states @state))]
      (kn/render-string :ttl (st/latest-env) states))})

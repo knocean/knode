@@ -38,7 +38,7 @@
     :default #(->> % :root-dir fs/expand-home io/file .getAbsolutePath)}
    {:key :connection-url
     :label "Database connection URL"
-    :default #(constantly "jdbc:postgresql://localhost/james")}
+    :default (constantly "jdbc:postgresql://localhost/james")}
    {:key :repo
     :label "Git repository"
     :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
@@ -148,7 +148,6 @@
 
 (defn query
   [& args]
-  (println "QUERY" args)
   (apply jdbc/query @state args))
 
 (defn select

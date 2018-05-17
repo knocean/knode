@@ -9,6 +9,7 @@
             [clojure.java.jdbc :as jdbc]
 
             [org.knotation.clj-api :as kn]
+            [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]))
 
 (defn slurps
@@ -24,79 +25,79 @@
 ; They are in a specific order.
 ; The :default key is a function from an ENV map to a default value.
 (def configurators
-  [{:key :root-dir
-    :label "Root directory"
-    :default (constantly "~/projects/knode-example")}
-   {:key :port
-    :label "Port"
-    :default (constantly "3210")}
-   {:key :root-iri
-    :label "Root IRI"
-    :default #(str "http://localhost:" (:port %) "/")}
+  [{:key :project-dir
+    :label "Project directory"
+    :default (constantly ".")}
    {:key :absolute-dir
     :label "Absolute directory"
-    :default #(->> % :root-dir fs/expand-home io/file .getAbsolutePath)}
-   {:key :connection-url
-    :label "Database connection URL"
-    :default (constantly "jdbc:postgresql://localhost/james")}
-   {:key :repo
-    :label "Git repository"
-    :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
-                (git/load-repo r))}
+    :default #(->> % :project-dir fs/expand-home io/file .getAbsolutePath)}
    {:key :project-name
     :label "Project name"
-    :default #(->> % :absolute-dir
-                   io/file
-                   .getName
-                   string/lower-case)}
-   {:key :project-iri
-    :label "Project IRI"
-    :default #(str (:root-iri %) "/ontology/" (:project-name %) "_")}
-   {:key :readme
-    :label "README file"
-    :default #(io/file (str (:absolute-dir %) "/README.md"))}
+    :default #(->> % :absolute-dir io/file .getName string/lower-case)}
    {:key :idspace
     :label "IDSPACE"
     :default #(string/upper-case (:project-name %))}
-   {:key :database-table
-    :label "Database table"
-    :default #(:idspace %)}
-   {:key :ssh-identity
-    :label "SSH identity"
-    :default (constantly "~/.ssh/id_rsa")}
-   {:key :ssh-passphrase
-    :label "SSH passphrase"
-    :default (constantly nil)}
-
-   {:key :maps-file
-    :label "Maps Source File"
-    :default (constantly "obi_core.edn")}
-   {:key :maps
-    :label "Maps Data"
-    :default #(slurps (:maps-file %))}
-
-   {:key :google-client-id
-    :label "Google Client ID"
-    :default (constantly "")}
-   {:key :google-client-secret
-    :label "Google Client Secret"
-    :default (constantly "")}
-   {:key :build-files
-    :label "Build files"
-    :default (constantly "ontology/context.kn ontology/content.kn")}
-   {:key :write-file
-    :label "Write file"
-    :default #(->> % :build-files last)}
-   {:key :states
-    :label "Create state"
-    :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (string/split (:build-files %) #" "))]
-                (when (every? identity (map (fn [f] (.exists (io/file f))) fs))
-                  (vec (kn/read-paths nil nil fs))))}
+   {:key :base-iri
+    :label "Base IRI"
+    :default (constantly "https://ontology.iedb.org/ontology/ONTIE_")}
+   {:key :port
+    :label "Port"
+    :default (constantly "3210")}
+   {:key :database-url
+    :label "Database URL"
+    :default #(str "jdbc:sqlite:" (:absolute-dir %) "/knode.db")}
+   {:key :database-type
+    :label "Database type"
+    :default #(-> % :database-url (string/split #":") second)}
    {:key :connection
-    :label "Connect to database"
-    :default #(jdbc/get-connection (:connection-url %))}])
+    :label "Database connection"
+    :default #(jdbc/get-connection (:database-url %))}])
 
-(defn init
+   ; Older
+
+   ;{:key :repo
+   ; :label "Git repository"
+   ; :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
+   ;             (git/load-repo r))}
+   ;{:key :project-iri
+   ; :label "Project IRI"
+   ; :default #(str (:root-iri %) "/ontology/" (:project-name %) "_")}
+   ;{:key :readme
+   ; :label "README file"
+   ; :default #(io/file (str (:absolute-dir %) "/README.md"))}
+   ;{:key :ssh-identity
+   ; :label "SSH identity"
+   ; :default (constantly "~/.ssh/id_rsa")}
+   ;{:key :ssh-passphrase
+   ; :label "SSH passphrase"
+   ; :default (constantly nil)}
+
+   ;{:key :maps-file
+   ; :label "Maps Source File"
+   ; :default (constantly "obi_core.edn")}
+   ;{:key :maps
+   ; :label "Maps Data"
+   ; :default #(slurps (:maps-file %))}
+
+   ;{:key :google-client-id
+   ; :label "Google Client ID"
+   ; :default (constantly "")}
+   ;{:key :google-client-secret
+   ; :label "Google Client Secret"
+   ; :default (constantly "")}
+   ;{:key :build-files
+   ; :label "Build files"
+   ; :default (constantly "ontology/context.kn ontology/content.kn")}
+   ;{:key :write-file
+   ; :label "Write file"
+   ; :default #(->> % :build-files last)}
+   ;{:key :states
+   ; :label "Create state"
+   ; :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (string/split (:build-files %) #" "))]
+   ;             (when (every? identity (map (fn [f] (.exists (io/file f))) fs))
+   ;               (vec (kn/read-paths nil nil fs))))}]
+
+(defn configure
   "Given a base map, apply the configurators (in order)
    and return a new map."
   [base]
@@ -113,7 +114,7 @@
 
 (defn plain-view
   [label value]
-  (format "%-18s %s" label (str value)))
+  (format "%-20s %s" (str label ":") (str value)))
 
 (defn report
   "Given a state map (dereferenced),
@@ -128,23 +129,17 @@
 
 ; Initialize the application state in an atom
 ; starting with the ENV.
-(defonce state
-  (-> env
-      init
-      atom))
+(defonce state (atom {}))
 
-;(swap! state assoc :connection (jdbc/get-connection "jdbc:postgresql://localhost/james"))
-;(jdbc/query @state "SELECT * FROM ontie LIMIT 2")
-;(jdbc/query @state "TRUNCATE ontie")
-;(jdbc/insert-multi! @state "ontie" (->> @state :states (map #(select-keys % [:gi :zi :si :sb :pi :oi :ob :ol :dt :ln])) (filter :pi))
-
-;(->> "/Users/james/Repositories/github/knotation/knotation-cljc/junk/ncbitaxon.owl"
-;     (kn/read-path nil nil)
-;     (map #(select-keys % [:gi :zi :si :sb :pi :oi :ob :ol :dt :ln]))
-;     (filter :pi)
-;     (partition-all 2000)
-;     (map (partial jdbc/insert-multi! @state "ontie"))
-;     doall)
+(defn init
+  "Initialize the state atom."
+  []
+  (->> env
+       (filter #(.startsWith (name (key %)) "knode-"))
+       (map (fn [[k v]] [(-> k name (string/replace "knode-" "") keyword) v]))
+       (into {})
+       configure
+       (reset! state)))
 
 (defn query
   [& args]
@@ -152,7 +147,21 @@
 
 (defn select
   [s]
-  (query (str "SELECT * FROM " (:database-table @state) " WHERE " s)))
+  (query (str "SELECT * FROM states WHERE " s)))
 
 (defn latest-env []
-  (->> @state :states last ::en/env))
+  (-> (format "rt='%s'" (:project-name @state))
+      select
+      kn/collect-env
+      (en/add-prefix "rdf" (rdf/rdf))
+      (en/add-prefix "rdfs" (rdf/rdfs))
+      (en/add-prefix "xsd" (rdf/xsd))
+      (en/add-prefix "owl" (rdf/owl))
+      (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+      (en/add-prefix (:idspace @state) (:base-iri @state))))
+
+(defn latest-prefix-states
+  []
+  (->> (latest-env)
+       ::en/prefix-iri
+       (map (fn [[prefix iri]] {:prefix prefix :iri iri}))))

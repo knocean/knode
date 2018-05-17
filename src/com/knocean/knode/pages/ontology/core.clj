@@ -3,6 +3,7 @@
 
             [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
+            [org.knotation.environment :as en]
             [org.knotation.json-ld :as json-ld]
             [org.knotation.clj-api :as kn]
 
@@ -50,9 +51,7 @@
     (st/latest-env)
     (first requested-iris)
     (concat
-     (->> @state
-          :states
-          (filter :prefix))
+     (st/latest-prefix-states)
      (st/select (format "si='%s'" (first requested-iris)))))})
 
 (defmethod ontology-result "ttl"
@@ -60,18 +59,14 @@
   {:status 200
    :body
    (let [iri (first requested-iris)
-         states (if iri
-                  (concat
-                   (->> @state
-                        :states
-                        (filter :prefix)
-                        (map #(select-keys % [:prefix :iri])))
+         states (concat
+                 (st/latest-prefix-states)
+                 (if iri
                    (->> iri
                         (format "si='%s'")
                         st/select
-                        rdf/assign-stanzas))
-                  ; TODO
-                  (:states @state))]
+                        rdf/assign-stanzas)
+                   (st/select (format "rt='%s'" (:project-name @state)))))]
      (kn/render-string :ttl (st/latest-env) states))})
 
 (def routes

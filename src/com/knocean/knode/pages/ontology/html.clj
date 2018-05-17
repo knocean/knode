@@ -29,7 +29,7 @@
   [env iri]
   (let [curie (ln/iri->curie env iri)]
     [:a
-     {:href (str "/ontology/" (string/replace curie ":" "_"))}
+     {:href (if curie (str "/ontology/" (string/replace curie ":" "_")) iri)}
      curie
      " "
      (ln/iri->name env iri)]))

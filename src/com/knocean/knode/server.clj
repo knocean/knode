@@ -53,7 +53,7 @@
      ["/index.html" (bring/redirect index)]
      ["/doc/" (bring/redirect index)]
      ["/doc/index.html" index]
-     ["/doc/api.html" #(render-doc % (str (:root-dir @state) "/doc/api.md"))]
+     ["/doc/api.html" #(render-doc % (str (:project-dir @state) "/doc/api.md"))]
      ["/" (bring/->ResourcesMaybe {:prefix "public/"})]
      [true not-found]])])
 

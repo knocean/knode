@@ -6,7 +6,8 @@
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
-            
+
+            [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]))
 
 ;;; DUMMY DATA
@@ -42,7 +43,7 @@
 
 (defn query->sql
   [query]
-  (let [base "SELECT * FROM ontology"
+  (let [base "SELECT * FROM states"
         [where & params] (-query->sql-where-clause query)
         pagination (-query->sql-pagination query)]
     (vec
@@ -51,17 +52,17 @@
       params))))
 
 (defmethod query-stream :database
-  [query data]
-  (let [base "SELECT * FROM ontology"
+  [query source]
+  (let [base "SELECT * FROM states"
         [where & params] (-query->sql-where-clause query)]
-    (sql/with-db-connection [db data]
-      (map
-       #(into {} (filter second %))
-       (sql/query
-        db (vec
-            (cons
-             (string/join [base where])
-             params)))))))
+    (map
+     #(into {} (filter second %))
+     (sql/query
+      source
+      (vec
+       (cons
+        (string/join [base where])
+        params))))))
 
 (defn count!
   [query db]

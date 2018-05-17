@@ -36,13 +36,7 @@
   [query data]
   (cond
     (or (vector? data) (list? data)) :default
-
-    (and (map? data)
-         (set/subset?
-          (set (keys data))
-          #{:classname :subprotocol :subname :connection}))
-    :database
-
+    (and (map? data) (:connection data)) :database
     :else :default))
 
 (defmulti query-stream -data-source-dispatch)

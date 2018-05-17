@@ -124,7 +124,7 @@
         (query-stream
          (gspo->query s p o)
          source))))
-    
+
     (getGraph
       ([] (println "GETTING PLAIN GRAPH...") (graph source))
       ([node] (println "GETTING GRAPH BY NODE..." node) (graph source)))
@@ -136,35 +136,21 @@
     ;;        it looks like we shouldn't have to worry about returning false for read-only datasets
     (supportsTransactions ([] false))))
 
-(defn model [graph]
-  (DatasetFactory/wrap graph))
-
-(def source #(:maps @st/state))
-
-(def g (atom (dataset-graph (source))))
-(def m (atom (model @g)))
-
-(do
-  (add-watch
-   st/state :jena-base-recompute
-   (fn [k atom old new]
-     (when (= k :jena-base-recompute)
-       (println "Recomputing Jena graph on @state change...")
-       (reset! g (graph (source))))
-     nil))
-  (add-watch
-   g :jena-model-recompute
-   (fn [k atom old new]
-     (println "  Recomputing Jena graph model...")
-     (reset! m (model new))))
-  nil)
-
 (defn query-jena [sparql-string]
-  (->> (QueryExecutionFactory/create (QueryFactory/create sparql-string) @m)
+  (->> @state
+       dataset-graph
+       (DatasetFactory/wrap)
+       (QueryExecutionFactory/create (QueryFactory/create sparql-string))
        (.execSelect)
-       iterator-seq
-       first))
+       iterator-seq))
 
-(query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")
-(query-jena "select * where {?s <http://protege.stanford.edu/plugins/owl/protege#defaultLanguage> ?o }")
-(query-jena "select ?g ?s ?p ?o where { {?s ?p ?o} union { GRAPH ?g {?s ?p ?o} } }")
+;(query-jena "select * where {?s ?p ?o } limit 1")
+;(query-jena "select * where {<https://ontology.iedb.org/ontology/ONTIE_0000002> ?p ?o }")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> ?o } limit 1")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> ?o ; <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?p } limit 10")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> \"Mus musculus BALB/c\" }")
+;(query-jena "select * where {<https://ontology.iedb.org/ontology/ONTIE_0000002> <http://www.w3.org/2000/01/rdf-schema#label> ?o }")
+;(query-jena "select * where { GRAPH ?g {?s ?p ?o} } limit 1")
+;(query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")
+;(query-jena "select * where {?s <http://protege.stanford.edu/plugins/owl/protege#defaultLanguage> ?o }")
+;(query-jena "select ?g ?s ?p ?o where { {?s ?p ?o} union { GRAPH ?g {?s ?p ?o} } }")

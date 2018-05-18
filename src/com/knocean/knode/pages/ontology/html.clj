@@ -56,7 +56,12 @@
 (defn render-subject-html
   [iri]
   (let [env (st/latest-env)
-        states (st/select (format "si='%s'" iri))]
+        states
+        (->> iri
+             (format "si='%s'" iri)
+             st/select
+             (map #(select-keys % [:si :sb :pi :oi :ob :ol :dt :ln]))
+             distinct)]
     [:div
      [:h2 (ln/iri->curie env iri) " " (ln/iri->name env iri)]
      [:p [:a {:href iri} iri]]

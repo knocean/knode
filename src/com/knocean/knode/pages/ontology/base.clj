@@ -32,7 +32,7 @@
     (map
      #(ln/subject->iri env %)
      (concat
-      (when (.startsWith uri (str "/ontology/" (:idspace @state) "_"))
+      (when (.startsWith uri (str "/ontology/" (:project-name @state) "_"))
         [(-> uri
              (string/replace #"^/ontology/" "")
              (string/replace #"\.ttl$" "")

@@ -33,10 +33,7 @@
     :default #(->> % :project-dir fs/expand-home io/file .getAbsolutePath)}
    {:key :project-name
     :label "Project name"
-    :default #(->> % :absolute-dir io/file .getName string/lower-case)}
-   {:key :idspace
-    :label "IDSPACE"
-    :default #(string/upper-case (:project-name %))}
+    :default #(->> % :absolute-dir io/file .getName)}
    {:key :base-iri
     :label "Base IRI"
     :default (constantly "https://ontology.iedb.org/ontology/ONTIE_")}
@@ -158,7 +155,7 @@
       (en/add-prefix "xsd" (rdf/xsd))
       (en/add-prefix "owl" (rdf/owl))
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-      (en/add-prefix (:idspace @state) (:base-iri @state))))
+      (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn latest-prefix-states
   []

@@ -43,13 +43,12 @@
          [:span {:class "icon-bar"}]
          [:span {:class "icon-bar"}]
          [:span {:class "icon-bar"}]]
-        [:a {:class "navbar-brand" :href "/"} (:idspace @state)]]
+        [:a {:class "navbar-brand" :href "/"} (:project-name @state)]]
        [:div {:id "navbar" :class "navbar-collapse collapse"}
         [:ul {:class "nav navbar-nav"}
          ;[:li [:a {:href "/doc/"} "Documentation"]]
-         ;[:li [:a {:href "/resource/"} "Resources"]]
-         ;[:li [:a {:href "/ontology"} "Ontology"]]]
-         [:li [:a {:href (str "/ontology/" (:idspace @state))} "Terms"]]]]]]
+         [:li [:a {:href "/ontology"} "Ontology"]]
+         [:li [:a {:href "/resources"} "Resources"]]]]]]
         ;[:ul {:class "nav navbar-nav navbar-right"}
         ; (if (empty? session)
         ;   [:li [:a {:href "/login"} "Login"]]

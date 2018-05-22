@@ -60,7 +60,7 @@
         (->> iri
              (format "si='%s'" iri)
              st/select
-             (map #(select-keys % [:si :sb :pi :oi :ob :ol :dt :ln]))
+             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
              distinct)]
     [:div
      [:h2 (ln/iri->curie env iri) " " (ln/iri->name env iri)]
@@ -102,7 +102,7 @@
   (html
    (case (count requested-iris)
      0 {:session session
-        :title (:idspace @state)
+        :title (:project-name @state)
         :content
         [:div
            ;(when (auth/logged-in? req)
@@ -124,9 +124,9 @@
          [:h3 "Term List"]
          [:p
           "Other formats: "
-          [:a {:href (str "/ontology/" (:idspace @state) ".ttl")} "Turtle (ttl)"]
+          [:a {:href (str "/ontology/" (:project-name @state) ".ttl")} "Turtle (ttl)"]
           ", "
-          [:a {:href (str "/ontology/" (:idspace @state) ".tsv")} "TSV (tsv)"]
+          [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
           "."]
          [:ul (map (fn [s] [:li (render-subject env s)])
                    (base/all-subjects))]]}
@@ -134,5 +134,5 @@
         :title (ln/iri->name env (first requested-iris))
         :content (render-subject-html (first requested-iris))}
      {:session session
-      :title (:idspace @state)
+      :title (:project-name @state)
       :content (map render-subject-html requested-iris)})))

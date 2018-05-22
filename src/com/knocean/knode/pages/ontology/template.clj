@@ -60,7 +60,7 @@
   ([template content] (validate-application (st/latest-env) template content))
   ([env template content]
    (let [unknowns (->> content
-                       (filter #(nil? (ln/subject->iri env (second %))))
+                       (filter #(nil? (ln/->iri env (second %))))
                        (into {}))
          base (if (empty? unknowns) {} {:warnings {:unknown-values unknowns}})]
      (if (valid-application? template content)

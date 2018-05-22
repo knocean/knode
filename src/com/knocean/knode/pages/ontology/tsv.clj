@@ -50,9 +50,9 @@
               (cond
                 (= k "IRI") [:IRI nil :IRI]
                 (= k "CURIE") [:CURIE nil :CURIE]
-                (= (ln/subject->iri env k) (rdf/rdfs "label"))
+                (= (ln/->iri env k) (rdf/rdfs "label"))
                 [k (rdf/rdfs "label") :label]
-                :else [k (ln/subject->iri env k) (if compact? :CURIE :IRI)]))))
+                :else [k (ln/->iri env k) (if compact? :CURIE :IRI)]))))
          vec)))
 
 (defmethod ontology-result "tsv"

@@ -39,7 +39,7 @@
   [env raw-template-input]
   (let [parsed (string/split-lines raw-template-input)
         [_ subject] (string/split (second parsed) #": ")
-        template-iri (ln/subject->iri env subject)
+        template-iri (ln/->iri env subject)
         template (tmp/template-by-iri template-iri)
         content (string/join \newline (drop 2 parsed))]
     {:iri template-iri

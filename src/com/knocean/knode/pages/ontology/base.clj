@@ -30,7 +30,7 @@
                     (if-let [_operator (second (re-find #"^(in|eq)\." s))]
                       (string/split (subs s 3) #" +"))))]
     (map
-     #(ln/subject->iri env %)
+     #(ln/->iri env %)
      (concat
       (when (.startsWith uri (str "/ontology/" (:project-name @state) "_"))
         [(-> uri

@@ -63,7 +63,7 @@ CREATE INDEX states_si ON states(si);"))
          (kn/read-paths nil nil args)
          (kn/read-path nil nil (first args)))
        (filter :pi)
-       (map (juxt (constantly resource) :gi :si :sb :pi :oi :ob :ol :dt :ln))
+       (map (juxt (constantly resource) :gi :si :sb :pi :oi :ob :ol :di :ln))
        (partition-all 2000) ; WARN: This number is pretty arbitrary
        (map-indexed
         (fn [i p]
@@ -71,6 +71,6 @@ CREATE INDEX states_si ON states(si);"))
           (jdbc/insert-multi!
            @state
            "states"
-           [:rt :gi :si :sb :pi :oi :ob :ol :dt :ln]
+           [:rt :gi :si :sb :pi :oi :ob :ol :di :ln]
            p)))
        doall))

@@ -28,7 +28,7 @@
   oi text,
   ob text,
   ol text,
-  dt text,
+  di text,
   ln text
 );"
     (case (:database-type @state)

@@ -55,10 +55,12 @@
      (st/select (format "si='%s'" (first requested-iris)))))})
 
 (defmethod ontology-result "ttl"
-  [{:keys [requested-iris env] :as req}]
+  [{:keys [requested-iris params env] :as req}]
   {:status 200
    :body
    (let [iri (first requested-iris)
+         resource (or (:resource params)
+                      (:project-name @state))
          states (concat
                  (st/latest-prefix-states)
                  (if iri
@@ -66,7 +68,7 @@
                         (format "si='%s'")
                         st/select
                         rdf/assign-stanzas)
-                   (st/select (format "rt='%s'" (:project-name @state)))))]
+                   (st/select (format "rt='%s'" resource))))]
      (kn/render-string :ttl (st/latest-env) states))})
 
 (def routes

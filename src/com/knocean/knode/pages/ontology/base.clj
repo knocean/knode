@@ -46,11 +46,11 @@
 (defn with-requested-terms
   [f]
   (mime/with-content-header
-    (fn [{:keys [params uri] :as req}]
+    (fn [{:keys [params uri requested-iris] :as req}]
       (let [env (st/latest-env)
             remaining-path (vec (drop 2 (string/split (:uri req) #"/")))]
         (f (assoc
             req
             :env env
             :remaining-path remaining-path
-            :requested-iris (vec (parse-request-terms env req))))))))
+            :requested-iris (or requested-iris (vec (parse-request-terms env req)))))))))

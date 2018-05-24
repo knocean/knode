@@ -9,6 +9,7 @@
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.authentication :as auth]
             [com.knocean.knode.pages.html :refer [html]]
+            [com.knocean.knode.pages.resources :as res]
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
@@ -99,9 +100,9 @@
 
 (defmethod ontology-result "html"
   [{:keys [requested-iris env params session] :as req}]
-  (html
-   (case (count requested-iris)
-     0 {:session session
+  (case (count requested-iris)
+    0 (html
+       {:session session
         :title (:project-name @state)
         :content
         [:div
@@ -129,10 +130,12 @@
           [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
           "."]
          [:ul (map (fn [s] [:li (render-subject env s)])
-                   (base/all-subjects))]]}
-     1 {:session session
-        :title (ln/iri->name env (first requested-iris))
-        :content (render-subject-html (first requested-iris))}
-     {:session session
-      :title (:project-name @state)
-      :content (map render-subject-html requested-iris)})))
+                   (base/all-subjects))]]})
+    1 (-> req
+          (assoc :iri (first requested-iris))
+          (assoc-in [:params :resource] (:project-name @state))
+          res/subject-page)
+    (html
+     {:session session}
+     :title (:project-name @state)
+     :content (map render-subject-html requested-iris))))

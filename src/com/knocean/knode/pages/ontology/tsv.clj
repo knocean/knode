@@ -41,18 +41,19 @@
 (defn parse-tsv-select
   "Given a query string, return a vector of required columns."
   [env compact? select]
-  (let [format-reg #" \[(CURIE|IRI|label)\]$"]
+  (let [format-reg #" \[(CURIE|IRI|label)\]$"
+        default (if compact? :CURIE :IRI)]
     (->> (string/split select #",")
          (map
           (fn [k]
             (if-let [format (second (re-find format-reg k))]
               [(string/replace k format-reg "") (keyword format)]
               (cond
-                (= k "IRI") [:IRI nil :IRI]
-                (= k "CURIE") [:CURIE nil :CURIE]
+                (= k "IRI") ["IRI" nil :IRI]
+                (= k "CURIE") ["CURIE" nil :CURIE]
                 (= (ln/->iri env k) (rdf/rdfs "label"))
-                [k (rdf/rdfs "label") :label]
-                :else [k (ln/->iri env k) (if compact? :CURIE :IRI)]))))
+                [k (rdf/rdfs "label") :literal]
+                :else [k (ln/->iri env k) default]))))
          vec)))
 
 (defmethod ontology-result "tsv"

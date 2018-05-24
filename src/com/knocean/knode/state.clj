@@ -162,3 +162,19 @@
   (->> (latest-env)
        ::en/prefix-iri
        (map (fn [[prefix iri]] {:prefix prefix :iri iri}))))
+
+(def base-env
+  (-> en/default-env
+      (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+      (en/add-prefix (:project-name @state) (:base-iri @state))))
+
+(defn build-env
+  [iris]
+  (->> iris
+       (map #(format "'%s'" %))
+       (string/join ", ")
+       (format "SELECT DISTINCT si, ol FROM states WHERE pi='http://www.w3.org/2000/01/rdf-schema#label' AND si IN (%s)")
+       query
+       (reduce
+        (fn [env row] (en/add-label env (:ol row) (:si row)))
+        base-env)))

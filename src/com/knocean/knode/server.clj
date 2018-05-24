@@ -28,18 +28,15 @@
     :content "404 Page not found"}))
 
 (defn render-doc
-  [req path]
-  (let [file (io/file path)]
+  [req relative-path]
+  (let [path (str (:absolute-dir @state) relative-path)
+        file (io/file path)]
     (when (.exists file)
-      (let [[_ _ header content] (re-find #"(?s)(---(.*?)---)(.*)" (slurp file))
-            metadata (yaml/parse-string header)]
+      (let [[_ _ header content] (re-find #"(?s)(---(.*?)---)?(.*)" (slurp file))
+            metadata (when header (yaml/parse-string header))]
         (html
          {:title (:title metadata)
           :content (md/md-to-html-string content)})))))
-
-(defn index
-  [request]
-  (render-doc request (:readme @state)))
 
 (def routes
   [""
@@ -50,12 +47,12 @@
     resources/routes
     ;stat/routes
     ;ldf/routes
-    [["" (bring/redirect index)]
-     ["/" index]
-     ["/index.html" (bring/redirect index)]
-     ["/doc/" (bring/redirect index)]
-     ["/doc/index.html" index]
-     ["/doc/api.html" #(render-doc % (str (:project-dir @state) "/doc/api.md"))]
+    [["" (bring/redirect "/")]
+     ["/" #(render-doc % "/README.md")]
+     ["/index.html" (bring/redirect "/")]
+     ["/doc/" (bring/redirect "/doc/index.html")]
+     ["/doc/index.html" #(render-doc % "/doc/index.md")]
+     ["/doc/api.html" #(render-doc % "/doc/api.md")]
      ["/" (bring/->ResourcesMaybe {:prefix "public/"})]
      [true not-found]])])
 

@@ -27,7 +27,7 @@
 (def configurators
   [{:key :project-dir
     :label "Project directory"
-    :default (constantly ".")}
+    :default (constantly "")}
    {:key :absolute-dir
     :label "Absolute directory"
     :default #(->> % :project-dir fs/expand-home io/file .getAbsolutePath)}
@@ -59,9 +59,6 @@
    ;{:key :project-iri
    ; :label "Project IRI"
    ; :default #(str (:root-iri %) "/ontology/" (:project-name %) "_")}
-   ;{:key :readme
-   ; :label "README file"
-   ; :default #(io/file (str (:absolute-dir %) "/README.md"))}
    ;{:key :ssh-identity
    ; :label "SSH identity"
    ; :default (constantly "~/.ssh/id_rsa")}

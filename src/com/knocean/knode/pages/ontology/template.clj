@@ -14,28 +14,22 @@
 (def template-content "https://knotation.org/predicate/template-content")
 
 (defn list-templates []
-  (->> (:states @st/state)
-       (filter #(= {::rdf/iri template-content} (::rdf/predicate %)))
-       (map (comp ::rdf/iri ::rdf/subject))))
+  (->> (format "SELECT * FROM states WHERE pi='%s' AND rt='%s'"
+               template-content
+               (:project-name @st/state))
+       st/query
+       (map :si)))
 
 (defn template-by-iri [iri]
-  (->> (:states @st/state)
-       (filter #(and (= {::rdf/iri iri} (::rdf/subject %))
-                     (= ::s/statement (::s/event %))))
-       (map (fn [s]
-              (let [input (::s/input s)
-                    content (string/join \newline (::s/lines input))
-                    preds (set (map second (re-seq #"\{(.*?)\}" content)))
-                    src {:source (::s/source input)
-                         :line-number (::s/line-number input)
-                         :format (::s/format input)
-                         :lines (vec (::s/lines input))}
-                    env (st/latest-env)]
-                {:template content
-                 :predicates preds
-                 :input src
-                 :name (ln/iri->name env iri) :iri iri})))
-       first))
+  (let [content (->> (format "SELECT * FROM states WHERE rt='%s' AND si='%s' AND pi='%s'" (:project-name @st/state) iri template-content)
+                     st/query
+                     first
+                     :ol)
+        preds (set (map second (re-seq #"\{(.*?)\}" content)))]
+    {:template content
+     :predicates preds
+     :input {}
+     :name (ln/iri->name (st/latest-env) iri) :iri iri}))
 
 (defn template-dummy
   [template]

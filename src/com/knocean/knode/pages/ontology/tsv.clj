@@ -11,7 +11,8 @@
   [seq]
   (->> seq
        (map (partial string/join \tab))
-       (string/join \newline)))
+       (map #(str % \newline))
+       string/join))
 
 (defn render-object
   [env format {:keys [oi ob ol] :as state}]
@@ -47,7 +48,7 @@
          (map
           (fn [k]
             (if-let [format (second (re-find format-reg k))]
-              [(string/replace k format-reg "") (keyword format)]
+              [k (ln/->iri env (string/replace k format-reg "")) (keyword format)]
               (cond
                 (= k "IRI") ["IRI" nil :IRI]
                 (= k "CURIE") ["CURIE" nil :CURIE]
@@ -62,10 +63,12 @@
    :body
    (let [show-headers? (not (= (get params "show-headers") "false"))
          compact? (= (get params "compact") "true")
+         curie-column (when (:body-string req)
+                        (->> req :body-string string/split-lines first string/trim (= "CURIE")))
          default (if compact? :CURIE :IRI)
          headers (if-let [select (get params "select")]
                    (parse-tsv-select env compact? select)
-                   [(if compact? ["CURIE" nil :CURIE] ["IRI" nil :IRI])
+                   [(if (or compact? curie-column) ["CURIE" nil :CURIE] ["IRI" nil :IRI])
                     ["label" (rdf/rdfs "label") :label]
                     ["recognized" nil :boolean]
                     ["obsolete" (rdf/owl "deprecated") :boolean]

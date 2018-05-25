@@ -98,14 +98,14 @@
      ;       (filter :pi)
      ;       (map #(render-pair-row (::en/env %) %))))]]))
 
-(defmethod ontology-result "html"
+(defn term-list
   [{:keys [requested-iris env params session] :as req}]
-  (case (count requested-iris)
-    0 (html
-       {:session session
-        :title (:project-name @state)
-        :content
-        [:div
+  (let [iris (if (first requested-iris) requested-iris (base/all-subjects))]
+    (html
+     {:session session
+      :title (:project-name @state)
+      :content
+      [:div
            ;(when (auth/logged-in? req)
            ;  (list [:div {:class "col-md-6"}
            ;         [:h3 "Add Term"]
@@ -122,20 +122,20 @@
            ;             (let [t (tmp/template-by-iri iri)]
            ;               [:li (:name t) [:i " (" (string/join ", " (:predicates t)) ")"]]))
            ;           (tmp/list-templates))]])
-         [:h3 "Term List"]
-         [:p
-          "Other formats: "
-          [:a {:href (str "/ontology/" (:project-name @state) ".ttl")} "Turtle (ttl)"]
-          ", "
-          [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
-          "."]
-         [:ul (map (fn [s] [:li (render-subject env s)])
-                   (base/all-subjects))]]})
-    1 (-> req
-          (assoc :iri (first requested-iris))
-          (assoc-in [:params :resource] (:project-name @state))
-          res/subject-page)
-    (html
-     {:session session}
-     :title (:project-name @state)
-     :content (map render-subject-html requested-iris))))
+       [:h3 "Term List"]
+       [:p
+        "Other formats: "
+        [:a {:href (str "/ontology/" (:project-name @state) ".ttl")} "Turtle (ttl)"]
+        ", "
+        [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
+        "."]
+       [:ul (map (fn [s] [:li (render-subject env s)]) iris)]]})))
+
+(defmethod ontology-result "html"
+  [{:keys [requested-iris env params session] :as req}]
+  (if (= 1 (count requested-iris))
+    (-> req
+        (assoc :iri (first requested-iris))
+        (assoc-in [:params :resource] (:project-name @state))
+        res/subject-page)
+    (term-list req)))

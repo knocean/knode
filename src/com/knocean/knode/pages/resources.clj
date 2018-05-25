@@ -90,7 +90,22 @@
        (when-let [description (:description resource)] [:p description])
        [:ul
         [:li [:a {:href (str "/resources/" (:label resource) "/subjects")} "Subjects"]]
-        [:li [:a {:href (str "/resources/" (:label resource) "/predicates")} "Predicates"]]]]})))
+        [:li [:a {:href (str "/resources/" (:label resource) "/predicates")} "Predicates"]]]
+       (when (not= "all" (:label resource))
+         (let [iri
+               (->> (format "SELECT si FROM states WHERE rt='%s' AND pi = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' AND oi = 'http://www.w3.org/2002/07/owl#Ontology' LIMIT 1" (:label resource))
+                    st/query
+                    first
+                    :si)]
+           (when iri
+             (let [states
+                   (->> (format "SELECT * FROM states WHERE rt='%s' AND si='%s'" (:label resource) iri)
+                        st/query)
+                   env (st/build-env-from-states states)]
+               (->> states
+                    (map (partial render-pair env (:label resource)))
+                    (into [:ul])
+                    (conj [:div [:h3 "Details"]]))))))]})))
 
 (defn resource-page
   [{:keys [session params] :as req}]
@@ -135,12 +150,7 @@
                  st/select
                  (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
                  distinct)
-            env
-            (->> states
-                 (mapcat (juxt :si :pi :oi))
-                 (remove nil?)
-                 set
-                 st/build-env)]
+            env (st/build-env-from-states states)]
         (html
          {:title (ln/iri->name env iri)
           :content

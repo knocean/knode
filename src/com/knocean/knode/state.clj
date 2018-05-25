@@ -152,6 +152,7 @@
       (en/add-prefix "xsd" (rdf/xsd))
       (en/add-prefix "owl" (rdf/owl))
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+      (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn latest-prefix-states
@@ -160,9 +161,11 @@
        ::en/prefix-iri
        (map (fn [[prefix iri]] {:prefix prefix :iri iri}))))
 
-(def base-env
+(defn base-env
+  []
   (-> en/default-env
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+      (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn build-env
@@ -174,4 +177,12 @@
        query
        (reduce
         (fn [env row] (en/add-label env (:ol row) (:si row)))
-        base-env)))
+        (base-env))))
+
+(defn build-env-from-states
+  [states]
+  (->> states
+       (mapcat (juxt :si :pi :oi))
+       (remove nil?)
+       set
+       build-env))

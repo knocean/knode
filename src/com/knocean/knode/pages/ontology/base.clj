@@ -20,8 +20,9 @@
 (defn parse-body-terms
   [req]
   (when (and (= :post (:request-method req))
-             (= "GET" (get-in req [:params "method"])))
-    (rest (string/split-lines (slurp (:body req))))))
+             (= "GET" (get-in req [:params "method"]))
+             (:body-string req))
+    (rest (string/split-lines (:body-string req)))))
 
 (defn parse-request-terms
   [env {:keys [params uri] :as req}]
@@ -48,7 +49,8 @@
   (mime/with-content-header
     (fn [{:keys [params uri requested-iris] :as req}]
       (let [env (st/latest-env)
-            remaining-path (vec (drop 2 (string/split (:uri req) #"/")))]
+            remaining-path (vec (drop 2 (string/split (:uri req) #"/")))
+            req (assoc req :body-string (when (:body req) (-> req :body slurp)))]
         (f (assoc
             req
             :env env

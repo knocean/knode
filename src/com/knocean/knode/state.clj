@@ -48,7 +48,18 @@
     :default #(-> % :database-url (string/split #":") second)}
    {:key :connection
     :label "Database connection"
-    :default #(jdbc/get-connection (:database-url %))}])
+    :default #(jdbc/get-connection (:database-url %))}
+
+   {:key :ssh-identity
+    :label "SSH identity"
+    :default (constantly "~/.ssh/id_rsa")}
+   {:key :ssh-passphrase
+    :label "SSH passphrase"
+    :default (constantly nil)}
+
+   {:key :api-key
+    :label "API key"
+    :default (constantly "default-key")}])
 
    ; Older
 
@@ -62,12 +73,6 @@
    ;{:key :readme
    ; :label "README file"
    ; :default #(io/file (str (:absolute-dir %) "/README.md"))}
-   ;{:key :ssh-identity
-   ; :label "SSH identity"
-   ; :default (constantly "~/.ssh/id_rsa")}
-   ;{:key :ssh-passphrase
-   ; :label "SSH passphrase"
-   ; :default (constantly nil)}
 
    ;{:key :maps-file
    ; :label "Maps Source File"

@@ -94,7 +94,8 @@
              [:h4 "Warnings:"]
              [:ul
               (map (fn [[k v]]
-                     [:li (name k) " :: " (map (fn [[k v]] (str k " => " v)) v)])
+                     [:li (name k) " :: "
+                      (string/join ", " (map (fn [[k v]] (str k " => " v)) v))])
                    (:warnings validated))]])
           (when (:errors validated)
             [:span

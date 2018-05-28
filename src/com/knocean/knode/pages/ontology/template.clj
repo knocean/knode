@@ -55,11 +55,16 @@
   ([env template content]
    (let [unknowns (->> content
                        (filter #(nil? (ln/->iri env (second %))))
-                       (into {}))
-         base (if (empty? unknowns) {} {:warnings {:unknown-values unknowns}})]
+                       (map (fn [[k v]] [:unrecognized-name v])))
+         base (if (empty? unknowns) {} {:warnings unknowns})]
      (if (valid-application? template content)
        base
        (assoc
         base :errors
-        {:extra-predicates (set/difference (set (keys content)) (:predicates template))
-         :missing-predicates (set/difference (:predicates template) (set (keys content)))})))))
+        (concat
+         (map
+          (fn [p] [:extra-predicate p])
+          (set/difference (set (keys content)) (:predicates template)))
+         (map
+          (fn [p] [:missing-predicate p])
+          (set/difference (:predicates template) (set (keys content))))))))))

@@ -5,6 +5,7 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
+            [org.knotation.api :as api]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -67,6 +68,27 @@
           [:h2 "Term Added!"]]]}))
     (util/redirect "/ontology/validate-term")))
 
+;; (valid-knotation? ": SUBJECT\nknp:apply-template: protein class\n taxon: REQUIRED\n label: REQUIRED")
+;; (valid-knotation? (tmp/template-dummy (tmp/template-by-iri (first (tmp/list-templates)))))
+
+;; TODO - these functions (and probably the template validation stuff)
+;;        should all be moved to knotation-cljc
+(defn validate-knotation
+  ([snippet] (validate-knotation (st/latest-env) snippet))
+  ([env snippet]
+   (try
+     (let [es (filter identity (api/errors-of (api/read-string :kn env snippet)))]
+       (if (empty? es)
+         {}
+         {:errors es}))
+     (catch Exception e
+       {:errors (list [:bad-parse (.getMessage e)])}))))
+
+(defn valid-knotation?
+  ([snippet] (valid-knotation? (st/latest-env) snippet))
+  ([env snippet]
+   (empty? (:errors (validate-knotation env snippet)))))
+
 (defn validate-term
   [{:keys [env params session] :as req}]
   (if-let [raw (get params "template-text")]
@@ -75,8 +97,12 @@
       :title "Validate Term"
       :content
       (let [parsed (-parse-template-application env raw)
-            valid? (tmp/valid-application? (:template parsed) (:content-map parsed))
-            validated (tmp/validate-application (:template parsed) (:content-map parsed))]
+            valid? (and (valid-knotation? env raw)
+                        (tmp/valid-application? (:template parsed) (:content-map parsed)))
+            validated (merge-with
+                       concat
+                       (validate-knotation env raw)
+                       (tmp/validate-application (:template parsed) (:content-map parsed)))]
         [:div
          [:div {:class "col-md-6"}
           [:h3 "Validate Term"]
@@ -93,14 +119,12 @@
             [:span
              [:h4 "Warnings:"]
              [:ul
-              (map (fn [[k v]]
-                     [:li (name k) " :: "
-                      (string/join ", " (map (fn [[k v]] (str k " => " v)) v))])
+              (map (fn [[k v]] [:li (name k) " :: " v])
                    (:warnings validated))]])
           (when (:errors validated)
             [:span
              [:h4 "Errors:"]
              [:ul
-              (map (fn [[k v]] [:li (name k) " :: " (str (vec v))])
+              (map (fn [[k v]] [:li (name k) " :: " v])
                    (:errors validated))]])]] )})
     (util/redirect "/ontology")))

@@ -24,9 +24,10 @@
          (not (string/blank? google-secret)))))
 
 (defn logged-in?
-  [{:keys [session] :as req}]
-  (and (not (empty? session))
-       (set/subset? #{:name :email :id} (set (keys session)))))
+  [{:keys [session params] :as req}]
+  (or (= (:api-key @state) (get params "api-key"))
+      (and (not (empty? session))
+           (set/subset? #{:name :email :id} (set (keys session))))))
 
 (defn logged-in-only
   [f]

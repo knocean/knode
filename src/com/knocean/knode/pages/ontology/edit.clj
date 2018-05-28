@@ -5,6 +5,7 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
+            [org.knotation.api :as api]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -35,24 +36,29 @@
     (update-state! valid-kn)
     nil))
 
-(defn -parse-template-application
-  [env raw-template-input]
-  (let [parsed (string/split-lines raw-template-input)
-        [_ subject] (string/split (second parsed) #": ")
-        template-iri (ln/->iri env subject)
-        template (tmp/template-by-iri template-iri)
-        content (string/join \newline (drop 2 parsed))]
-    {:iri template-iri
-     :template template
-     :content content
-     :content-map (tmp/parse-content content)}))
+;; (valid-knotation? ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
+;; (validate-knotation ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
+
+;; TODO - these functions (and probably the template validation stuff)
+;;        should all be moved to knotation-cljc
+(defn validate-knotation
+  ([snippet] (validate-knotation (st/latest-env) snippet))
+  ([env snippet]
+   (try
+     (filter identity (api/errors-of (api/read-string :kn env snippet)))
+     (catch Exception e
+       (list [:bad-parse (.getMessage e)])))))
+
+(defn valid-knotation?
+  ([snippet] (valid-knotation? (st/latest-env) snippet))
+  ([env snippet]
+   (empty? (validate-knotation env snippet))))
 
 (defn add-term
   [{:keys [env params session] :as req}]
   (if-let [raw (get params "template-text")]
-    (let [parsed (-parse-template-application env raw)
-          valid? (tmp/valid-application? (:template parsed) (:content-map parsed))]
-      (when (and valid? (auth/logged-in? req))
+    (do
+      (when (and (valid-knotation? raw) (auth/logged-in? req))
         (commit-term! raw (select-keys session [:name :email])))
       (html
        {:session session
@@ -69,14 +75,13 @@
 
 (defn validate-term
   [{:keys [env params session] :as req}]
-  (if-let [raw (get params "template-text")]
+  (if-let [raw (string/replace (get params "template-text") #"\r\n" "\n")]
     (html
      {:session session
       :title "Validate Term"
       :content
-      (let [parsed (-parse-template-application env raw)
-            valid? (tmp/valid-application? (:template parsed) (:content-map parsed))
-            validated (tmp/validate-application (:template parsed) (:content-map parsed))]
+      (let [valid? (valid-knotation? env raw)
+            validated (validate-knotation env raw)]
         [:div
          [:div {:class "col-md-6"}
           [:h3 "Validate Term"]
@@ -87,19 +92,11 @@
                     :value (if valid? "Add Term" "Validate Term")}]]]
          [:div {:class "col-md-6"}
           [:h3 "Validation:"]
-          (when (empty? validated)
-            [:p "Valid"])
-          (when (:warnings validated)
-            [:span
-             [:h4 "Warnings:"]
-             [:ul
-              (map (fn [[k v]]
-                     [:li (name k) " :: " (map (fn [[k v]] (str k " => " v)) v)])
-                   (:warnings validated))]])
-          (when (:errors validated)
+          (if (empty? validated)
+            [:p "Valid"]
             [:span
              [:h4 "Errors:"]
              [:ul
-              (map (fn [[k v]] [:li (name k) " :: " (str (vec v))])
-                   (:errors validated))]])]] )})
+              (map (fn [[k v]] [:li (name k) " :: " v])
+                   validated)]])]])})
     (util/redirect "/ontology")))

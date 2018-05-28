@@ -48,7 +48,18 @@
     :default #(-> % :database-url (string/split #":") second)}
    {:key :connection
     :label "Database connection"
-    :default #(jdbc/get-connection (:database-url %))}])
+    :default #(jdbc/get-connection (:database-url %))}
+
+   {:key :ssh-identity
+    :label "SSH identity"
+    :default (constantly "~/.ssh/id_rsa")}
+   {:key :ssh-passphrase
+    :label "SSH passphrase"
+    :default (constantly nil)}
+
+   {:key :api-key
+    :label "API key"
+    :default (constantly "default-key")}])
 
    ; Older
 
@@ -65,6 +76,9 @@
    ;{:key :ssh-passphrase
    ; :label "SSH passphrase"
    ; :default (constantly nil)}
+   ;{:key :readme
+   ; :label "README file"
+   ; :default #(io/file (str (:absolute-dir %) "/README.md"))}
 
    ;{:key :maps-file
    ; :label "Maps Source File"
@@ -137,6 +151,7 @@
 
 (defn query
   [& args]
+  ;(println "QUERY" args)
   (apply jdbc/query @state args))
 
 (defn select
@@ -153,6 +168,9 @@
       (en/add-prefix "owl" (rdf/owl))
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+      (en/add-prefix "kn" (rdf/kn))
+      (en/add-prefix "knd" (rdf/kn "datatype/"))
+      (en/add-prefix "knp" (rdf/kn "predicate/"))
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn latest-prefix-states
@@ -170,14 +188,17 @@
 
 (defn build-env
   [iris]
-  (->> iris
-       (map #(format "'%s'" %))
-       (string/join ", ")
-       (format "SELECT DISTINCT si, ol FROM states WHERE pi='http://www.w3.org/2000/01/rdf-schema#label' AND si IN (%s)")
-       query
-       (reduce
-        (fn [env row] (en/add-label env (:ol row) (:si row)))
-        (base-env))))
+  (if (first iris)
+    (->> iris
+         (remove nil?)
+         (map #(format "'%s'" %))
+         (string/join ", ")
+         (format "SELECT DISTINCT si, ol FROM states WHERE pi='http://www.w3.org/2000/01/rdf-schema#label' AND si IN (%s)")
+         query
+         (reduce
+          (fn [env row] (en/add-label env (:ol row) (:si row)))
+          (base-env)))
+    (base-env)))
 
 (defn build-env-from-states
   [states]

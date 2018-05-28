@@ -18,18 +18,14 @@
             [com.knocean.knode.pages.ontology.tsv]
             [com.knocean.knode.pages.ontology.edit :as edit]))
 
-; TODO: What does this do?
-(defn with-name [env iri]
-  (ln/iri->name env iri))
-
 (defn subject-by-iri
   [iri]
   (let [env (st/latest-env)
         relevant (st/select (format "si='%s'" iri))]
     (map (fn [statement]
            (if-let [pi (:pi statement)]
-             [(with-name env pi)
-              (with-name env (:oi statement))]
+             [(ln/iri->name env pi)
+              (ln/iri->name env (:oi statement))]
              [:subject (:si statement)]))
          relevant)))
 

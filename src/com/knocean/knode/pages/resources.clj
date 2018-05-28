@@ -37,7 +37,7 @@
   (let [states (st/select
                 (str
                  (when (not= "all" resource) (format "rt='%s' AND " resource))
-                 (format "si='%s'" iri)))]
+                 (format "si='%s' ORDER BY id" iri)))]
     (into
      [:tr]
      (for [[column pi format] headers]

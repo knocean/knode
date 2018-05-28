@@ -68,3 +68,15 @@
          (map
           (fn [p] [:missing-predicate p])
           (set/difference (:predicates template) (set (keys content))))))))))
+
+(defn parse-template-application
+  [env raw-template-input]
+  (let [parsed (string/split-lines raw-template-input)
+        [_ subject] (string/split (second parsed) #": ")
+        template-iri (ln/->iri env subject)
+        template (tmp/template-by-iri template-iri)
+        content (string/join \newline (drop 2 parsed))]
+    {:iri template-iri
+     :template template
+     :content content
+     :content-map (tmp/parse-content content)}))

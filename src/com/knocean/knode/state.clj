@@ -160,6 +160,9 @@
       (en/add-prefix "xsd" (rdf/xsd))
       (en/add-prefix "owl" (rdf/owl))
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+      (en/add-prefix "kn" (rdf/kn))
+      (en/add-prefix "knd" (rdf/kn "datatype/"))
+      (en/add-prefix "knp" (rdf/kn "predicate/"))
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn latest-prefix-states

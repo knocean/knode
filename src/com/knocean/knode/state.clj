@@ -50,6 +50,10 @@
     :label "Database connection"
     :default #(jdbc/get-connection (:database-url %))}
 
+   {:key :git-repo
+    :label "Git repository"
+    :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
+                (git/load-repo r))}
    {:key :ssh-identity
     :label "SSH identity"
     :default (constantly "~/.ssh/id_rsa")}
@@ -59,14 +63,13 @@
 
    {:key :api-key
     :label "API key"
-    :default (constantly "default-key")}])
+    :default (constantly nil)}
+   {:key :write-file
+    :label "Write file"
+    :default (constantly nil)}])
 
    ; Older
 
-   ;{:key :repo
-   ; :label "Git repository"
-   ; :default #(if-let [r (->> % :absolute-dir git/discover-repo)]
-   ;             (git/load-repo r))}
    ;{:key :project-iri
    ; :label "Project IRI"
    ; :default #(str (:root-iri %) "/ontology/" (:project-name %) "_")}
@@ -96,9 +99,6 @@
    ;{:key :build-files
    ; :label "Build files"
    ; :default (constantly "ontology/context.kn ontology/content.kn")}
-   ;{:key :write-file
-   ; :label "Write file"
-   ; :default #(->> % :build-files last)}
    ;{:key :states
    ; :label "Create state"
    ; :default #(let [fs (map (fn [f] (str (:absolute-dir %) "/" f)) (string/split (:build-files %) #" "))]
@@ -157,6 +157,16 @@
 (defn select
   [s]
   (query (str "SELECT * FROM states WHERE " s)))
+
+(def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+
+(defn insert!
+  [states]
+  (->> states
+       (filter :pi)
+       (map (apply juxt columns))
+       (#(do (println %) %))
+       (jdbc/insert-multi! @state "states" columns)))
 
 (defn latest-env []
   (-> (format "rt='%s'" (:project-name @state))

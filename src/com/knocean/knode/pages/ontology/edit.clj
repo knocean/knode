@@ -4,6 +4,7 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
+            [org.knotation.state :as knst]
             [org.knotation.link :as ln]
             [org.knotation.api :as api]
 
@@ -20,20 +21,20 @@
     nil))
 
 (defn commit-term!
-  [valid-kn user]
+  [stanza user]
   (let [st @state
         id {:name (:ssh-identity st) :exclusive true}]
     (spit
      (str (:absolute-dir st) "/" (:write-file st))
-     (str \newline \newline valid-kn \newline) :append true)
-    (git/git-add (:repo st) (:write-file st))
-    (git/git-commit
-     (:repo st) "Add new term" user)
-    (git/with-identity 
-      (if-let [pass (:ssh-passphrase st)]
-        (assoc id :passphrase pass) id)
-      (git/git-push (:repo st)))
-    (update-state! valid-kn)
+     (str \newline stanza \newline)
+     :append true)
+    (git/git-add (:git-repo st) (:write-file st))
+    (git/git-commit (:git-repo st) "Add new term" user)
+    ;(git/with-identity
+    ;  (if-let [pass (:ssh-passphrase st)]
+    ;    (assoc id :passphrase pass) id)
+    ;  (git/git-push (:git-repo st)))
+    ;(update-state! valid-kn)
     nil))
 
 ;; (valid-knotation? ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
@@ -54,24 +55,57 @@
   ([env snippet]
    (empty? (validate-knotation env snippet))))
 
+(defn next-iri
+  [resource base-iri]
+  (->> (format "SELECT DISTINCT si FROM states WHERE rt='%s' and si LIKE '%s%%'" resource base-iri)
+       st/query
+       (map :si)
+       (map #(last (string/split % #"_")))
+       (map #(try (Integer/parseInt %) (catch Exception e nil)))
+       (filter int?)
+       (apply max)
+       inc
+       (format (str base-iri "%07d"))))
+
+; TODO: Generalize
 (defn add-term
   [{:keys [env params session] :as req}]
-  (if-let [raw (get params "template-text")]
-    (do
-      (when (and (valid-knotation? raw) (auth/logged-in? req))
-        (commit-term! raw (select-keys session [:name :email])))
-      (html
-       {:session session
-        :title "Add Term"
-        :content
-        [:div
-         [:div {:class "col-md-6"}
-          [:h3 "Add Term"]
-          [:script {:type "text/javascript" :src "/js/knode.js"}]
-          [:textarea {:id "editor" :rows "6" :name "template-text"} raw]]
-         [:div {:class "col-md-6"}
-          [:h2 "Term Added!"]]]}))
-    (util/redirect "/ontology/validate-term")))
+  (if (get @state :api-key)
+    (if (get @state :write-file)
+      (if-let [api-key (get-in req [:headers "x-api-key"])]
+        (if (= api-key (get @state :api-key))
+          (if-let [body (when (:body req) (slurp (:body req)))]
+            (let [iri (next-iri "ONTIE" "https://ontology.iedb.org/ontology/ONTIE_")
+                  stanza (str ": " iri "\n" body)
+                  states (try
+                           (api/read-string :kn (st/latest-env) stanza)
+                           (catch Exception e
+                             [{::knst/error {:bad-parse (.getMessage e)}}]))
+                  errors (filter ::knst/error states)]
+              (if (first errors)
+                {:status 400
+                 :body (->> errors
+                            (map #(dissoc % ::en/env :input))
+                            (map str)
+                            (string/join "\n")
+                            (str "ERROR(S):\n"))}
+                (do
+                  (->> states
+                       (map #(assoc % :rt "ONTIE"))
+                       st/insert!)
+                  (commit-term! stanza nil)
+                  {:status 201
+                   :body iri})))
+            {:status 400
+             :body "ERROR: Term content required"})
+          {:status 403
+           :body "ERROR: API key not authorized"})
+        {:status 403
+         :body "ERROR: API key required"})
+      {:status 403
+       :body "ERROR: Server not configured with a write-file"})
+    {:status 403
+     :body "ERROR: Server not configured with an API key"}))
 
 (defn validate-term
   [{:keys [env params session] :as req}]

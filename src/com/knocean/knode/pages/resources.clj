@@ -34,7 +34,10 @@
 
 (defn iri->seq
   [resource env headers iri]
-  (let [states (st/select (format "si='%s'" iri))]
+  (let [states (st/select
+                (str
+                 (when (not= "all" resource) (format "rt='%s' AND " resource))
+                 (format "si='%s'" iri)))]
     (into
      [:tr]
      (for [[column pi format] headers]
@@ -218,30 +221,54 @@
          (Integer/parseInt))
     (catch Exception e 0)))
 
-(def ignore-keys [:resource "compact" "select" "limit" "offset" "order" "format"])
+(def ignore-keys [:resource "IRI" "CURIE" "show-headers" "compact" "select" "limit" "offset" "order" "format" "method"])
+
+(defn build-condition-object
+  [value]
+  (let [[obj value] (if (.startsWith value "iri.")
+                      ["oi" (subs value 4)]
+                      ["ol" value])]
+    (str
+     obj
+     (cond
+       (.startsWith value "eq.")
+       (format "='%s'" (subs value 3))
+       (.startsWith value "like.")
+       (format " LIKE '%s'" (-> value (subs 5) (string/replace "*" "%")))
+       :else
+       (throw (Exception. (str "Unhandled query parameter: " value)))))))
+
+(defn build-condition
+  [env column value]
+  (case column
+    "iri"  (if (re-matches #"in\.\(.*\)" value)
+             (->> (string/split (subs value 4 (dec (count value))) #",")
+                  (string/split #",")
+                  (map string/trim)
+                  (map #(str "'" % "'"))
+                  (string/join ", ")
+                  (format "si IN (%s)"))
+             (throw (Exception. (str "Unhandled query value for 'iri': " value))))
+    "curie"  (if (re-matches #"in\.\(.*\)" value)
+               (->> (string/split (subs value 4 (dec (count value))) #",")
+                    (map string/trim)
+                    (map (partial ln/curie->iri env))
+                    (map #(str "'" % "'"))
+                    (string/join ", ")
+                    (format "si IN (%s)"))
+               (throw (Exception. (str "Unhandled query value for 'curie': " value))))
+    "any" (build-condition-object value)
+    (let [pi (ln/label->iri env column)]
+      (when-not pi
+        (throw (Exception. (str "Unknown column: " column))))
+      (str
+       (when pi (format "pi='%s' AND " pi))
+       (build-condition-object value)))))
 
 (defn build-query
   [env resource conditions]
   (->> (apply dissoc conditions ignore-keys)
-       (map
-        (fn [[column value]]
-          (let [pi (ln/label->iri env column)
-                [obj value] (if (.startsWith value "iri.")
-                              ["oi" (subs value 4)]
-                              ["ol" value])]
-            (when (and (not= column "any") (nil? pi))
-              (throw (Exception. (str "Unknown column: " column))))
-            (str
-             (when pi (format "pi='%s' AND " pi))
-             obj
-             (cond
-               (.startsWith value "eq.")
-               (format "='%s'" (subs value 3))
-               (.startsWith value "like.")
-               (format " LIKE '%s'" (-> value (subs 5) (string/replace "*" "%")))
-
-               :else
-               (throw (Exception. (str "Unhandled query parameter: " value))))))))
+       (map (partial apply build-condition env))
        (concat [(when (not= resource "all") (format "rt='%s'" resource))])
        (remove nil?)
        (interpose "AND")
@@ -374,21 +401,52 @@ return false" this-select)}
 ; TODO: This is just for more convenient REPL reloading
 (defn inner-subjects-page
   [{:keys [params query-params] :as req}]
-  (let [env (st/latest-env)
+  (let [req (assoc req :body-string (when (:body req) (-> req :body slurp)))
+        env (st/latest-env)
         file-format (get params "format" "html")
         show-headers? (not (= (get params "show-headers") "false"))
         resource (get params :resource "all")
         resource-map (get-resource-entry resource)
         compact (= (get params "compact") "true")
         default (if compact :CURIE :IRI)
-        query (build-query env resource params)
-        iris (map :si (st/query query))
+        specified-iris
+        (cond
+          (find params "IRI")
+          (let [value (get params "IRI")]
+            (if-let [[_ value] (re-matches #"in\.\((.*)\)" value)]
+              (->> (string/split value #",")
+                   (map string/trim))
+              (throw (Exception. (str "Unhandled query value for 'IRI': " value)))))
+          (find params "CURIE")
+          (let [value (get params "CURIE")]
+            (if-let [[_ value] (re-matches #"in\.\((.*)\)" value)]
+              (->> (string/split value #",")
+                   (map string/trim)
+                   (map (partial ln/curie->iri env)))
+              (throw (Exception. (str "Unhandled query value for 'CURIE': " value)))))
+          (and (= :post (:request-method req))
+               (= "GET" (get-in req [:params "method"]))
+               (:body-string req))
+          (let [lines (->> req :body-string string/split-lines (map string/trim))]
+            (case (first lines)
+              "IRI" (rest lines)
+              "CURIE" (map (partial ln/curie->iri env) (rest lines))
+              (throw (Exception. (str "Unhandled POST body column: " (first lines)))))))
+        iris (or specified-iris
+                 (->> (build-query env resource params)
+                      st/query
+                      (map :si)))
+        curie-column (when (:body-string req)
+                       (->> req :body-string string/split-lines first string/trim (= "CURIE")))
         headers (if-let [select (get params "select")]
                   (tsv/parse-tsv-select env compact select)
-                  [(if compact ["CURIE" nil :CURIE] ["IRI" nil :IRI])
-                   ["label" (rdf/rdfs "label") :label]
-                   ["obsolete" (rdf/owl "deprecated") :boolean]
-                   ["replacement" "http://purl.obolibrary.org/obo/IAO_0100001" default]])]
+                  (remove
+                   nil?
+                   [(if (or compact curie-column) ["CURIE" nil :CURIE] ["IRI" nil :IRI])
+                    ["label" (rdf/rdfs "label") :label]
+                    (when specified-iris ["recognized" nil :boolean])
+                    ["obsolete" (rdf/owl "deprecated") :boolean]
+                    ["replacement" "http://purl.obolibrary.org/obo/IAO_0100001" default]]))]
     (case file-format
       "tsv"
       {:headers
@@ -521,10 +579,20 @@ return false" this-select)}
   [req]
   (inner-predicates-page req))
 
+; TODO: This is just for more convenient REPL reloading
+(defn inner-term-status-page
+  [{:keys [params query-params] :as req}]
+  (html {:content [:h2 "Term Status"]}))
+
+(defn term-status-page
+  [req]
+  (inner-term-status-page req))
+
 (def routes
   [["/resources" resources-page]
    ["/resources/" resources-page]
    [["/resources/" :resource] resource-page]
    [["/resources/" :resource "/subject"] subject-page]
    [["/resources/" :resource "/subjects"] subjects-page]
-   [["/resources/" :resource "/predicates"] predicates-page]])
+   [["/resources/" :resource "/predicates"] predicates-page]
+   [["/resources/" :resource "/term-status"] term-status-page]])

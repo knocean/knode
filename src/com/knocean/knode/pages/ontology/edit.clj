@@ -29,7 +29,7 @@
      (str \newline stanza \newline)
      :append true)
     (git/git-add (:git-repo st) (:write-file st))
-    (git/git-commit (:git-repo st) "Add new term" user)
+    (git/git-commit (:git-repo st) "Add new term"); user)
     ;(git/with-identity
     ;  (if-let [pass (:ssh-passphrase st)]
     ;    (assoc id :passphrase pass) id)
@@ -70,8 +70,8 @@
 ; TODO: Generalize
 (defn add-term
   [{:keys [env params session] :as req}]
-  (if (get @state :api-key)
-    (if (get @state :write-file)
+  (if (get @state :write-file)
+    (if (get @state :api-key)
       (if-let [api-key (get-in req [:headers "x-api-key"])]
         (if (= api-key (get @state :api-key))
           (if-let [body (when (:body req) (slurp (:body req)))]
@@ -98,14 +98,14 @@
                    :body iri})))
             {:status 400
              :body "ERROR: Term content required"})
-          {:status 403
+          {:status 401
            :body "ERROR: API key not authorized"})
         {:status 403
          :body "ERROR: API key required"})
       {:status 403
-       :body "ERROR: Server not configured with a write-file"})
-    {:status 403
-     :body "ERROR: Server not configured with an API key"}))
+       :body "ERROR: Server not configured with an API key"})
+    {:status 405
+     :body "ERROR: Server not configured with a write-file"}))
 
 (defn validate-term
   [{:keys [env params session] :as req}]

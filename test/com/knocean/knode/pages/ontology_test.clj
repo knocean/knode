@@ -78,7 +78,7 @@
   (s/and
    ::successful-response
    #(= (get-in % [:headers "Content-Type"]) "text/html; charset=utf-8")))
-(deftest test-HTML-result-basics (basic-format-test "text/html" "html" ::html-success))
+;(deftest test-HTML-result-basics (basic-format-test "text/html" "html" ::html-success))
 
 (s/def ::json-success
   (s/and ::successful-response
@@ -86,119 +86,121 @@
          #(not (empty? (:body %)))
          #(any? (json/decode (:body %)))))
 (comment
- (deftest test-JSON-result-basics (basic-format-test "application/json" "json" ::json-success)))
+  (deftest test-JSON-result-basics (basic-format-test "application/json" "json" ::json-success)))
 
 (s/def ::tsv-success
   (s/and
    ::successful-response
    #(= (get-in % [:headers "Content-Type"]) "text/tab-separated-values; charset=utf-8")))
 
-(deftest test-TSV-result-basics (basic-format-test "text/tab-separated-values" "tsv" ::tsv-success))
+;(deftest test-TSV-result-basics (basic-format-test "text/tab-separated-values" "tsv" ::tsv-success))
 
 (comment
- (deftest test-TSV-result-specifics
-  (testing "the SELECT option can restrict/expand default fields in the result"
-    (is (= "CURIE\tlabel\nex:0033333\tsample feather 33333"
-           (:body
-            (->result
-             (assoc
-              dummy-req :params {"format" "tsv" "select" "CURIE,label"}
-              :requested-iris ["https://example.com/0033333"]))))))
-  (testing "The compact=true option doesn't reduce the `label`  predicate to a `CURIE` in output"
-    (is (= "CURIE\tlabel\nex:0033333\tsample feather 33333"
-           (:body
-            (->result
-             (assoc
-              dummy-req :params {"format" "tsv" "select" "CURIE,label" "compact" "true"}
-              :requested-iris ["https://example.com/0033333"]))))))))
+  (deftest test-TSV-result-specifics
+    (testing "the SELECT option can restrict/expand default fields in the result"
+      (is (= "CURIE\tlabel\nex:0033333\tsample feather 33333"
+             (:body
+              (->result
+               (assoc
+                dummy-req :params {"format" "tsv" "select" "CURIE,label"}
+                :requested-iris ["https://example.com/0033333"]))))))
+    (testing "The compact=true option doesn't reduce the `label`  predicate to a `CURIE` in output"
+      (is (= "CURIE\tlabel\nex:0033333\tsample feather 33333"
+             (:body
+              (->result
+               (assoc
+                dummy-req :params {"format" "tsv" "select" "CURIE,label" "compact" "true"}
+                :requested-iris ["https://example.com/0033333"]))))))))
 
-(deftest test-TSV-multiple-results
-  (testing "Baic multi-result level test for TSV format"
-    (let [iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
-          success? (fn [& {:keys [] :as req}]
-                     (let [res (->result (merge dummy-req req))]
-                       (is (s/valid? ::tsv-success res))
-                       (doseq [iri iris] (is (.contains (:body res) iri)))))]
-      (testing (str "Specified via `accept` header returns tsv response")
-        (success? :headers {"accept" "text/tab-separated-values"} :requested-iris iris))
-      (testing (str "Specified via format parameter header returns tsv response")
-        (success? :headers {} :params {"format" "tsv"} :requested-iris iris))
-      (testing (str "Specified via output-format parameter header returns tsv response")
-        (success? :headers {} :params {"output-format" "tsv"} :requested-iris iris))
-      (testing (str "Specified via file suffix returns tsv response")
-        (success? :headers {} :params {} :uri (str "/ontology." "tsv") :requested-iris iris)))))
+(comment
+  (deftest test-TSV-multiple-results
+    (testing "Baic multi-result level test for TSV format"
+      (let [iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
+            success? (fn [& {:keys [] :as req}]
+                       (let [res (->result (merge dummy-req req))]
+                         (is (s/valid? ::tsv-success res))
+                         (doseq [iri iris] (is (.contains (:body res) iri)))))]
+        (testing (str "Specified via `accept` header returns tsv response")
+          (success? :headers {"accept" "text/tab-separated-values"} :requested-iris iris))
+        (testing (str "Specified via format parameter header returns tsv response")
+          (success? :headers {} :params {"format" "tsv"} :requested-iris iris))
+        (testing (str "Specified via output-format parameter header returns tsv response")
+          (success? :headers {} :params {"output-format" "tsv"} :requested-iris iris))
+        (testing (str "Specified via file suffix returns tsv response")
+          (success? :headers {} :params {} :uri (str "/ontology." "tsv") :requested-iris iris))))))
 
 (s/fdef parse-request-terms
         :args (s/cat :env ::env :req (s/keys :req-un [::params ::uri]))
         :ret seq?)
 
 (comment
- (deftest test-term-parsing
-  (testing "Parses main term"
-    (testing "Gets main term from `iri` parameter"
-      (is (= ["https://example.com/0033333"]
+  (deftest test-term-parsing
+    (testing "Parses main term"
+      (testing "Gets main term from `iri` parameter"
+        (is (= ["https://example.com/0033333"]
+               (parse-request-terms
+                env {:params {"iri" "https://example.com/0033333"}
+                     :uri "/ontology"}))))
+      (testing "Gets term from path var label or CURIE"
+        (is (= ["https://example.com/0033333"]
+               (parse-request-terms
+                env {:params {} :uri "/ontology/ex:0033333"})))
+        (is (= ["https://example.com/0033333"]
+               (parse-request-terms
+                env {:params {} :uri "/ontology/sample feather 33333"}))))
+      (testing "Gives a higher priority to `iri` parameter")
+      (is (= ["https://example.com/0033332"]
              (parse-request-terms
-              env {:params {"iri" "https://example.com/0033333"}
-                   :uri "/ontology"}))))
-    (testing "Gets term from path var label or CURIE"
-      (is (= ["https://example.com/0033333"]
-             (parse-request-terms
-              env {:params {} :uri "/ontology/ex:0033333"})))
-      (is (= ["https://example.com/0033333"]
-             (parse-request-terms
-              env {:params {} :uri "/ontology/sample feather 33333"}))))
-    (testing "Gives a higher priority to `iri` parameter")
-    (is (= ["https://example.com/0033332"]
-           (parse-request-terms
-            env {:params {"iri" "https://example.com/0033332"}
-                 :uri "/ontology/sample feather 33333"}))))
+              env {:params {"iri" "https://example.com/0033332"}
+                   :uri "/ontology/sample feather 33333"}))))
 
-  (testing "Parses terms from parameters"
-    (let [iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
-          curies ["ex:0033333" "ex:0033332" "ex:0033331"]]
-      (testing "Gets terms from `CURIE` parameter"
-        (is (= (take 1 iris)
-               (parse-request-terms
-                env {:params {"CURIE" (str "eq." (first curies))} :uri "/ontology"})))
-        (is (= iris
-               (parse-request-terms
-                env {:params {"CURIE" (str "in." (string/join " " curies))} :uri "/ontology"}))))
-      (testing "Gets terms from `IRI` parameter"
-        (is (= (take 1 iris)
-               (parse-request-terms
-                env {:params {"IRI" (str "eq." (first iris))} :uri "/ontology"})))
-        (is (= iris
-               (parse-request-terms
-                env {:params {"IRI" (str "in." (string/join " " iris))} :uri "/ontology"}))))))))
+    (testing "Parses terms from parameters"
+      (let [iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
+            curies ["ex:0033333" "ex:0033332" "ex:0033331"]]
+        (testing "Gets terms from `CURIE` parameter"
+          (is (= (take 1 iris)
+                 (parse-request-terms
+                  env {:params {"CURIE" (str "eq." (first curies))} :uri "/ontology"})))
+          (is (= iris
+                 (parse-request-terms
+                  env {:params {"CURIE" (str "in." (string/join " " curies))} :uri "/ontology"}))))
+        (testing "Gets terms from `IRI` parameter"
+          (is (= (take 1 iris)
+                 (parse-request-terms
+                  env {:params {"IRI" (str "eq." (first iris))} :uri "/ontology"})))
+          (is (= iris
+                 (parse-request-terms
+                  env {:params {"IRI" (str "in." (string/join " " iris))} :uri "/ontology"}))))))))
 
 (s/fdef parse-body-terms
         :args (s/keys :req-un [::request-method ::params ::body])
         :ret seq?)
 
-(deftest test-parsing-body-terms
-  (let [->body (fn [lines] (java.io.StringReader. (string/join \newline lines)))
-        iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
-        curies ["ex:0033333" "ex:0033332" "ex:0033331"]]
-    (testing "Parses terms from POST body"
-      (testing "Only gets terms from POST body when the request is a POST with parameter `method` set to GET"
-        (is (empty?
-             (parse-body-terms
-              {:params {}
-               :request-method :post
-               :body (->body (cons "IRI" iris))})))
-        (is (empty?
-             (parse-body-terms
-              {:params {"method" "GET"}
-               :request-method :get
-               :body (->body (cons "IRI" iris))}))))
-      (testing "Gets terms from TSV POST body"
-        (is (= iris
+(comment
+  (deftest test-parsing-body-terms
+    (let [->body (fn [lines] (java.io.StringReader. (string/join \newline lines)))
+          iris ["https://example.com/0033333" "https://example.com/0033332" "https://example.com/0033331"]
+          curies ["ex:0033333" "ex:0033332" "ex:0033331"]]
+      (testing "Parses terms from POST body"
+        (testing "Only gets terms from POST body when the request is a POST with parameter `method` set to GET"
+          (is (empty?
                (parse-body-terms
-                {:params {"method" "GET"}
+                {:params {}
                  :request-method :post
                  :body (->body (cons "IRI" iris))})))
-        (is (= iris
+          (is (empty?
                (parse-body-terms
                 {:params {"method" "GET"}
-                 :request-method :post
-                 :body (->body (cons "IRI" iris))})))))))
+                 :request-method :get
+                 :body (->body (cons "IRI" iris))}))))
+        (testing "Gets terms from TSV POST body"
+          (is (= iris
+                 (parse-body-terms
+                  {:params {"method" "GET"}
+                   :request-method :post
+                   :body (->body (cons "IRI" iris))})))
+          (is (= iris
+                 (parse-body-terms
+                  {:params {"method" "GET"}
+                   :request-method :post
+                   :body (->body (cons "IRI" iris))}))))))))

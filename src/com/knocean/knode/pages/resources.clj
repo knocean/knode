@@ -67,7 +67,7 @@
 
 (defn resource-entry
   [{:keys [label title description homepage]}]
-  [:div
+  [:div.resource
    [:h3 [:a {:href (str "/resources/" label)} title]]
    [:p description]
    (when homepage [:p [:a {:href homepage} homepage]])])
@@ -88,7 +88,7 @@
     (html
      {:title (:title resource)
       :content
-      [:div
+      [:div.resource
        [:h2 (:title resource)]
        (when-let [description (:description resource)] [:p description])
        [:ul
@@ -157,7 +157,7 @@
         (html
          {:title (ln/iri->name env iri)
           :content
-          [:div
+          [:div.subject
            [:h2 (ln/iri->name env iri)]
            [:p [:b "IRI:"] " " [:a {:href iri} iri]]
            [:p "Showing data from "
@@ -579,20 +579,10 @@ return false" this-select)}
   [req]
   (inner-predicates-page req))
 
-; TODO: This is just for more convenient REPL reloading
-(defn inner-term-status-page
-  [{:keys [params query-params] :as req}]
-  (html {:content [:h2 "Term Status"]}))
-
-(defn term-status-page
-  [req]
-  (inner-term-status-page req))
-
 (def routes
   [["/resources" resources-page]
    ["/resources/" resources-page]
    [["/resources/" :resource] resource-page]
    [["/resources/" :resource "/subject"] subject-page]
    [["/resources/" :resource "/subjects"] subjects-page]
-   [["/resources/" :resource "/predicates"] predicates-page]
-   [["/resources/" :resource "/term-status"] term-status-page]])
+   [["/resources/" :resource "/predicates"] predicates-page]])

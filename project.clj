@@ -14,6 +14,7 @@
                  [com.cemerick/url "0.1.1"]
                  [bidi "2.1.3"]
                  [hiccup "1.0.5"]
+                 [enlive "1.1.6"]
                  [org.apache.jena/jena-core "3.7.0"]
                  [org.apache.jena/jena-arq "3.7.0"]
                  [org.apache.jena/jena-iri "3.7.0"]

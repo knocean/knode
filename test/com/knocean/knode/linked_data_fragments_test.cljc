@@ -27,17 +27,17 @@
         :ret ::object)
 
 (comment
- (deftest test-string->object
-  (testing "Defaults to assuming IRI"
-    (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
-    (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
-  (testing "Deals with pointied IRIs"
-    (is (= {:oi "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
-  (testing "Deals with quoted strings"
-    (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
-    (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
-    (is (= {:ol "Foo" :di "http://example.com/string"}
-           (ldf/string->object "\"Foo\"^^<http://example.com/string>"))))))
+  (deftest test-string->object
+    (testing "Defaults to assuming IRI"
+      (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
+      (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
+    (testing "Deals with pointied IRIs"
+      (is (= {:oi "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
+    (testing "Deals with quoted strings"
+      (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
+      (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
+      (is (= {:ol "Foo" :di "http://example.com/string"}
+             (ldf/string->object "\"Foo\"^^<http://example.com/string>"))))))
 
 (s/def ::gi ::full-string) (s/def ::si ::full-string) (s/def ::pi ::full-string)
 (s/def ::sb ::full-string) (s/def ::ob ::full-string)
@@ -92,7 +92,7 @@
 (deftest test-matches-query?
   (testing "Nonexistent slots match anything"
     (doseq [e (gen/sample (s/gen ::entry))]
-      (is (ldf/matches-query? {} e) )))
+      (is (ldf/matches-query? {} e))))
   (testing "Slots with values match literally"
     (is (ldf/matches-query?
          {:gi "foo" :si "bar"}
@@ -112,7 +112,7 @@
 (s/def ::items coll?)
 (s/def ::paginated (s/keys :req-un [::total ::per-page ::page ::items]))
 
-(s/fdef ldf/paginated 
+(s/fdef ldf/paginated
         :args (s/cat :per-page ::per-page :page ::page :seq ::items)
         :ret ::object)
 

@@ -160,12 +160,16 @@
 
 (def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
 
+(defn execute!
+  [query]
+  (jdbc/execute! @state query))
+
 (defn insert!
   [states]
   (->> states
        (filter :pi)
        (map (apply juxt columns))
-       (#(do (println %) %))
+       ;(#(do (println %) %))
        (jdbc/insert-multi! @state "states" columns)))
 
 (defn latest-env []

@@ -50,6 +50,7 @@
     [["" (bring/redirect "/")]
      ["/" #(render-doc % "/README.md")]
      ["/index.html" (bring/redirect "/")]
+     ["/doc" (bring/redirect "/doc/index.html")]
      ["/doc/" (bring/redirect "/doc/index.html")]
      ["/doc/index.html" #(render-doc % "/doc/index.md")]
      ["/doc/api.html" #(render-doc % "/doc/api.md")]

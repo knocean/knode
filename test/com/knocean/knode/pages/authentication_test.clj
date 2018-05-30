@@ -22,14 +22,14 @@
 (defn a-req []
   (gen/generate (s/gen ::authed-req)))
 
-(deftest test-logged-in?
-  (testing "Returns true when given a map with a session that contains :name, :email and :id slots"
-    (is (auth/logged-in? (a-req))))
-  (testing "Returns false when given a map with no session"
-    (is (not (auth/logged-in? (dissoc (a-req) :session)))))
-  (testing "Returns false when given a session that doesn't contain all three necessary keys"
-    (doseq [k [:name :email :id]]
-      (is (not (auth/logged-in? (update-in (a-req) [:session] #(dissoc % k))))))))
+;(deftest test-logged-in?
+;  (testing "Returns true when given a map with a session that contains :name, :email and :id slots"
+;    (is (auth/logged-in? (a-req))))
+;  (testing "Returns false when given a map with no session"
+;    (is (not (auth/logged-in? (dissoc (a-req) :session)))))
+;  (testing "Returns false when given a session that doesn't contain all three necessary keys"
+;    (doseq [k [:name :email :id]]
+;      (is (not (auth/logged-in? (update-in (a-req) [:session] #(dissoc % k))))))))
 
 ;; TODO - adding these tests involves centralizing specs somewhere. (We'd otherwise have to re-define ::request here
 ;; (deftest test-logged-in-only?
@@ -42,4 +42,3 @@
 ;;       (testing "Wrapped function returns a 400 response otherwise"
 ;;         (let [req (dissoc (a-req) :session)]
 ;;           (is (= 400 (:status ((auth/logged-in-only f) req)))))))))
-

@@ -48,12 +48,20 @@
        (< 0)
        is))
 
+(defn select
+  [selector doc]
+  (html/select doc selector))
+
 (defn unpack-link
   [node]
   [(get-in node [:attrs :href]) (html/text node)])
 
 (deftest test-resources-page
-  (let [doc (html/html-snippet (:body (res/resources-page {})))]
+  (let [doc
+        (->> {}
+             res/resources-page
+             :body
+             html/html-snippet)]
     (->> (html/select doc [:.resource :a])
          (map unpack-link)
          (= [["/resources/all" "All Resources"]
@@ -62,7 +70,11 @@
          is)))
 
 (deftest test-resource-page
-  (let [doc (html/html-snippet (:body (res/resource-page {:params {:resource "example"}})))]
+  (let [doc
+        (->> {:params {:resource "example"}}
+             res/resource-page
+             :body
+             html/html-snippet)]
     (->> (html/select doc [:.resource :a])
          (map unpack-link)
          (= [["/resources/example/subjects" "Subjects"]
@@ -73,18 +85,26 @@
          is)))
 
 (deftest test-subject-page
-  (is (= "IRI	label	recognized	obsolete	replacement
+  (->> {:uri ""
+        :params
+        {:resource "example"
+         "iri" "https://example.com/0000111"
+         "format" "tsv"}}
+       res/subject-page
+       :body
+       (= "IRI	label	recognized	obsolete	replacement
 https://example.com/0000111	barn owl primary remex feather	true		
-"
-         (:body
-          (res/subject-page
-           {:uri ""
-            :params
-            {:resource "example"
-             "iri" "https://example.com/0000111"
-             "format" "tsv"}}))))
+")
+       is)
 
-  (is (= "@prefix owl: <http://www.w3.org/2002/07/owl#> .
+  (->> {:uri ""
+        :params
+        {:resource "example"
+         "iri" "https://example.com/0000111"
+         "format" "ttl"}}
+       res/subject-page
+       :body
+       (= "@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix knd: <https://knotation.org/datatype/> .
 @prefix example: <https://ontology.iedb.org/ontology/ONTIE_> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -100,16 +120,16 @@ https://example.com/0000111	barn owl primary remex feather	true
   rdf:type owl:Class ;
   obo:IAO_0000115 \"A primary remex feather of a barn owl\" ;
   obo:IAO_0000118 \"grange hibou primaire remex plume\"@fr .
-"
-         (:body
-          (res/subject-page
-           {:uri ""
-            :params
-            {:resource "example"
-             "iri" "https://example.com/0000111"
-             "format" "ttl"}}))))
+")
+       is)
 
-  (let [doc (html/html-snippet (:body (res/subject-page {:params {:resource "example" "iri" "https://example.com/0000111"}})))]
+  (let [doc
+        (->> {:params
+              {:resource "example"
+               "iri" "https://example.com/0000111"}}
+             res/subject-page
+             :body
+             html/html-snippet)]
     (->> (html/select doc [:.subject :a])
          (map unpack-link)
          (= [["https://example.com/0000111" "https://example.com/0000111"]

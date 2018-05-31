@@ -35,6 +35,7 @@
     ;    (assoc id :passphrase pass) id)
     ;  (git/git-push (:git-repo st)))
     ;(update-state! valid-kn)
+    (st/clear-env-cache!)
     nil))
 
 ;; (valid-knotation? ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")

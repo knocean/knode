@@ -9,7 +9,6 @@
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.authentication :as auth]
             [com.knocean.knode.pages.html :refer [html]]
-            [com.knocean.knode.pages.resources :as res]
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
@@ -98,44 +97,43 @@
      ;       (filter :pi)
      ;       (map #(render-pair-row (::en/env %) %))))]]))
 
-(defn term-list
-  [{:keys [requested-iris env params session] :as req}]
-  (let [iris (if (first requested-iris) requested-iris (base/all-subjects))]
-    (html
-     {:session session
-      :title (:project-name @state)
-      :content
-      [:div
-           ;(when (auth/logged-in? req)
-           ;  (list [:div {:class "col-md-6"}
-           ;         [:h3 "Add Term"]
-           ;         [:script {:type "text/javascript" :src "/js/knode.js"}]
-           ;         [:form {:method "POST" :action "/ontology/validate-term"}
-           ;          [:textarea {:id "editor" :rows "6" :name "template-text"}
-           ;           (tmp/template-dummy (tmp/template-by-iri (first (tmp/list-templates))))]
-           ;          [:input {:class "btn btn-primary" :type "submit" :value "Validate Term"}]]]
-           ;        [:div {:class "col-md-6"}
-           ;         [:p "Templates " [:i "(required predicates)"] ":"]
-           ;         [:ul
-           ;          (map
-           ;           (fn [iri]
-           ;             (let [t (tmp/template-by-iri iri)]
-           ;               [:li (:name t) [:i " (" (string/join ", " (:predicates t)) ")"]]))
-           ;           (tmp/list-templates))]])
-       [:h3 "Term List"]
-       [:p
-        "Other formats: "
-        [:a {:href (str "/ontology/" (:project-name @state) ".ttl")} "Turtle (ttl)"]
-        ", "
-        [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
-        "."]
-       [:ul (map (fn [s] [:li (render-subject env s)]) iris)]]})))
-
 (defmethod ontology-result "html"
   [{:keys [requested-iris env params session] :as req}]
-  (if (= 1 (count requested-iris))
-    (-> req
-        (assoc :iri (first requested-iris))
-        (assoc-in [:params :resource] (:project-name @state))
-        res/subject-page)
-    (term-list req)))
+  (html
+   (case (count requested-iris)
+     0 {:session session
+        :title (:project-name @state)
+        :content
+        [:div
+         (when (auth/logged-in? req)
+           (list [:div {:class "col-md-6"}
+                  [:h3 "Add Term"]
+                  [:script {:type "text/javascript" :src "/js/knode.js"}]
+                  [:form {:method "POST" :action "/ontology/validate-term"}
+                   [:input {:type "hidden" :name "api-key" :value (str (get params "api-key"))}]
+                   [:textarea {:id "editor" :rows "6" :name "template-text"}
+                    (tmp/template-dummy (tmp/template-by-iri (first (tmp/list-templates))))]
+                   [:input {:class "btn btn-primary" :type "submit" :value "Validate Term"}]]]
+                 [:div {:class "col-md-6"}
+                  [:p "Templates " [:i "(required predicates)"] ":"]
+                  [:ul
+                   (map
+                    (fn [iri]
+                      (let [t (tmp/template-by-iri iri)]
+                        [:li (:name t) [:i " (" (string/join ", " (:predicates t)) ")"]]))
+                    (tmp/list-templates))]]))
+         [:h3 "Term List"]
+         [:p
+          "Other formats: "
+          [:a {:href (str "/ontology/" (:project-name @state) ".ttl")} "Turtle (ttl)"]
+          ", "
+          [:a {:href (str "/ontology/" (:project-name @state) ".tsv")} "TSV (tsv)"]
+          "."]
+         [:ul (map (fn [s] [:li (render-subject env s)])
+                   (base/all-subjects))]]}
+     1 {:session session
+        :title (ln/iri->name env (first requested-iris))
+        :content (render-subject-html (first requested-iris))}
+     {:session session
+      :title (:project-name @state)
+      :content (map render-subject-html requested-iris)})))

@@ -172,20 +172,26 @@
        ;(#(do (println %) %))
        (jdbc/insert-multi! @state "states" columns)))
 
+(def -env-cache (atom nil))
+(defn clear-env-cache! []
+  (reset! -env-cache nil))
 (defn latest-env []
-  (-> (format "rt='%s'" (:project-name @state))
-      select
-      kn/collect-env
-      (en/add-prefix "rdf" (rdf/rdf))
-      (en/add-prefix "rdfs" (rdf/rdfs))
-      (en/add-prefix "xsd" (rdf/xsd))
-      (en/add-prefix "owl" (rdf/owl))
-      (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-      (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
-      (en/add-prefix "kn" (rdf/kn))
-      (en/add-prefix "knd" (rdf/kn "datatype/"))
-      (en/add-prefix "knp" (rdf/kn "predicate/"))
-      (en/add-prefix (:project-name @state) (:base-iri @state))))
+  (or @-env-cache
+      (reset!
+       -env-cache
+       (-> (format "rt='%s'" (:project-name @state))
+           select
+           kn/collect-env
+           (en/add-prefix "rdf" (rdf/rdf))
+           (en/add-prefix "rdfs" (rdf/rdfs))
+           (en/add-prefix "xsd" (rdf/xsd))
+           (en/add-prefix "owl" (rdf/owl))
+           (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
+           (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+           (en/add-prefix "kn" (rdf/kn))
+           (en/add-prefix "knd" (rdf/kn "datatype/"))
+           (en/add-prefix "knp" (rdf/kn "predicate/"))
+           (en/add-prefix (:project-name @state) (:base-iri @state))))))
 
 (defn latest-prefix-states
   []

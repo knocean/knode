@@ -25,9 +25,9 @@
   [resource env format {:keys [oi ob ol] :as state}]
   (cond
     oi (case format
-         :CURIE [:a {:href (str "/resources/" resource "/subject?iri=" (escape oi))} (ln/iri->curie env oi)]
-         :label [:a {:href (str "/resources/" resource "/subject?iri=" (escape oi))} (ln/iri->name env oi)]
-         [:a {:href (str "/resources/" resource "/subject?iri=" (escape oi))} oi])
+         :CURIE [:a {:href (local-link env resource oi)} (ln/iri->curie env oi)]
+         :label [:a {:href (local-link env resource oi)} (ln/iri->name env oi)]
+         [:a {:href (local-link env resource oi)} oi])
     ob ob
     ol ol
     :else ""))
@@ -42,8 +42,8 @@
      [:tr]
      (for [[column pi format] headers]
        (case column
-         "IRI" [:td [:a {:href (str "/resources/" resource "/subject?iri=" (escape iri))} iri]]
-         "CURIE" [:td [:a {:href (str "/resources/" resource "/subject?iri=" (escape iri))} (ln/iri->curie env iri)]]
+         "IRI" [:td [:a {:href (local-link env resource iri)} iri]]
+         "CURIE" [:td [:a {:href (local-link env resource iri)} (ln/iri->curie env iri)]]
          "recognized" [:td (->> states first boolean str)]
          (->> states
               (filter #(= pi (:pi %)))
@@ -164,7 +164,7 @@
             [:a {:href (str "/resources/" resource)} (:label resource-map)]
             ". "
             (when (not= resource "all")
-              [:a {:href (str "/resources/all/subject?iri=" (escape iri))} "Query all resources for this subject."])]
+              [:a {:href (local-link env "all" iri)} "Query all resources for this subject."])]
            (->> states
                 (map :pi)
                 (remove nil?)
@@ -401,7 +401,9 @@ return false" this-select)}
 ; TODO: This is just for more convenient REPL reloading
 (defn inner-subjects-page
   [{:keys [params query-params] :as req}]
-  (let [req (assoc req :body-string (when (:body req) (-> req :body slurp)))
+  (let [req (if (:body-string req)
+              req
+              (assoc req :body-string (when (:body req) (-> req :body slurp))))
         env (st/latest-env)
         file-format (get params "format" "html")
         show-headers? (not (= (get params "show-headers") "false"))
@@ -428,6 +430,7 @@ return false" this-select)}
                (= "GET" (get-in req [:params "method"]))
                (:body-string req))
           (let [lines (->> req :body-string string/split-lines (map string/trim))]
+            (println "GET LINES")
             (case (first lines)
               "IRI" (rest lines)
               "CURIE" (map (partial ln/curie->iri env) (rest lines))
@@ -492,10 +495,10 @@ return false" this-select)}
                      (map first)
                      (map (fn [x]
                             (if-let [iri (ln/->iri env x)]
-                              [:th [:a {:href (str "subject?iri=" (escape iri))} x]]
+                              [:th [:a {:href (local-link env resource iri)} x]]
                               [:th x])))
                      (into [:tr]))])
-              (into [:table.table]))
+              (into [:table#results.table]))
          (build-nav "subjects" req)]})
       (html
        {:status 404
@@ -566,7 +569,7 @@ return false" this-select)}
                      (map first)
                      (map (fn [x]
                             (if-let [iri (ln/->iri env x)]
-                              [:th [:a {:href (str "subject?iri=" (escape iri))} x]]
+                              [:th [:a {:href (local-link env resource iri)} x]]
                               [:th x])))
                      (into [:tr]))])
               (into [:table.table]))]})

@@ -140,7 +140,7 @@ ex:0000111
          (map unpack-link)
          (= [["https://example.com/0000111" "https://example.com/0000111"]
              ["/resources/ex" "ex"]
-             ["/resources/all/subject?iri=https%3A%2F%2Fexample.com%2F0000111"
+             ["/resources/all/subject?curie=ex:0000111"
               "Query all resources for this subject."]
 
              ["/resources/ex/subject?curie=rdf:type" "type"]
@@ -204,6 +204,90 @@ ex:0000003	coloration
 ex:0000111	barn owl primary remex feather		
 ex:0002222	barn owl 2222		
 ")
+       is)
+
+  (->> {:uri ""
+        :params
+        {:resource "ex"
+         "show-headers" "false"
+         "format" "tsv"
+         "compact" "true"
+         "limit" "5"
+         "offset" "12"}}
+       res/subjects-page
+       :body
+       (= "ex:0000001	birth date		
+ex:0000002	length (cm)		
+ex:0000003	coloration		
+ex:0000111	barn owl primary remex feather		
+ex:0002222	barn owl 2222		
+")
+       is)
+
+  (->> {:uri ""
+        :params
+        {:resource "ex"
+         "format" "tsv"
+         "compact" "true"
+         "label" "eq.barn owl 2222"}}
+       res/subjects-page
+       :body
+       (= "CURIE	label	obsolete	replacement
+ex:0002222	barn owl 2222		
+")
+       is)
+
+  (->> {:uri ""
+        :params
+        {:resource "ex"
+         "format" "tsv"
+         "compact" "true"
+         "method" "GET"
+         "CURIE" "in.(ex:0002222,ex:foobar)"}}
+       res/subjects-page
+       :body
+       (= "CURIE	label	recognized	obsolete	replacement
+ex:0002222	barn owl 2222	true		
+ex:foobar		false		
+")
+       is)
+
+  (->> {:uri ""
+        :params
+        {:resource "ex"
+         "format" "tsv"
+         "compact" "true"
+         "method" "GET"}
+        :request-method :post
+        :body-string "CURIE
+ex:0002222
+ex:foobar"}
+       res/subjects-page
+       :body
+       (= "CURIE	label	recognized	obsolete	replacement
+ex:0002222	barn owl 2222	true		
+ex:foobar		false		
+")
+       is)
+
+  (->> {"compact" "true"
+        "limit" "5"
+        "offset" "12"}
+       (#(assoc
+          {:uri ""}
+          :params (assoc % :resource "ex")
+          :query-params %
+          :query-string (ring.util.codec/form-encode %)))
+       res/subjects-page
+       :body
+       html/html-snippet
+       (#(html/select % [:#results :td :a]))
+       (map unpack-link)
+       (= [["/resources/ex/subject?curie=ex:0000001" "ex:0000001"]
+           ["/resources/ex/subject?curie=ex:0000002" "ex:0000002"]
+           ["/resources/ex/subject?curie=ex:0000003" "ex:0000003"]
+           ["/resources/ex/subject?curie=ex:0000111" "ex:0000111"]
+           ["/resources/ex/subject?curie=ex:0002222" "ex:0002222"]])
        is))
 
 ; /

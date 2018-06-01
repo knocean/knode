@@ -68,45 +68,33 @@
        inc
        (format (str base-iri "%07d"))))
 
-; TODO: Generalize
+;; TODO: Generalize
 (defn add-term
   [{:keys [env params session] :as req}]
-  (if (get @state :write-file)
-    (if (get @state :api-key)
-      (if-let [api-key (get-in req [:headers "x-api-key"])]
-        (if (= api-key (get @state :api-key))
-          (if-let [body (when (:body req) (slurp (:body req)))]
-            (let [iri (next-iri "ONTIE" "https://ontology.iedb.org/ontology/ONTIE_")
-                  stanza (str ": " iri "\n" body)
-                  states (try
-                           (api/read-string :kn (st/latest-env) stanza)
-                           (catch Exception e
-                             [{::knst/error {:bad-parse (.getMessage e)}}]))
-                  errors (filter ::knst/error states)]
-              (if (first errors)
-                {:status 400
-                 :body (->> errors
-                            (map #(dissoc % ::en/env :input))
-                            (map str)
-                            (string/join "\n")
-                            (str "ERROR(S):\n"))}
-                (do
-                  (->> states
-                       (map #(assoc % :rt "ONTIE"))
-                       st/insert!)
-                  (commit-term! stanza nil)
-                  {:status 201
-                   :body iri})))
-            {:status 400
-             :body "ERROR: Term content required"})
-          {:status 401
-           :body "ERROR: API key not authorized"})
-        {:status 403
-         :body "ERROR: API key required"})
-      {:status 403
-       :body "ERROR: Server not configured with an API key"})
-    {:status 405
-     :body "ERROR: Server not configured with a write-file"}))
+  (if-let [body (when (:body req) (slurp (:body req)))]
+    (let [iri (next-iri "ONTIE" "https://ontology.iedb.org/ontology/ONTIE_")
+          stanza (str ": " iri "\n" body)
+          states (try
+                   (api/read-string :kn (st/latest-env) stanza)
+                   (catch Exception e
+                     [{::knst/error {:bad-parse (.getMessage e)}}]))
+          errors (filter ::knst/error states)]
+      (if (first errors)
+        {:status 400
+         :body (->> errors
+                    (map #(dissoc % ::en/env :input))
+                    (map str)
+                    (string/join "\n")
+                    (str "ERROR(S):\n"))}
+        (do
+          (->> states
+               (map #(assoc % :rt "ONTIE"))
+               st/insert!)
+          (commit-term! stanza nil)
+          {:status 201
+           :body iri})))
+    {:status 400
+     :body "ERROR: Term content required"}))
 
 (defn validate-term
   [{:keys [env params session] :as req}]

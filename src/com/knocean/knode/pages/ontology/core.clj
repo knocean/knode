@@ -67,18 +67,13 @@
                    (st/select (format "rt='%s'" resource))))]
      (kn/render-string :ttl (st/latest-env) states))})
 
-; TODO: This is pulled out just to make REPL development easier.
-(defn inner-ontology-request
+(defn ontology-request
   [{:keys [:request-method] :as req}]
   (if (= request-method :put)
     (edit/add-term req)
     ((base/with-requested-terms ontology-result) req)))
 
-(defn ontology-request
-  [req]
-  (inner-ontology-request req))
-
 (def routes
-  [["/ontology/add-term" (auth/logged-in-only (base/with-requested-terms #(edit/add-term %)))]
+  [["/ontology/add-term" (->> edit/add-term auth/api-key-only base/with-requested-terms)]
    ["/ontology/validate-term" (auth/logged-in-only (base/with-requested-terms #(edit/validate-term %)))]
-   ["/ontology" [[true ontology-request]]]])
+   ["/ontology" [[true #(ontology-request %)]]]])

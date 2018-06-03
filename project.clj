@@ -20,6 +20,7 @@
                  [org.apache.jena/jena-iri "3.7.0"]
                  [org.apache.jena/jena-tdb "3.7.0"]
 
+                 [honeysql "0.9.2"]
                  [org.clojure/java.jdbc "0.7.6"]
                  [org.xerial/sqlite-jdbc "3.21.0"]
                  [org.postgresql/postgresql "42.2.2"]

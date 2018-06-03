@@ -6,7 +6,7 @@
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
 
-            [com.knocean.knodea.util :as util]
+            [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.authentication :as auth]
             [com.knocean.knode.pages.html :refer [html]]

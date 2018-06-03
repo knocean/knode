@@ -564,10 +564,6 @@ return false" this-select)}
         :title "Unknown format"
         :error (str "unknown format: " format)}))))
 
-(defn predicates-page
-  [req]
-  (inner-predicates-page req))
-
 (def routes
   [["/resources" resources-page]
    ["/resources/" resources-page]

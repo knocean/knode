@@ -6,20 +6,17 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
+            [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
             [com.knocean.knode.pages.ontology.base :as base]
             [com.knocean.knode.pages.ontology.tsv :as tsv]))
 
-(defn escape
-  [iri]
-  (java.net.URLEncoder/encode iri))
-
 (defn local-link
   [env resource iri]
   (if-let [curie (ln/iri->curie env iri)]
     (str "/resources/" resource "/subject?curie=" curie)
-    (str "/resources/" resource "/subject?iri=" (escape iri))))
+    (str "/resources/" resource "/subject?iri=" (util/escape iri))))
 
 (defn render-object
   [resource env format {:keys [oi ob ol] :as state}]
@@ -77,12 +74,12 @@
   (if (= "all" resource)
     {:label "all" :title "All Resources" :description "All resources loaded into this system."}
     (->> resource
+         ;; TODO - figure out how to paginate intelligently
          (conj ["SELECT * FROM resources WHERE label=?"])
          st/query
          first)))
 
-; TODO: This is just for more convenient REPL reloading
-(defn inner-resource-page
+(defn resource-page
   [{:keys [session params] :as req}]
   (let [resource (get-resource-entry (:resource params))]
     (html
@@ -96,6 +93,8 @@
         [:li [:a {:href (str "/resources/" (:label resource) "/predicates")} "Predicates"]]]
        (when (not= "all" (:label resource))
          (let [iri
+               ;; TODO - cut literal IRIs out of this
+               ;;        possibly move them into k-cljc (or just use those if they're already provided)
                (->> (format "SELECT si FROM states WHERE rt='%s' AND pi = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' AND oi = 'http://www.w3.org/2002/07/owl#Ontology' LIMIT 1" (:label resource))
                     st/query
                     first
@@ -109,10 +108,6 @@
                     (map (partial render-pair env (:label resource)))
                     (into [:ul])
                     (conj [:div [:h3 "Details"]]))))))]})))
-
-(defn resource-page
-  [{:keys [session params] :as req}]
-  (inner-resource-page req))
 
 (defn resources-page
   [{:keys [session] :as req}]
@@ -137,7 +132,7 @@
    (rdf/rdfs "subClassOf")
    (obo "ncbitaxon#has_rank")])
 
-(defn inner-subject-page
+(defn subject-page
   [{:keys [params] :as req}]
   (if-let [iri (or (:iri req)
                    (get-in req [:params "iri"])
@@ -195,11 +190,6 @@
       [:div
        [:h2 "Subject not found"]
        [:p "The subject could not be found"]]})))
-
-; TODO: This is just for more convenient REPL reloading
-(defn subject-page
-  [req]
-  (inner-subject-page req))
 
 (def default-limit 100)
 (def max-limit 5000)
@@ -265,6 +255,7 @@
        (when pi (format "pi='%s' AND " pi))
        (build-condition-object value)))))
 
+;; TODO - replace this with LDF machinery (looks like it does pretty much the same thing)
 (defn build-query
   [env resource conditions]
   (->> (apply dissoc conditions ignore-keys)
@@ -292,6 +283,7 @@
     (= compact "true") (string/replace default-select "IRI" "CURIE")
     :else default-select))
 
+;; TODO - most of this should be done in the front-end rather than back-end JS craziness like the below
 (defn build-form
   [{:keys [params] :as req}]
   (let [resource (:resource params)
@@ -398,8 +390,7 @@ return false" this-select)}
            (assoc {} :href))
       "Next"]]))
 
-; TODO: This is just for more convenient REPL reloading
-(defn inner-subjects-page
+(defn subjects-page
   [{:keys [params query-params] :as req}]
   (let [req (if (:body-string req)
               req
@@ -505,12 +496,7 @@ return false" this-select)}
         :title "Unknown format"
         :error (str "unknown format: " format)}))))
 
-(defn subjects-page
-  [req]
-  (inner-subjects-page req))
-
-; TODO: This is just for more convenient REPL reloading
-(defn inner-predicates-page
+(defn predicates-page
   [{:keys [params query-params] :as req}]
   (let [env (st/latest-env)
         file-format (get params "format" "html")
@@ -585,7 +571,7 @@ return false" this-select)}
 (def routes
   [["/resources" resources-page]
    ["/resources/" resources-page]
-   [["/resources/" :resource] resource-page]
-   [["/resources/" :resource "/subject"] subject-page]
-   [["/resources/" :resource "/subjects"] subjects-page]
-   [["/resources/" :resource "/predicates"] predicates-page]])
+   [["/resources/" :resource] #(resource-page %)]
+   [["/resources/" :resource "/subject"] #(subject-page %)]
+   [["/resources/" :resource "/subjects"] #(subjects-page %)]
+   [["/resources/" :resource "/predicates"] #(predicates-page %)]])

@@ -6,16 +6,13 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
+            [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]))
 
-(defn escape
-  [iri]
-  (java.net.URLEncoder/encode iri))
-
 (defn render-link
   [env iri]
-  [:a {:href (str "/subject?iri=" (escape iri))} (ln/iri->name env iri)])
+  [:a {:href (str "/subject?iri=" (util/escape iri))} (ln/iri->name env iri)])
 
 (defn render-object
   [env {:keys [oi ob ol dt ln] :as state}]
@@ -54,7 +51,7 @@
      [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
      [:div
       "Download as "
-      [:a {:href (str "/subject/?iri=" (escape iri) "&format=ttl")} "Turtle (ttl)"]
+      [:a {:href (str "/subject/?iri=" (util/escape iri) "&format=ttl")} "Turtle (ttl)"]
       ", JSON, TSV."]
      (into
       [:table.table

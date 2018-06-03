@@ -6,15 +6,12 @@
             [org.knotation.environment :as en]
             [org.knotation.link :as ln]
 
+            [com.knocean.knodea.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.authentication :as auth]
             [com.knocean.knode.pages.html :refer [html]]
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.pages.ontology.template :as tmp]))
-
-(defn escape
-  [iri]
-  (java.net.URLEncoder/encode iri))
 
 (defn render-link
   [env iri]

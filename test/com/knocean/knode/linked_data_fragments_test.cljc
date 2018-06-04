@@ -129,10 +129,3 @@
   (testing "If we paginate past the first page, drop the appropriate number of items"
     (is (= {:total 12, :per-page 5, :page 1, :items [6 7 8 9 10]}
            (ldf/paginated 5 1 [1 2 3 4 5 6 7 8 9 10 11 12])))))
-
-(deftest test-query->where-clause
-  (testing "Returns nil when no clauses present"
-    (is (nil? (sql/-query->sql-where-clause {}))))
-  (testing "Applies WHERE clause for all present slots"))
-(deftest test-query->sql-pagination
-  (testing "Applies LIMIT and OFFSET for "))

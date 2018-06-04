@@ -3,6 +3,7 @@
             [clojure.string :as string]
             [clojure.set :as set]
             [clojure.java.jdbc :as jdbc]
+            [honeysql.core :as sql]
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
@@ -26,60 +27,38 @@
 ;;     (doseq [d (:maps @st/state)] (jdbc/insert! handle :ontology d))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn -query->sql-where-clause
-  [query]
-  (let [relevant (base/remove-falsies (select-keys query [:gi :si :sb :pi :oi :ol :ln :di]))]
-    (when (not (empty? relevant))
-      (cons
-       (str " WHERE " (string/join " AND " (remove nil? (map #(str (name %) "=?") (keys relevant)))))
-       (vals relevant)))))
-
-(defn -query->sql-pagination [{:keys [per-page page]}]
-  (str " " (string/join
-            " "
-            (remove
-             nil? [(str "LIMIT " per-page)
-                   (when (> page 0) (str "OFFSET " (* page per-page)))]))))
+(def columns [:gi :si :sb :pi :oi :ol :ln :di])
 
 (defn query->sql
-  [query]
-  (let [base "SELECT * FROM states"
-        [where & params] (-query->sql-where-clause query)
-        pagination (-query->sql-pagination query)]
-    (vec
-     (cons
-      (string/join [base where pagination])
-      params))))
+  [{:keys [per-page page] :as query}]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
+    (sql/build
+     :select :* :from :states
+     :where (when (not (empty? wheres)) (vec (cons :and wheres)))
+     :limit per-page :offset (when (> page 0) (* page per-page)))))
 
 (defmethod query-stream :database
-  [query source]
-  (let [base "SELECT * FROM states"
-        [where & params] (-query->sql-where-clause query)]
+  [{:keys [per-page page] :as query} source]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
     (map
      #(into {} (filter second %))
      (jdbc/query
       source
-      (vec
-       (cons
-        (string/join [base where])
-        params))))))
+      (sql/format
+       (dissoc (query->sql query) :limit :offset))))))
 
 (defn count!
-  [query db]
-  (let [base "SELECT COUNT(*) FROM ontology"
-        [where & params] (-query->sql-where-clause query)
-        pagination (-query->sql-pagination query)]
+  [{:keys [per-page page] :as query} db]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
     (second
      (first
       (first
        (jdbc/query
-        db (vec
-            (cons
-             (string/join [base where pagination])
-             params))))))))
+        db (sql/format (assoc (query->sql query) :select [:%count.*]))))))))
 
 (defmethod query :database ;; if we've got a database, we need to query it for matching entries
   [query data]
   (jdbc/with-db-connection [db data]
     {:total (count! query db) :per-page (:per-page query) :page (:page query)
-     :items (vec (map #(into {} (filter second %)) (jdbc/query db (query->sql query))))}))
+     :items (vec (map #(into {} (filter second %))
+                      (jdbc/query db (sql/format (query->sql query)))))}))

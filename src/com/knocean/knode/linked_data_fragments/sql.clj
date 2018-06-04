@@ -27,11 +27,9 @@
 ;;     (doseq [d (:maps @st/state)] (jdbc/insert! handle :ontology d))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def columns [:gi :si :sb :pi :oi :ol :ln :di])
-
 (defn query->sql
   [{:keys [per-page page] :as query}]
-  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query st/columns))]
     (sql/build
      :select :* :from :states
      :where (when (not (empty? wheres)) (vec (cons :and wheres)))
@@ -39,7 +37,7 @@
 
 (defmethod query-stream :database
   [{:keys [per-page page] :as query} source]
-  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query st/columns))]
     (map
      #(into {} (filter second %))
      (jdbc/query
@@ -49,7 +47,7 @@
 
 (defn count!
   [{:keys [per-page page] :as query} db]
-  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query columns))]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query st/columns))]
     (second
      (first
       (first

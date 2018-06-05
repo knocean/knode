@@ -225,17 +225,15 @@
 (defn build-condition-object
   [value]
   (let [[obj value] (if (.startsWith value "iri.")
-                      ["oi" (subs value 4)]
-                      ["ol" value])]
-    (str
-     obj
-     (cond
-       (.startsWith value "eq.")
-       (format "='%s'" (subs value 3))
-       (.startsWith value "like.")
-       (format " LIKE '%s'" (-> value (subs 5) (string/replace "*" "%")))
-       :else
-       (throw (Exception. (str "Unhandled query parameter: " value)))))))
+                      [:oi (subs value 4)]
+                      [:ol value])]
+    (cond
+      (.startsWith value "eq.")
+      [:= obj (subs value 3)]
+      (.startsWith value "like.")
+      [:like obj (-> value (subs 5) (string/replace "*" "%"))]
+      :else
+      (throw (Exception. (str "Unhandled query parameter: " value))))))
 
 (defn build-condition
   [env column value]
@@ -244,56 +242,31 @@
              (->> (string/split (subs value 4 (dec (count value))) #",")
                   (string/split #",")
                   (map string/trim)
-                  (map #(str "'" % "'"))
-                  (string/join ", ")
-                  (format "si IN (%s)"))
+                  ((fn [vs] [[:in :si vs]])))
              (throw (Exception. (str "Unhandled query value for 'iri': " value))))
     "curie"  (if (re-matches #"in\.\(.*\)" value)
                (->> (string/split (subs value 4 (dec (count value))) #",")
                     (map string/trim)
                     (map (partial ln/curie->iri env))
-                    (map #(str "'" % "'"))
-                    (string/join ", ")
-                    (format "si IN (%s)"))
+                    ((fn [vs] [[:in :si vs]])))
                (throw (Exception. (str "Unhandled query value for 'curie': " value))))
     "any" (build-condition-object value)
     (let [pi (ln/label->iri env column)]
       (when-not pi
         (throw (Exception. (str "Unknown column: " column))))
-      (str
-       (when pi (format "pi='%s' AND " pi))
-       (build-condition-object value)))))
+      [[:= :pi pi] (build-condition-object value)])))
 
-;; TODO - replace this with LDF machinery (looks like it does pretty much the same thing)
 (defn build-query
   [env resource conditions]
-    (->> (apply dissoc conditions ignore-keys)
-       (map (partial apply build-condition env))
-       (concat [(when (not= resource "all") (format "rt='%s'" resource))])
-       (remove nil?)
-       (interpose "AND")
-       (#(when (first %) (concat ["WHERE"] %)))
-       (concat ["SELECT DISTINCT si FROM states"])
-       vec
-       (#(conj % "ORDER BY si"))
-       (#(conj % (str "LIMIT " (get-limit (get conditions "limit")))))
-       (#(conj % (let [offset (get conditions "offset")]
-                   (when-not (string/blank? offset)
-                     (str "OFFSET " offset)))))
-       (remove nil?)
-       (string/join " ")))
-  ;; (let [q {:select [:si] :modifier [:distinct] :from [:states]
-  ;;          :where (vec (concat [:and (when (not= resource "all") [:= :rt resource])]
-  ;;                              ;; FIXME - this call to build-condition needs to be looked at; it's the last
-  ;;                              ;;         place SQL injection things might
-  ;;                              ;;         be hiding (it may take a while :/ )
-  ;;                              (map #(sql/raw (apply build-condition env %))
-  ;;                                   (apply dissoc conditions ignore-keys))))
-  ;;          :order-by [:si]
-  ;;          :limit (str (get-limit (get conditions "limit")))
-  ;;          :offset (let [offset (get conditions "offset")]
-  ;;                    (when-not (string/blank? offset) (str offset)))}]
-  ;;   q))
+  (sql/build
+   :select [:si] :modifiers [:distinct] :from [:states]
+   :where (vec (concat [:and (when (not= resource "all") [:= :rt resource])]
+                       (mapcat #(apply build-condition env %)
+                               (apply dissoc conditions ignore-keys))))
+   :order-by [:si]
+   :limit (str (get-limit (get conditions "limit")))
+   :offset (let [offset (get conditions "offset")]
+             (when-not (string/blank? offset) (str offset)))))
 
 (def default-select "IRI,label,obsolete,replacement")
 
@@ -447,7 +420,7 @@ return false" this-select)}
               "CURIE" (map (partial ln/curie->iri env) (rest lines))
               (throw (Exception. (str "Unhandled POST body column: " (first lines)))))))
         iris (or specified-iris
-                 (->> (jdbc/query @st/state (build-query env resource params))
+                 (->> (st/query (build-query env resource params))
                       (map :si)))
         curie-column (when (:body-string req)
                        (->> req :body-string string/split-lines first string/trim (= "CURIE")))

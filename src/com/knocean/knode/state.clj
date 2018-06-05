@@ -6,6 +6,7 @@
             [clj-jgit.porcelain :as git]
             [me.raynes.fs :as fs]
 
+            [honeysql.core :as sql]
             [clojure.java.jdbc :as jdbc]
 
             [org.knotation.clj-api :as kn]
@@ -21,9 +22,9 @@
         (recur (clojure.edn/read {:eof nil} s) (conj lines ln))
         lines))))
 
-; This is a set of map describing configuration options.
-; They are in a specific order.
-; The :default key is a function from an ENV map to a default value.
+;; This is a set of maps describing configuration options.
+;; They are in a specific order.
+;; The :default key is a function from an ENV map to a default value.
 (def configurators
   [{:key :project-dir
     :label "Project directory"
@@ -149,16 +150,15 @@
        configure
        (reset! state)))
 
+(def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+
 (defn query
-  [& args]
-  ;(println "QUERY" args)
-  (apply jdbc/query @state args))
+  [honey]
+  (jdbc/query @state (sql/format honey)))
 
 (defn select
   [s]
-  (query (str "SELECT * FROM states WHERE " s)))
-
-(def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+  (query (sql/build :select :* :from :states :where s)))
 
 (defn execute!
   [query]
@@ -169,7 +169,6 @@
   (->> states
        (filter :pi)
        (map (apply juxt columns))
-       ;(#(do (println %) %))
        (jdbc/insert-multi! @state "states" columns)))
 
 (def -env-cache (atom nil))
@@ -179,7 +178,7 @@
   (or @-env-cache
       (reset!
        -env-cache
-       (-> (format "rt='%s'" (:project-name @state))
+       (-> [:= :rt (:project-name @state)]
            select
            kn/collect-env
            (en/add-prefix "rdf" (rdf/rdf))
@@ -209,11 +208,10 @@
 (defn build-env
   [iris]
   (if (first iris)
-    (->> iris
-         (remove nil?)
-         (map #(format "'%s'" %))
-         (string/join ", ")
-         (format "SELECT DISTINCT si, ol FROM states WHERE pi='http://www.w3.org/2000/01/rdf-schema#label' AND si IN (%s)")
+    (->> {:select [:si :ol] :modifiers [:distinct] :from [:states]
+          :where [:and
+                  [:= :pi "http://www.w3.org/2000/01/rdf-schema#label"]
+                  [:in :si (remove nil? iris)]]}
          query
          (reduce
           (fn [env row] (en/add-label env (:ol row) (:si row)))

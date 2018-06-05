@@ -54,8 +54,7 @@
   [iri]
   (let [env (st/latest-env)
         states
-        (->> iri
-             (format "si='%s'" iri)
+        (->> [:= :si iri]
              st/select
              (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
              distinct)]

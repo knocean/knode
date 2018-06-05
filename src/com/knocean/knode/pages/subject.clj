@@ -36,7 +36,7 @@
 
 (defn subject-by-iri
   [iri]
-  (st/select (format "si='%s'" iri)))
+  (st/select [:= :si iri]))
 
 (defn subject
   [{:keys [query-params] :as req}]
@@ -46,7 +46,7 @@
 
 (defn render-subject-html
   [iri]
-  (let [states (st/select (format "si='%s'" iri))]
+  (let [states (st/select [:= :si iri])]
     [:div
      [:p [:strong "Subject"] ": " [:a {:href iri} iri]]
      [:div

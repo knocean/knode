@@ -14,14 +14,19 @@
 (def template-content "https://knotation.org/predicate/template-content")
 
 (defn list-templates []
-  (->> (format "SELECT * FROM states WHERE pi='%s' AND rt='%s'"
-               template-content
-               (:project-name @st/state))
+  (->> {:select [:*] :from [:states]
+        :where [:and
+                [:= :pi template-content]
+                [:= :rt (:project-name @st/state)]]}
        st/query
        (map :si)))
 
 (defn template-by-iri [iri]
-  (let [content (->> (format "SELECT * FROM states WHERE rt='%s' AND si='%s' AND pi='%s'" (:project-name @st/state) iri template-content)
+  (let [content (->> {:select [:*] :from [:states]
+                      :where [:and
+                              [:= :rt (:project-name @st/state)]
+                              [:= :si iri]
+                              [:= :pi template-content]]}
                      st/query
                      first
                      :ol)

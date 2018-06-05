@@ -10,9 +10,7 @@
 
 (defn all-subjects
   []
-  (->> @state
-       :project-name
-       (format "SELECT DISTINCT si FROM states WHERE rt='%s' ORDER BY si")
+  (->> {:select [:si] :from [:states] :where [:= :rt (:project-name @state)] :order-by :si}
        st/query
        (map :si)
        (filter #(.startsWith % (:base-iri @state)))))

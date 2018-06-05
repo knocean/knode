@@ -37,6 +37,7 @@
   (cond
     (or (vector? data) (list? data)) :default
     (and (map? data) (:connection data)) :database
+    (= clojure.lang.Atom (class data)) :atom
     :else :default))
 
 (defmulti query-stream -data-source-dispatch)

@@ -48,7 +48,7 @@
 (use-fixtures :once example-state-fixture)
 
 (deftest test-states-loaded
-  (->> "SELECT * FROM states LIMIT 10"
+  (->> {:select [:*] :from [:states] :limit 10}
        st/query
        count
        (< 0)

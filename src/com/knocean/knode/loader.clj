@@ -63,7 +63,7 @@ CREATE INDEX states_si ON states(si);"))
   [resource args]
   (println "LOAD" (:connection @state) resource args)
   (try
-    (st/query "SELECT * FROM states LIMIT 1")
+    (st/query {:select [:*] :from [:states] :limit 1})
     (catch Exception e
       (println "The 'states' table does not exist.")
       (create-tables)))

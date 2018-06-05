@@ -21,7 +21,7 @@
 (defn subject-by-iri
   [iri]
   (let [env (st/latest-env)
-        relevant (st/select (format "si='%s'" iri))]
+        relevant (st/select [:= :si iri])]
     (map (fn [statement]
            (if-let [pi (:pi statement)]
              [(ln/iri->name env pi)
@@ -48,7 +48,7 @@
     (first requested-iris)
     (concat
      (st/latest-prefix-states)
-     (st/select (format "si='%s'" (first requested-iris)))))})
+     (st/select [:= :si (first requested-iris)])))})
 
 (defmethod ontology-result "ttl"
   [{:keys [requested-iris params env] :as req}]
@@ -60,11 +60,10 @@
          states (concat
                  (st/latest-prefix-states)
                  (if iri
-                   (->> iri
-                        (format "si='%s'")
+                   (->> [:= :si iri]
                         st/select
                         rdf/assign-stanzas)
-                   (st/select (format "rt='%s'" resource))))]
+                   (st/select [:= :rt resource])))]
      (kn/render-string :ttl (st/latest-env) states))})
 
 (defn ontology-request

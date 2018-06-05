@@ -27,7 +27,7 @@
 
 (defn iri->seq
   [env headers iri]
-  (let [states (st/select (format "si='%s' ORDER BY id" iri))]
+  (let [states (st/select [:= :si iri])] ;; FIXME (format "si='%s' ORDER BY id" iri)
     (for [[column pi format] headers]
       (case column
         "IRI" iri

@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [cheshire.core :as json]
+            [honeysql.core :as sql]
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
@@ -32,9 +33,10 @@
 (defn iri->seq
   [resource env headers iri]
   (let [states (st/select
-                (str
-                 (when (not= "all" resource) (format "rt='%s' AND " resource))
-                 (format "si='%s' ORDER BY id" iri)))]
+                (if (not= "all" resource)
+                  [:and [:= :rt resource] [:= :si iri]]
+                  [:= :si iri]) ;; FIXME (format "si='%s' ORDER BY id" iri)
+                )]
     (into
      [:tr]
      (for [[column pi format] headers]
@@ -73,9 +75,8 @@
   [resource]
   (if (= "all" resource)
     {:label "all" :title "All Resources" :description "All resources loaded into this system."}
-    (->> resource
-         ;; TODO - figure out how to paginate intelligently
-         (conj ["SELECT * FROM resources WHERE label=?"])
+    ;; TODO - figure out how to paginate intelligently
+    (->> {:select [:*] :from [:resources] :where [:= :label resource]}
          st/query
          first)))
 
@@ -95,13 +96,22 @@
          (let [iri
                ;; TODO - cut literal IRIs out of this
                ;;        possibly move them into k-cljc (or just use those if they're already provided)
-               (->> (format "SELECT si FROM states WHERE rt='%s' AND pi = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' AND oi = 'http://www.w3.org/2002/07/owl#Ontology' LIMIT 1" (:label resource))
+               (->> {:select [:si] :from [:states]
+                     :where [:and
+                             [:= :rt (:label resource)]
+                             [:= :pi "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"]
+                             [:= :oi "http://www.w3.org/2002/07/owl#Ontology"]]
+                     :limit "1"}
+                    (#(println "BUILT QUERY --- " (str %)))
                     st/query
                     first
                     :si)]
            (when iri
              (let [states
-                   (->> (format "SELECT * FROM states WHERE rt='%s' AND si='%s'" (:label resource) iri)
+                   (->> {:select [:*] :from [:states]
+                         :where [:and
+                                 [:= :rt (:label resource)]
+                                 [:= :si iri]]}
                         st/query)
                    env (st/build-env-from-states states)]
                (->> states
@@ -117,7 +127,7 @@
     :content
     [:div
      [:h2 "Resources"]
-     (->> "SELECT * FROM resources ORDER BY id"
+     (->> {:select [:*] :from [:resources] :order-by [:id]}
           st/query
           (concat [{:label "all" :title "All Resources" :description "Query all available resources"}])
           (map resource-entry)
@@ -142,9 +152,9 @@
       (let [resource (get-in req [:params :resource] "all")
             resource-map (get-resource-entry resource)
             states
-            (->> iri
-                 (format "si='%s'" iri)
-                 (str (when (not= "all" resource) (format "rt='%s' AND " resource)))
+            (->> (if (not= "all" resource)
+                   [:and [:= :si iri] [:= :rt resource]]
+                   [:= :si iri])
                  st/select
                  (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
                  distinct)
@@ -258,21 +268,17 @@
 ;; TODO - replace this with LDF machinery (looks like it does pretty much the same thing)
 (defn build-query
   [env resource conditions]
-  (->> (apply dissoc conditions ignore-keys)
-       (map (partial apply build-condition env))
-       (concat [(when (not= resource "all") (format "rt='%s'" resource))])
-       (remove nil?)
-       (interpose "AND")
-       (#(when (first %) (concat ["WHERE"] %)))
-       (concat ["SELECT DISTINCT si FROM states"])
-       vec
-       (#(conj % "ORDER BY si"))
-       (#(conj % (str "LIMIT " (get-limit (get conditions "limit")))))
-       (#(conj % (let [offset (get conditions "offset")]
-                   (when-not (string/blank? offset)
-                     (str "OFFSET " offset)))))
-       (remove nil?)
-       (string/join " ")))
+  {:select [:si] :modifier [:distinct] :from [:states]
+   :where (vec (concat [:and (when (not= resource "all") [:= :rt resource])]
+                       ;; FIXME - this call to build-condition needs to be looked at; it's the last
+                       ;;         place SQL injection things might
+                       ;;         be hiding (it may take a while :/ )
+                       (map #(sql/raw (build-condition env %))
+                            (apply dissoc conditions ignore-keys))))
+   :order-by [:si]
+   :limit (str (get-limit (get conditions "limit")))
+   :offset (let [offset (get conditions "offset")]
+             (when-not (string/blank? offset) (str offset)))})
 
 (def default-select "IRI,label,obsolete,replacement")
 
@@ -505,9 +511,9 @@ return false" this-select)}
         resource-map (get-resource-entry resource)
         compact (= (get params "compact") "true")
         default (if compact :CURIE :IRI)
-        query (str "SELECT DISTINCT pi FROM states"
-                   (when (not= "all" resource) (format " WHERE rt='%s'" resource))
-                   " ORDER BY pi")
+        query {:select [:pi] :modifiers [:distinct] :from [:states]
+               :where (when (not= "all" resource) [:= :rt resource])
+               :order-by [:pi]}
         iris (map :pi (st/query query))
         headers
         [(if compact ["CURIE" nil :CURIE] ["IRI" nil :IRI])

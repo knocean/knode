@@ -223,16 +223,14 @@
 
 (defn build-condition-object
   [value]
-  (let [[obj value] (if (.startsWith value "iri.")
-                      [:oi (subs value 4)]
-                      [:ol value])]
-    (cond
-      (.startsWith value "eq.")
-      [:= obj (subs value 3)]
-      (.startsWith value "like.")
-      [:like obj (-> value (subs 5) (string/replace "*" "%"))]
-      :else
-      (throw (Exception. (str "Unhandled query parameter: " value))))))
+  (let [[_ kind operator raw] (re-find #"(iri\.)?(eq|like)\.(.*)" value)
+        obj (if (= "iri." kind) :oi :ol)
+        op (case operator
+             "eq" :=
+             "like" :like
+                   (throw (Exception. (str "Unhandled query parameter: " value))))
+        v (if (= :like op) (string/replace raw "*" "%") raw)]
+    [op obj v]))
 
 (defn build-condition
   [env column value]

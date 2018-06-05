@@ -157,8 +157,8 @@
   (jdbc/query @state (sql/format honey)))
 
 (defn select
-  [s]
-  (query (sql/build :select :* :from :states :where s)))
+  [where & args]
+  (query (apply sql/build :select :* :from :states :where where args)))
 
 (defn execute!
   [query]

@@ -126,8 +126,7 @@
     :content
     [:div
      [:h2 "Resources"]
-     (->> ;; (jdbc/query @st/state "SELECT * FROM resources ORDER BY id")
-          (st/query {:select [:*] :from [:resources] :order-by [:id]})
+     (->> (st/query {:select [:*] :from [:resources] :order-by [:id]})
           (concat [{:label "all" :title "All Resources" :description "Query all available resources"}])
           (map resource-entry)
           (into [:div]))]}))

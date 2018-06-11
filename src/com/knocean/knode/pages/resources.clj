@@ -124,6 +124,7 @@
     :content
     [:div
      [:h2 "Resources"]
+     ;; TODO - pagination needs to extend into these front-ends
      (->> (st/query {:select [:*] :from [:resources] :order-by [:id]})
           (concat [{:label "all" :title "All Resources" :description "Query all available resources"}])
           (map resource-entry)
@@ -197,6 +198,8 @@
        [:h2 "Subject not found"]
        [:p "The subject could not be found"]]})))
 
+;; TODO - push these off into a util file somewhere; we have query limits defined elsewhere
+;;        (it might make sense to push all of this into state, given how we currently structure queries)
 (def default-limit 100)
 (def max-limit 5000)
 
@@ -273,6 +276,7 @@
     :else default-select))
 
 ;; TODO - most of this should be done in the front-end rather than back-end JS craziness like the below
+;;        start a front-end file and get the appropriate plumbing into it
 (defn build-form
   [{:keys [params] :as req}]
   (let [resource (:resource params)
@@ -291,7 +295,7 @@
                        :operator operator
                        :object object})
                     {:predicate "" :operator "eq." :object ""})
-        this-select (get-select (get params "select") (get params "compact"))]
+        this-select (get-select (get params "select") (get params "compact"))] ;; TODO - verify that this works with the new query system
     [:div.subject-search
      [:form.form-inline
       {:id "search" :action "subjects"}
@@ -341,7 +345,7 @@ $('#compact')[0].checked = false;
 $('#predicate').val('');
 $('#operator').val('eq.');
 $('#object').val('');
-return false" this-select)}
+return false" this-select)} 
        "Reset"]]
      [:p
       [:b "Search tips: "]

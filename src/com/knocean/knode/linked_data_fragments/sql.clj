@@ -11,22 +11,6 @@
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]))
 
-;;; DUMMY DATA
-;; (def db
-;;   {:classname "org.sqlite.JDBC"
-;;    :subprotocol "sqlite"
-;;    :subname "resources/obi_core.db"})
-;; (defn dummy-db!
-;;   [db]
-;;   (jdbc/with-db-connection [handle db]
-;;     (jdbc/execute! handle ["drop table if exists ontology"])
-;;     (jdbc/execute! handle [(jdbc/create-table-ddl
-;;                            :ontology
-;;                            (map (fn [name] [name :string])
-;;                                 [:gi :si :sb :pi :oi :ob :ol :di :ln]))])
-;;     (doseq [d (:maps @st/state)] (jdbc/insert! handle :ontology d))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defn query->sql
   [{:keys [per-page page] :as query}]
   (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query st/columns))]

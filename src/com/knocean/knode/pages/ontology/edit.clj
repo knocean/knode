@@ -69,11 +69,12 @@
        inc
        (format (str base-iri "%07d"))))
 
-;; TODO: Generalize
 (defn add-term
   [{:keys [env params session] :as req}]
   (if-let [body (when (:body req) (slurp (:body req)))]
-    (let [iri (next-iri "ONTIE" "https://ontology.iedb.org/ontology/ONTIE_")
+    (let [st @st/state
+          project-name (:project-name st)
+          iri (next-iri project-name (:base-iri st))
           stanza (str ": " iri "\n" body)
           states (try
                    (api/read-string :kn (st/latest-env) stanza)
@@ -89,7 +90,7 @@
                     (str "ERROR(S):\n"))}
         (do
           (->> states
-               (map #(assoc % :rt "ONTIE"))
+               (map #(assoc % :rt project-name))
                st/insert!)
           (commit-term! stanza nil)
           {:status 201

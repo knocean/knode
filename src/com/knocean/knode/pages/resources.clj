@@ -95,13 +95,11 @@
         [:li [:a {:href (str "/resources/" (:label resource) "/predicates")} "Predicates"]]]
        (when (not= "all" (:label resource))
          (let [iri
-               ;; TODO - cut literal IRIs out of this
-               ;;        possibly move them into k-cljc (or just use those if they're already provided)
                (->> {:select [:si] :from [:states]
                      :where [:and
                              [:= :rt (:label resource)]
-                             [:= :pi "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"]
-                             [:= :oi "http://www.w3.org/2002/07/owl#Ontology"]]
+                             [:= :pi (rdf/rdf "type")]
+                             [:= :oi (rdf/owl "Ontology")]]
                      :limit "1"}
                     st/query
                     first
@@ -429,7 +427,7 @@ return false" this-select)}
                     ["label" (rdf/rdfs "label") :label]
                     (when specified-iris ["recognized" nil :boolean])
                     ["obsolete" (rdf/owl "deprecated") :boolean]
-                    ["replacement" "http://purl.obolibrary.org/obo/IAO_0100001" default]]))]
+                    ["replacement" (obo "IAO_0100001") default]]))]
     (case file-format
       "tsv"
       {:headers
@@ -502,7 +500,7 @@ return false" this-select)}
         [(if compact ["CURIE" nil :CURIE] ["IRI" nil :IRI])
          ["label" (rdf/rdfs "label") :label]
          ["obsolete" (rdf/owl "deprecated") :boolean]
-         ["replacement" "http://purl.obolibrary.org/obo/IAO_0100001" default]]]
+         ["replacement" (obo "IAO_0100001") default]]]
     (case file-format
       "tsv"
       {:headers

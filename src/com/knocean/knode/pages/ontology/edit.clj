@@ -59,7 +59,7 @@
 (defn next-iri
   [resource base-iri]
   (->> {:select [:si] :modifiers [:distinct] :from [:states]
-        :where [:and [:= :rt resource] [:like :si (str base-iri "%")]]} ;; TODO - verify that the :like works here
+        :where [:and [:= :rt resource] [:like :si (str base-iri "%")]]}
        st/query
        (map :si)
        (map #(last (string/split % #"_")))

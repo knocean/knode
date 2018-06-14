@@ -268,12 +268,12 @@
 
 (def default-select "IRI,label,obsolete,replacement")
 
-(defn get-select
-  [select-string compact]
-  (cond
-    select-string select-string
-    (= compact "true") (string/replace default-select "IRI" "CURIE")
-    :else default-select))
+(defn req->select
+  [{:keys [params] :as req}]
+  (let [s (or (get params "select") default-select)]
+    (if (= (= (get params "compact") "true") "true")
+      (string/replace s "IRI" "CURIE")
+      s)))
 
 ;; TODO - most of this should be done in the front-end rather than back-end JS craziness like the below
 ;;        start a front-end file and get the appropriate plumbing into it
@@ -295,7 +295,7 @@
                        :operator operator
                        :object object})
                     {:predicate "" :operator "eq." :object ""})
-        this-select (get-select (get params "select") (get params "compact"))] ;; TODO - verify that this works with the new query system
+        this-select (req->select req)] ;; TODO - verify that this works with the new query system
     [:div.subject-search
      [:form.form-inline
       {:id "search" :action "subjects"}

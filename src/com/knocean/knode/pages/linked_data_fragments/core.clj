@@ -9,7 +9,6 @@
             
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
-            [com.knocean.knode.linked-data-fragments.base :refer [query]]
             [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
 (defn object->nquads-object
@@ -23,7 +22,7 @@
   (html
    {:session session
     :title "Linked Data Fragments Result"
-    :content (let [res (query ldf-query (:maps @st/state))
+    :content (let [res (ldf/query! ldf-query)
                    ix (* (:page res) (:per-page res))]
                (if (empty? (:items res))
                  [:span "Not enough results..."]

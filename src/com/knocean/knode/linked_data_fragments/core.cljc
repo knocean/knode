@@ -2,16 +2,20 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as string]
             [clojure.set :as set]
+            [honeysql.core :as sql]
 
             [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
-            [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]))
+
+            [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]
+
+            [com.knocean.knode.state :as st]))
 
 (defn nquads-object->object
   [object]
   (throw (Exception. "TODO: object->nquads-object")))
 
-;;;;; Query parsing
+;;;;; Query parsing/manipulating
 (defn string->object
   [s]
   (util/handler-case
@@ -39,6 +43,14 @@
     :per-page #(min base/+per-page+ (max 1 (base/str->int % base/+per-page+)))
     :page #(max 0 (base/str->int % 0)))))
 
+(defn query->sql
+  [{:keys [per-page page] :as query}]
+  (let [wheres (map (fn [[k v]] [:= k v]) (select-keys query st/columns))]
+    (sql/build
+     :select :* :from :states
+     :where (when (not (empty? wheres)) (vec (cons :and wheres)))
+     :limit per-page :offset (when (> page 0) (* page per-page)))))
+
 ;;;;; Query handling
 (defn matches-query?
   [query entry]
@@ -58,11 +70,17 @@
    :page pg
    :items (vec (take per-page (drop (* per-page pg) seq)))})
 
-(defmethod query-stream :default
-  [query data]
-  (filter (partial matches-query? query) data))
-
-(defmethod query :default ;; default is an in-memory sequence, which we just filter.
-  [query data]
-  (paginated (get query :per-page base/+per-page+) (get query :page 0)
-             (query-stream query data)))
+(defn query!
+  [query-map]
+  (cond
+    (:connection @st/state)
+    (let [q (query->sql query-map)
+          total (first (vals (first (st/query (assoc q :select [:%count.*])))))]
+      {:total total :per-page (:per-page query-map) :page (:page query-map)
+       :items (vec (map #(into {} (filter second %)) (st/query q)))})
+    
+    (:maps @st/state)
+    (paginated (:per-page query-map) (:page query-map)
+               (filter (partial matches-query? query-map) (:maps @st/state)))
+    
+    :else nil))

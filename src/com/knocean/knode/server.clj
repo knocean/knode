@@ -46,7 +46,7 @@
     ontology/routes
     resources/routes
     ;stat/routes
-    ;ldf/routes
+    ldf/routes
     [["" (bring/redirect "/")]
      ["/" #(render-doc % "/README.md")]
      ["/index.html" (bring/redirect "/")]

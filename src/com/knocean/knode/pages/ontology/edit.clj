@@ -42,13 +42,6 @@
     (st/clear-env-cache!)
     nil))
 
-;; (valid-knotation? ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
-;; (validate-knotation ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
-;; (->> ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED"
-;;      (api/read-string :kn (st/latest-env))
-;;      (map #(dissoc % :org.knotation.environment/env))
-;;      count)
-
 ;; TODO - these functions (and probably the template validation stuff)
 ;;        should all be moved to knotation-cljc
 (defn validate-knotation

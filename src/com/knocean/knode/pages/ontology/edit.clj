@@ -20,7 +20,7 @@
       (api/read-string :kn (st/latest-env))
       (filter #(= :statement (:event %)))
       (map #(select-keys % st/columns))
-      insert!))
+      st/insert!))
 
 (defn commit-term!
   [stanza user]

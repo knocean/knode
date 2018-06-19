@@ -16,9 +16,11 @@
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
 (defn update-state! [valid-kn]
-  (let [states (org.knotation.clj-api/read-string :kn (st/latest-env) valid-kn)]
-    (swap! state (fn [st] (update st :states #(concat % states))))
-    nil))
+  (-> valid-kn
+      (api/read-string :kn (st/latest-env))
+      (filter #(= :statement (:event %)))
+      (map #(select-keys % st/columns))
+      insert!))
 
 (defn commit-term!
   [stanza user]
@@ -30,16 +32,22 @@
      :append true)
     (git/git-add (:git-repo st) (:write-file st))
     (git/git-commit (:git-repo st) "Add new term"); user)
-    ;(git/with-identity
-    ;  (if-let [pass (:ssh-passphrase st)]
-    ;    (assoc id :passphrase pass) id)
-    ;  (git/git-push (:git-repo st)))
-    ;(update-state! valid-kn)
+    (when id
+      (git/with-identity
+        (if-let [pass (:ssh-passphrase st)]
+          (assoc id :passphrase pass)
+          id)
+        (git/git-push (:git-repo st))))
+    (update-state! valid-kn)
     (st/clear-env-cache!)
     nil))
 
 ;; (valid-knotation? ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
 ;; (validate-knotation ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED")
+;; (->> ": kn:SUBJECT\nknp:apply-template: protein class\n taxon: kn:REQUIRED\n label: kn:REQUIRED"
+;;      (api/read-string :kn (st/latest-env))
+;;      (map #(dissoc % :org.knotation.environment/env))
+;;      count)
 
 ;; TODO - these functions (and probably the template validation stuff)
 ;;        should all be moved to knotation-cljc

@@ -15,8 +15,8 @@
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
-(defn update-state! [valid-kn]
-  (-> valid-kn
+(defn update-state! [stanza]
+  (-> stanza
       (api/read-string :kn (st/latest-env))
       (filter #(= :statement (:event %)))
       (map #(select-keys % st/columns))
@@ -38,7 +38,7 @@
           (assoc id :passphrase pass)
           id)
         (git/git-push (:git-repo st))))
-    (update-state! valid-kn)
+    (update-state! stanza)
     (st/clear-env-cache!)
     nil))
 

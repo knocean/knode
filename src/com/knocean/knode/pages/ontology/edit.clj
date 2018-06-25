@@ -17,7 +17,7 @@
 
 (defn update-state! [stanza]
   (-> stanza
-      (api/read-string :kn (st/latest-env))
+      (api/read-from :kn (st/latest-env))
       (filter #(= :statement (:event %)))
       (map #(select-keys % st/columns))
       st/insert!))
@@ -48,7 +48,7 @@
   ([snippet] (validate-knotation (st/latest-env) snippet))
   ([env snippet]
    (try
-     (filter identity (api/errors-of (api/read-string :kn env snippet)))
+     (filter identity (api/errors-of (api/read-from :kn env snippet)))
      (catch Exception e
        (list [:bad-parse (.getMessage e)])))))
 
@@ -78,7 +78,7 @@
           iri (next-iri project-name (:base-iri st))
           stanza (str ": " iri "\n" body)
           states (try
-                   (api/read-string :kn (st/latest-env) stanza)
+                   (api/read-from :kn (st/latest-env) stanza)
                    (catch Exception e
                      [{::knst/error {:bad-parse (.getMessage e)}}]))
           errors (filter ::knst/error states)]

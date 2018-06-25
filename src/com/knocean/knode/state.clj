@@ -187,6 +187,7 @@
            (en/add-prefix "owl" (rdf/owl))
            (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
            (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+           (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
            (en/add-prefix "kn" (rdf/kn))
            (en/add-prefix "knd" (rdf/kn "datatype/"))
            (en/add-prefix "knp" (rdf/kn "predicate/"))
@@ -203,6 +204,7 @@
   (-> en/default-env
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+      (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn build-env

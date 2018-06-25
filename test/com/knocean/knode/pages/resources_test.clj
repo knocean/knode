@@ -118,6 +118,7 @@ https://example.com/0000111	barn owl primary remex feather	true
 @prefix ex: <https://example.com/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ncbitaxon: <http://purl.obolibrary.org/obo/ncbitaxon#> .
 @prefix knp: <https://knotation.org/predicate/> .
 
 ex:0000111

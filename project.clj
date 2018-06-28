@@ -33,7 +33,7 @@
 
                  [clj-jgit "0.8.10"]
 
-                 [org.knotation/knotation-cljc "0.2.0-SNAPSHOT"]]
+                 [org.knotation/knotation-cljc "0.3.0-SNAPSHOT"]]
   :cljsbuild {:builds [{:source-paths ["src/com/knocean/knode/front_end"]
                         :compiler {:output-to "resources/public/js/knode.js"
                                    :optimizations :whitespace

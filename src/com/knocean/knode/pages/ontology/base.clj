@@ -10,7 +10,8 @@
 
 (defn all-subjects
   []
-  (->> {:select [:si] :from [:states] :where [:= :rt (:project-name @state)] :order-by [:si]}
+  (->> {:select [:si] :modifiers [:distinct]
+        :from [:states] :where [:= :rt (:project-name @state)] :order-by [:si]}
        st/query
        (map :si)
        (filter #(.startsWith % (:base-iri @state)))))

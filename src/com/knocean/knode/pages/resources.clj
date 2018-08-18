@@ -258,13 +258,13 @@
   [env resource conditions]
   (let [where-clauses
         (concat
-         (when (not= resource "all") [:= :rt resource])
+         (when (not= resource "all") [[:= :rt resource]])
          (mapcat #(apply build-condition env %)
                  (apply dissoc conditions ignore-keys)))
         offset (get conditions "offset")]
     (sql/build
      :select [:si] :modifiers [:distinct] :from [:states]
-     :where (when-not (empty? where-clauses) (cons :and where-clauses))
+     :where (when-not (empty? where-clauses) (vec (cons :and where-clauses)))
      :order-by [:si]
      :limit (str (get-limit (get conditions "limit")))
      :offset (when-not (string/blank? offset) (str offset)))))

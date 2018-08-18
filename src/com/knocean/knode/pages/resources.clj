@@ -37,7 +37,7 @@
                 (if (not= "all" resource)
                   [:and [:= :rt resource] [:= :si iri]]
                   [:= :si iri])
-                :order-by :id)]
+                :order-by [:id])]
     (into
      [:tr]
      (for [[column pi format] headers]
@@ -100,7 +100,7 @@
                              [:= :rt (:label resource)]
                              [:= :pi (rdf/rdf "type")]
                              [:= :oi (rdf/owl "Ontology")]]
-                     :limit "1"}
+                     :limit 1}
                     st/query
                     first
                     :si)]
@@ -256,15 +256,18 @@
 
 (defn build-query
   [env resource conditions]
-  (sql/build
-   :select [:si] :modifiers [:distinct] :from [:states]
-   :where (vec (concat [:and (when (not= resource "all") [:= :rt resource])]
-                       (mapcat #(apply build-condition env %)
-                               (apply dissoc conditions ignore-keys))))
-   :order-by [:si]
-   :limit (str (get-limit (get conditions "limit")))
-   :offset (let [offset (get conditions "offset")]
-             (when-not (string/blank? offset) (str offset)))))
+  (let [where-clauses
+        (concat
+         (when (not= resource "all") [:= :rt resource])
+         (mapcat #(apply build-condition env %)
+                 (apply dissoc conditions ignore-keys)))
+        offset (get conditions "offset")]
+    (sql/build
+     :select [:si] :modifiers [:distinct] :from [:states]
+     :where (when-not (empty? where-clauses) (cons :and where-clauses))
+     :order-by [:si]
+     :limit (str (get-limit (get conditions "limit")))
+     :offset (when-not (string/blank? offset) (str offset)))))
 
 (def default-select "IRI,label,obsolete,replacement")
 

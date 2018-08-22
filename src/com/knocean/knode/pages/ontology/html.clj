@@ -104,7 +104,6 @@
          (when (auth/logged-in? req)
            (list [:div {:class "col-md-6"}
                   [:h3 "Add Term"]
-                  [:script {:type "text/javascript" :src "/js/knode.js"}]
                   [:form {:method "POST" :action "/ontology/validate-term"}
                    [:input {:type "hidden" :name "api-key" :value (str (get params "api-key"))}]
                    [:textarea {:id "editor" :rows "6" :name "template-text"}

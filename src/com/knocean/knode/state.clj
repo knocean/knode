@@ -9,6 +9,7 @@
             [honeysql.core :as sql]
             [clojure.java.jdbc :as jdbc]
 
+            [org.knotation.api :as kn-api]
             [org.knotation.clj-api :as kn]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]))
@@ -195,9 +196,7 @@
 
 (defn latest-prefix-states
   []
-  (->> (latest-env)
-       ::en/prefix-iri
-       (map (fn [[prefix iri]] {:prefix prefix :iri iri}))))
+  (kn-api/prefix-states (latest-env)))
 
 (defn base-env
   []

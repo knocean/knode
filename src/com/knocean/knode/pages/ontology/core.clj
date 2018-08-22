@@ -5,7 +5,7 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.json-ld :as json-ld]
-            [org.knotation.clj-api :as kn]
+            [org.knotation.api :as kn]
 
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.mimetypes :as mime]
@@ -64,7 +64,7 @@
                         st/select
                         rdf/assign-stanzas)
                    (st/select [:= :rt resource])))]
-     (kn/render-string :ttl (st/latest-env) states))})
+     (kn/render-to :ttl (st/latest-env) states))})
 
 (defn ontology-request
   [{:keys [:request-method] :as req}]

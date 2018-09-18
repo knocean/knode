@@ -59,11 +59,9 @@
                       (:project-name @state))
          states (concat
                  (st/latest-prefix-states)
-                 (if iri
-                   (->> [:= :si iri]
-                        st/select
-                        rdf/assign-stanzas)
-                   (st/select [:= :rt resource])))]
+                 (->> (if iri [:= :si iri] [:= :rt resource])
+                      st/select
+                      rdf/assign-stanzas))]
      (kn/render-to :ttl (st/latest-env) states))})
 
 (defn ontology-request

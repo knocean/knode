@@ -1,9 +1,9 @@
 (ns com.knocean.knode.pages.ontology.core
   (:require [cheshire.core :as json]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
+            [org.knotation.link :as ln]
             [org.knotation.json-ld :as json-ld]
             [org.knotation.api :as kn]
 
@@ -20,7 +20,7 @@
 
 (defn subject-by-iri
   [iri]
-  (let [env (st/latest-env)
+  (let [env (st/base-env)
         relevant (st/select [:= :si iri])]
     (map (fn [statement]
            (if-let [pi (:pi statement)]

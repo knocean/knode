@@ -5,7 +5,6 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.state :as knst]
-            [org.knotation.link :as ln]
             [org.knotation.api :as api]
 
             [com.knocean.knode.util :as util]

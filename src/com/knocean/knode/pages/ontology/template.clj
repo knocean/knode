@@ -2,9 +2,9 @@
   (:require [clojure.string :as string]
             [clojure.set :as set]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
+            [org.knotation.link :as ln]
             [org.knotation.state :as s]
 
             [com.knocean.knode.state :refer [state] :as st]

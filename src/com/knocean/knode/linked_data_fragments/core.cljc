@@ -4,12 +4,12 @@
             [clojure.set :as set]
             [honeysql.core :as sql]
 
-            [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
 
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]
 
-            [com.knocean.knode.state :as st]))
+            [com.knocean.knode.state :as st]
+            [com.knocean.knode.util :as util]))
 
 (defn nquads-object->object
   [object]

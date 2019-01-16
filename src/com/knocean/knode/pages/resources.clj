@@ -16,9 +16,12 @@
 
 (defn local-link
   [env resource iri]
-  (if-let [curie (ln/iri->curie env iri)]
-    (str "/resources/" resource "/subject?curie=" curie)
-    (str "/resources/" resource "/subject?iri=" (util/escape iri))))
+  (try
+    (if-let [curie (ln/iri->curie env iri)]
+      (str "/resources/" resource "/subject?curie=" curie)
+      (str "/resources/" resource "/subject?iri=" (util/escape iri)))
+    (catch Exception e
+      (str "/resources/" resource "/subject?iri=" iri))))
 
 (defn render-object
   [resource env format {:keys [oi ob ol] :as state}]
@@ -473,22 +476,54 @@ return false" this-select)}
                 (assoc {} :href))
            "Download as TSV."]]
          (build-nav "subjects" req)
-         (->> iris
-              (map (partial iri->seq resource env headers))
-              (concat
-               [(->> headers
-                     (map first)
-                     (map (fn [x]
-                            (if-let [iri (ln/->iri env x)]
-                              [:th [:a {:href (local-link env resource iri)} x]]
-                              [:th x])))
-                     (into [:tr]))])
-              (into [:table#results.table]))
+         (let [iri-seq (reduce 
+                        (fn [out iri]
+                          (conj
+                            out
+                            (iri->seq resource env headers iri)))
+                        []
+                        iris)]
+           (->> iri-seq
+                (concat
+                  [(->> headers
+                        (map first)
+                        (map (fn [x]
+                              (try
+                                (if-let [iri (ln/->iri env x)]
+                                  [:th [:a {:href (local-link env resource iri)} x]]
+                                  [:th x])
+                                (catch Exception e
+                                  [:th x]))))
+                        (into [:tr]))])
+                (into [:table#results.table])))
          (build-nav "subjects" req)]})
       (html
-       {:status 404
-        :title "Unknown format"
-        :error (str "unknown format: " format)}))))
+        {:status 404
+         :title "Unknown format"
+         :error (str "unknown format: " format)}))))
+
+
+
+
+
+;         (doseq [h headers]
+ ;         (print h))
+  ;       (->> iris
+   ;           (map (partial iri->seq resource env headers))
+    ;          (concat
+     ;          [(->> headers
+      ;               (map first)
+       ;              (map (fn [x]
+        ;                    (if-let [iri (ln/->iri env x)]
+         ;                     [:th [:a {:href (local-link env resource iri)} x]]
+          ;                    [:th x])))
+           ;          (into [:tr]))])
+            ;  (into [:table#results.table]))
+;         (build-nav "subjects" req)]})
+ ;     (html
+  ;     {:status 404
+   ;     :title "Unknown format"
+    ;    :error (str "unknown format: " format)}))))
 
 (defn predicates-page
   [{:keys [params query-params] :as req}]

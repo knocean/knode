@@ -3,7 +3,6 @@
    [clojure.string :as string]
    [cheshire.core :as json]
 
-   [org.knotation.link :as ln]
    [org.knotation.rdf :as rdf]
    [org.knotation.environment :as en]
 

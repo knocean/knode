@@ -3,7 +3,7 @@
             [clojure.string :as string]
             [clojure.set :as set]
 
-            [org.knotation.util :as util]
+            [com.knocean.knode.util :as util]
             [org.knotation.rdf :as rdf]))
 
 (def +per-page+ 1000)

@@ -3,7 +3,8 @@
 
             [com.knocean.knode.state :as st]
             [com.knocean.knode.server :as server]
-            [com.knocean.knode.loader :as loader])
+            [com.knocean.knode.loader :as loader]
+            [com.knocean.knode.resources :as r])
   (:gen-class))
 
 (def usage "Usage: knode TASK
@@ -18,8 +19,22 @@
   (let [task (first args)]
     (case task
       "help" (println usage)
-      "config" (do (st/init) (println (st/report @st/state)))
-      "serve" (do (st/init) (server/start))
+      "config" (do (st/init-from-config) (println (st/report @st/state)))
+      "serve" (do (st/init-from-config) (server/start))
+
+      "load-config"
+      (let [config (or (second args) "knode.edn")]
+        (when-not (.exists (io/as-file config))
+          (println "No '" config "' exists in current directory...")
+          (println "\tyou must specify a configuration file")
+          (System/exit 1))
+        (println "Woo! Doing the thing!")
+        (st/init-from-config)
+        (println "Loading resources...")
+        (r/resources! config)
+        (doseq [r (:resources @st/state)]
+          (loader/load-resource r))
+        (System/exit 0))
 
       "load"
       (do (st/init)

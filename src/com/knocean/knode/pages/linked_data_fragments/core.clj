@@ -3,6 +3,7 @@
             [cemerick.url :as url]
 
             [org.knotation.rdf :as rdf]
+            [org.knotation.environment :as en]
             [org.knotation.link :as ln]
 
             [com.knocean.knode.pages.mimetypes :as mime]

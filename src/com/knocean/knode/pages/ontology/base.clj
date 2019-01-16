@@ -4,6 +4,7 @@
             [com.knocean.knode.pages.mimetypes :as mime]
 
             [com.knocean.knode.state :refer [state] :as st]
+            [org.knotation.environment :as en]
             [org.knotation.link :as ln]))
 
 (defmulti ontology-result mime/req->output-format)

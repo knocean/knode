@@ -9,6 +9,7 @@
             [honeysql.core :as sql]
             [clojure.java.jdbc :as jdbc]
 
+            [org.knotation.state :as st]
             [org.knotation.api :as kn-api]
             [org.knotation.clj-api :as kn]
             [org.knotation.rdf :as rdf]
@@ -68,6 +69,10 @@
     :default (constantly nil)}
    {:key :write-file
     :label "Write file"
+    :default #(->> % :build-files last)}
+    
+   {:key :resources
+    :label "Resources"
     :default (constantly nil)}])
 
    ; Older
@@ -122,6 +127,24 @@
         (select-keys base))
    configurators))
 
+(defn configure-from-file
+  "Given a config file containing a map of configuration options, apply the 
+   configurators (in order) and return a new map."
+  [config]
+  (let [file (io/as-file config)
+        config-str (if (.exists file) (slurp config) nil)
+        state (if-not (nil? config-str) (read-string config-str) {})]
+    (reduce
+      (fn [state {:keys [key label default] :as configurator}]
+        (println "RUNNING CONFIGURATOR" label "...")
+        (if (find state key)
+          state
+          (assoc state key (default state))))
+      (->> configurators
+           (map :key)
+           (select-keys state))
+      configurators)))
+
 (defn plain-view
   [label value]
   (format "%-20s %s" (str label ":") (str value)))
@@ -142,7 +165,7 @@
 (defonce state (atom {}))
 
 (defn init
-  "Initialize the state atom."
+  "Initialize the state atom from environment variables."
   []
   (->> env
        (filter #(.startsWith (name (key %)) "knode-"))
@@ -151,11 +174,20 @@
        configure
        (reset! state)))
 
+(defn init-from-config
+  "Initialize the state atom from a configuration file."
+  [& {:keys [config]
+      :or {config "knode.edn"}}]
+  (->> config
+       configure-from-file
+       (reset! state)))
+
 (def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
 
 (defn query
   [honey]
-  (jdbc/query @state (sql/format honey)))
+  (let [dbspec {:connection-uri (:database-url @state)}]
+    (jdbc/query dbspec (sql/format honey))))
 
 (defn select
   [where & args]
@@ -166,22 +198,34 @@
   (jdbc/execute! @state query))
 
 (defn insert!
-  [states]
-  (->> states
-       (filter :pi)
-       (map (apply juxt columns))
-       (jdbc/insert-multi! @state "states" columns)))
+  "Given an ID space and a collection of states from a resource, add the states 
+   to the 'states' table. If states with the same resource ID already exist, 
+   remove them and add the new states."
+  [idspace states]
+  (if (empty? (query {:select [:*] :from [:states] :where [:= :rt idspace]}))
+    (->> states
+         (filter :pi)
+         (map (apply juxt columns))
+         (jdbc/insert-multi! @state :states columns))
+    (do 
+      (println "UPDATING STATES FOR" idspace)
+      (jdbc/delete! @state :states ["rt = ?" idspace])
+      (->> states
+         (filter :pi)
+         (map (apply juxt columns))
+         (jdbc/insert-multi! @state :states columns)))))
 
 (def -env-cache (atom nil))
 (defn clear-env-cache! []
   (reset! -env-cache nil))
+
 (defn latest-env []
   (or @-env-cache
       (reset!
        -env-cache
        (-> [:= :rt (:project-name @state)]
-           select
-           kn/collect-env
+            select
+            kn/collect-env
            (en/add-prefix "rdf" (rdf/rdf))
            (en/add-prefix "rdfs" (rdf/rdfs))
            (en/add-prefix "xsd" (rdf/xsd))

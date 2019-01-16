@@ -2,10 +2,11 @@
   (:require [clojure.string :as string]
             [clojure.java.jdbc :as jdbc]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en] [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
-            [com.knocean.knode.state :refer [state] :as st]))
+            [org.knotation.link :as ln]
+            [com.knocean.knode.state :refer [state] :as st]
+            [com.knocean.knode.util :as util]))
 
 (defn tsv-join
   [seq]

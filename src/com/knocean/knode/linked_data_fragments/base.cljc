@@ -3,7 +3,7 @@
             [clojure.string :as string]
             [clojure.set :as set]
 
-            [com.knocean.knode.util :as util]
+            [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]))
 
 (def +per-page+ 1000)
@@ -28,9 +28,10 @@
 (defn str->int
   ([str] (str->int str 0))
   ([str default]
-   (util/handler-case
+   (try
     (Integer/parseInt str)
-    (:default e default))))
+    (catch Exception e
+      default))))
 
 (defn -data-source-dispatch
   [query data]

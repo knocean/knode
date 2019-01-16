@@ -10,7 +10,6 @@
             [clojure.java.jdbc :as jdbc]
 
             [org.knotation.state :as st]
-            [org.knotation.api :as kn-api]
             [org.knotation.clj-api :as kn]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]))
@@ -182,7 +181,9 @@
        configure-from-file
        (reset! state)))
 
-(def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+(def columns [:rt ::rdf/gi ::rdf/si ::rdf/sb ::rdf/pi ::rdf/oi ::rdf/ob ::rdf/ol ::rdf/di ::rdf/ln])
+
+(def sql-columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
 
 (defn query
   [honey]
@@ -201,46 +202,21 @@
   "Given an ID space and a collection of states from a resource, add the states 
    to the 'states' table. If states with the same resource ID already exist, 
    remove them and add the new states."
-  [idspace states]
+  [idspace quads]
   (if (empty? (query {:select [:*] :from [:states] :where [:= :rt idspace]}))
-    (->> states
-         (filter :pi)
+    (->> quads
          (map (apply juxt columns))
-         (jdbc/insert-multi! @state :states columns))
+         (jdbc/insert-multi! @state :states sql-columns))
     (do 
       (println "UPDATING STATES FOR" idspace)
       (jdbc/delete! @state :states ["rt = ?" idspace])
-      (->> states
-         (filter :pi)
-         (map (apply juxt columns))
-         (jdbc/insert-multi! @state :states columns)))))
+      (->> quads
+           (map (apply juxt columns))
+           (jdbc/insert-multi! @state :states sql-columns)))))
 
 (def -env-cache (atom nil))
 (defn clear-env-cache! []
   (reset! -env-cache nil))
-
-(defn latest-env []
-  (or @-env-cache
-      (reset!
-       -env-cache
-       (-> [:= :rt (:project-name @state)]
-            select
-            kn/collect-env
-           (en/add-prefix "rdf" (rdf/rdf))
-           (en/add-prefix "rdfs" (rdf/rdfs))
-           (en/add-prefix "xsd" (rdf/xsd))
-           (en/add-prefix "owl" (rdf/owl))
-           (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-           (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
-           (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
-           (en/add-prefix "kn" (rdf/kn))
-           (en/add-prefix "knd" (rdf/kn "datatype/"))
-           (en/add-prefix "knp" (rdf/kn "predicate/"))
-           (en/add-prefix (:project-name @state) (:base-iri @state))))))
-
-(defn latest-prefix-states
-  []
-  (kn-api/prefix-states (latest-env)))
 
 (defn base-env
   []
@@ -270,3 +246,18 @@
        (remove nil?)
        set
        build-env))
+
+(defn latest-env []
+  (or @-env-cache
+      (reset!
+       -env-cache
+       (-> [:= :rt (:project-name @state)]
+            select
+            build-env-from-states))))
+
+(defn latest-prefix-states []
+  (map (fn [[prefix iri]]
+         {::st/event ::st/prefix
+          :prefix prefix
+          :iri iri})
+       (::en/prefix-iri latest-env)))

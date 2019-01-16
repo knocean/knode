@@ -4,12 +4,12 @@
             [clojure.set :as set]
             [honeysql.core :as sql]
 
+            [org.knotation.util :as util]
             [org.knotation.rdf :as rdf]
 
             [com.knocean.knode.linked-data-fragments.base :as base :refer [query query-stream]]
 
-            [com.knocean.knode.state :as st]
-            [com.knocean.knode.util :as util]))
+            [com.knocean.knode.state :as st]))
 
 (defn nquads-object->object
   [object]
@@ -18,14 +18,15 @@
 ;;;;; Query parsing/manipulating
 (defn string->object
   [s]
-  (util/handler-case
-   (let [res (nquads-object->object s)]
-     (base/remove-falsies
-      [[:oi (::rdf/iri res)]
-       [:ol (::rdf/lexical res)]
-       [:ln (::rdf/language res)]
-       [:di (::rdf/datatype res)]]))
-   (:default e {:oi s})))
+  (try
+    (let [res (nquads-object->object s)]
+      (base/remove-falsies
+       [[:oi (::rdf/iri res)]
+        [:ol (::rdf/lexical res)]
+        [:ln (::rdf/language res)]
+        [:di (::rdf/datatype res)]]))
+    (catch Exception e
+      {:oi s})))
 
 (defn req->query
   [req]

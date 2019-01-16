@@ -4,7 +4,6 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
 
             [com.knocean.knode.pages.mimetypes :as mime]
             
@@ -48,12 +47,12 @@
                          (cond
                            (:si entry)
                            [:a {:href (str "?subject=" (url/url-encode (:si entry)))}
-                            (ln/iri->name env (:si entry))]
+                            (en/iri->name env (:si entry))]
 
                            (:sb entry)
                            [:a {:href (str "?subject=" (url/url-encode (:sb entry)))}
                             (:sb entry)]) " "
-                         [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (ln/iri->name env (:pi entry))] " "
+                         [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (en/iri->name env (:pi entry))] " "
                          [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))
 

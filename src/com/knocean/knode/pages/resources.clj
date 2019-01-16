@@ -7,7 +7,6 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
@@ -16,19 +15,16 @@
 
 (defn local-link
   [env resource iri]
-  (try
-    (if-let [curie (ln/iri->curie env iri)]
-      (str "/resources/" resource "/subject?curie=" curie)
-      (str "/resources/" resource "/subject?iri=" (util/escape iri)))
-    (catch Exception e
-      (str "/resources/" resource "/subject?iri=" iri))))
+  (if-let [curie (try (en/iri->curie env iri) (catch Exception e nil))]
+    (str "/resources/" resource "/subject?curie=" curie)
+    (str "/resources/" resource "/subject?iri=" (util/escape iri))))
 
 (defn render-object
   [resource env format {:keys [oi ob ol] :as state}]
   (cond
     oi (case format
-         :CURIE [:a {:href (local-link env resource oi)} (ln/iri->curie env oi)]
-         :label [:a {:href (local-link env resource oi)} (ln/iri->name env oi)]
+         :CURIE [:a {:href (local-link env resource oi)} (en/iri->curie env oi)]
+         :label [:a {:href (local-link env resource oi)} (en/iri->name env oi)]
          [:a {:href (local-link env resource oi)} oi])
     ob ob
     ol ol
@@ -46,7 +42,7 @@
      (for [[column pi format] headers]
        (case column
          "IRI" [:td [:a {:href (local-link env resource iri)} iri]]
-         "CURIE" [:td [:a {:href (local-link env resource iri)} (ln/iri->curie env iri)]]
+         "CURIE" [:td [:a {:href (local-link env resource iri)} (en/iri->curie env iri)]]
          "recognized" [:td (->> states first boolean str)]
          (->> states
               (filter #(= pi (:pi %)))
@@ -58,15 +54,15 @@
 (defn render-pair
   [env resource {:keys [pi oi ob ol] :as state}]
   [:li
-   [:a {:href (local-link env resource pi)} (ln/iri->name env pi)]
+   [:a {:href (local-link env resource pi)} (en/iri->name env pi)]
    ": "
    (cond
      oi [:a {:href (local-link env resource oi)
              :rel pi
              :resource oi}
-         (ln/iri->name env oi)]
+         (en/iri->name env oi)]
      ob ob
-     ol [:span {:property (ln/iri->curie env pi)} ol])])
+     ol [:span {:property (en/iri->curie env pi)} ol])])
 
 (defn resource-entry
   [{:keys [label title description homepage]}]
@@ -147,7 +143,7 @@
   (if-let [iri (or (:iri req)
                    (get-in req [:params "iri"])
                    (when-let [curie (get-in req [:params "curie"])]
-                     (ln/curie->iri (st/latest-env) curie)))]
+                     (en/curie->iri (st/latest-env) curie)))]
     (if (= "html" (get params "format" "html"))
       (let [resource (get-in req [:params :resource] "all")
             resource-map (get-resource-entry resource)
@@ -160,10 +156,10 @@
                  distinct)
             env (st/build-env-from-states states)]
         (html
-         {:title (ln/iri->name env iri)
+         {:title (en/iri->name env iri)
           :content
           [:div.subject
-           [:h2 (ln/iri->name env iri)]
+           [:h2 (en/iri->name env iri)]
            [:p [:b "IRI:"] " " [:a {:href iri} iri]]
            [:p "Showing data from "
             [:a {:href (str "/resources/" resource)} (:label resource-map)]
@@ -248,11 +244,11 @@
     "curie"  (if (re-matches #"in\.\(.*\)" value)
                (->> (string/split (subs value 4 (dec (count value))) #",")
                     (map string/trim)
-                    (map (partial ln/curie->iri env))
+                    (map (partial en/curie->iri env))
                     ((fn [vs] [[:in :si vs]])))
                (throw (Exception. (str "Unhandled query value for 'curie': " value))))
     "any" (build-condition-object value)
-    (let [pi (ln/label->iri env column)]
+    (let [pi (en/label->iri env column)]
       (when-not pi
         (throw (Exception. (str "Unknown column: " column))))
       [[:= :pi pi] (build-condition-object value)])))
@@ -414,7 +410,7 @@ return false" this-select)}
             (if-let [[_ value] (re-matches #"in\.\((.*)\)" value)]
               (->> (string/split value #",")
                    (map string/trim)
-                   (map (partial ln/curie->iri env)))
+                   (map (partial en/curie->iri env)))
               (throw (Exception. (str "Unhandled query value for 'CURIE': " value)))))
           (and (= :post (:request-method req))
                (= "GET" (get-in req [:params "method"]))
@@ -422,7 +418,7 @@ return false" this-select)}
           (let [lines (->> req :body-string string/split-lines (map string/trim))]
             (case (first lines)
               "IRI" (rest lines)
-              "CURIE" (map (partial ln/curie->iri env) (rest lines))
+              "CURIE" (map (partial en/curie->iri env) (rest lines))
               (throw (Exception. (str "Unhandled POST body column: " (first lines)))))))
         iris (or specified-iris
                  (->> (st/query (build-query env resource params))
@@ -476,54 +472,22 @@ return false" this-select)}
                 (assoc {} :href))
            "Download as TSV."]]
          (build-nav "subjects" req)
-         (let [iri-seq (reduce 
-                        (fn [out iri]
-                          (conj
-                            out
-                            (iri->seq resource env headers iri)))
-                        []
-                        iris)]
-           (->> iri-seq
-                (concat
-                  [(->> headers
-                        (map first)
-                        (map (fn [x]
-                              (try
-                                (if-let [iri (ln/->iri env x)]
-                                  [:th [:a {:href (local-link env resource iri)} x]]
-                                  [:th x])
-                                (catch Exception e
-                                  [:th x]))))
-                        (into [:tr]))])
-                (into [:table#results.table])))
+         (->> iris
+              (map (partial iri->seq resource env headers))
+              (concat
+               [(->> headers
+                     (map first)
+                     (map (fn [x]
+                            (if-let [iri (util/->iri env x)]
+                              [:th [:a {:href (local-link env resource iri)} x]]
+                              [:th x])))
+                     (into [:tr]))])
+              (into [:table#results.table]))
          (build-nav "subjects" req)]})
       (html
-        {:status 404
-         :title "Unknown format"
-         :error (str "unknown format: " format)}))))
-
-
-
-
-
-;         (doseq [h headers]
- ;         (print h))
-  ;       (->> iris
-   ;           (map (partial iri->seq resource env headers))
-    ;          (concat
-     ;          [(->> headers
-      ;               (map first)
-       ;              (map (fn [x]
-        ;                    (if-let [iri (ln/->iri env x)]
-         ;                     [:th [:a {:href (local-link env resource iri)} x]]
-          ;                    [:th x])))
-           ;          (into [:tr]))])
-            ;  (into [:table#results.table]))
-;         (build-nav "subjects" req)]})
- ;     (html
-  ;     {:status 404
-   ;     :title "Unknown format"
-    ;    :error (str "unknown format: " format)}))))
+       {:status 404
+        :title "Unknown format"
+        :error (str "unknown format: " format)}))))
 
 (defn predicates-page
   [{:keys [params query-params] :as req}]
@@ -583,7 +547,7 @@ return false" this-select)}
                [(->> headers
                      (map first)
                      (map (fn [x]
-                            (if-let [iri (ln/->iri env x)]
+                            (if-let [iri (util/->iri env x)]
                               [:th [:a {:href (local-link env resource iri)} x]]
                               [:th x])))
                      (into [:tr]))])

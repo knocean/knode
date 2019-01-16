@@ -392,7 +392,7 @@
           (io/as-file)
           (io/copy out-file))
       ; otherwise, we need to convert to kn
-      (kn/render-path nil nil (kn/read-path nil nil src-file) out-file))
+      (kn/render-path :kn nil (kn/read-path nil nil src-file) out-file))
     (if-not (.exists out-file)
       ; if the file does not exist after copying/converting,
       ; throw an error

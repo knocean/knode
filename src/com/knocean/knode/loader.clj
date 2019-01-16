@@ -3,6 +3,8 @@
             [clojure.string :as s]
             [org.knotation.clj-api :as kn]
             [org.knotation.jena :as jena]
+            [org.knotation.rdf :as rdf]
+            [org.knotation.state :as knst]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.resources :as r]))
 
@@ -84,8 +86,10 @@ CREATE INDEX states_si ON states(si);"))
           ; all resources should be in KN
           fpath (str dir (:idspace resource) ".kn")]
       (->> (kn/read-path :kn nil fpath)
-           (filter :pi)
-           ; associate the state with the resource ID
+           (map ::knst/quad-stack)
+           flatten
+           (filter ::rdf/pi)
+           ; associate the quad stack with the resource ID
            (map #(assoc % :rt (:idspace resource)))
            (partition-all 2000)
            (map-indexed

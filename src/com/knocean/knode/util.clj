@@ -8,7 +8,10 @@
 
 (defn escape
   [iri]
-  (java.net.URLEncoder/encode iri))
+  (try
+    (java.net.URLEncoder/encode iri)
+    (catch Exception e
+      nil)))
 
 (defn redirect [location]
   {:status 302 :headers {"Location" location}})
@@ -37,13 +40,10 @@
           (recur (conj redirs new-url) (:location headers))
           nil)))))       ;; Anthing else will not be returned
 
-(defmacro handler-case
-  [body & handlers]
-  `(try
-     ~body
-     ~@(map
-        (fn [[exception-type name & body]]
-          `(catch ~(if (= :default exception-type)
-                     Exception
-                     exception-type) ~name ~@body))
-        handlers)))
+(defn ->iri
+  [env input]
+  (or 
+    (en/wrapped-iri->iri input)
+    (en/curie->iri env input)
+    (en/label->iri env input)
+    (en/name->iri env input)))

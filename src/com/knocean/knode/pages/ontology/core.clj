@@ -3,7 +3,6 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
             [org.knotation.json-ld :as json-ld]
             [org.knotation.api :as kn]
 
@@ -20,12 +19,12 @@
 
 (defn subject-by-iri
   [iri]
-  (let [env (st/base-env)
+  (let [env (st/latest-env)
         relevant (st/select [:= :si iri])]
     (map (fn [statement]
            (if-let [pi (:pi statement)]
-             [(ln/iri->name env pi)
-              (ln/iri->name env (:oi statement))]
+             [(en/iri->name env pi)
+              (en/iri->name env (:oi statement))]
              [:subject (:si statement)]))
          relevant)))
 

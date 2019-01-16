@@ -5,6 +5,7 @@
             :url "https://opensource.org/licenses/BSD-3-Clause"}
   :plugins [[lein-cljsbuild "1.1.6"]]
   :hooks [leiningen.cljsbuild]
+  ;; :repositories {"local" "file:mvn"}
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/clojurescript "1.10.217"]
                  [org.clojure/test.check "0.9.0"]
@@ -33,8 +34,13 @@
 
                  [clj-jgit "0.8.10"]
 
-                 [org.knotation/knotation-cljc "0.4.0-SNAPSHOT"]
-                 [org.knotation/knotation-editor "1.2.0-SNAPSHOT"]]
+                 ;; knotation-cljc from Clojars will NOT work with this v of Knode
+                 ;; JAR should be built from most recent version of knotation-cljc 
+                 ;; and deployed to local "mvn" file in project directory
+                 ;; (uncomment line 8 to include)
+                 [org.knotation/knotation-cljc "0.4.0-SNAPSHOT"]]
+                 ;; editing is currently disabled
+                 ;; [org.knotation/knotation-editor "1.2.0-SNAPSHOT"]
   :cljsbuild {:builds [{:source-paths ["src/com/knocean/knode/front_end"]
                         :compiler {:output-to "resources/public/js/knode.js"
                                    :optimizations :whitespace

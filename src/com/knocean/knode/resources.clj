@@ -15,23 +15,44 @@
 
 (def obo "http://purl.obolibrary.org/obo/")
 
+(defn insert-branches!
+  "given an :obo-github-repo resource, add each of the branched resources to the
+   'resources' table. If a resource with the same label (ID) already exists, 
+   remove it and add the new one."
+  [{:keys [:paths :idspace :label :title :description :homepage] :as resource}]
+  (doseq [p paths]
+    (let [id (first (s/split p #"\."))
+          res {:label id
+               :title (or title id)
+               :description (or description "")
+               :homepage (or homepage "")}]
+      (println "... branch" (last (s/split id #"-")))
+      (if (empty? (st/query {:select [:*]
+                             :from [:resources]
+                             :where [:= :label id]}))
+        (jdbc/insert! @st/state :resources res)
+        (do
+          (println "Old entry exists! Updating" id)
+          (jdbc/delete! @st/state :resources ["label = ?" id])
+          (jdbc/insert! @st/state :resources res))))))
+
 (defn insert!
   "Given a resource entry, add the resource to the 'resources' table. If a 
    resource with the same label (idspace) already exists, remove it and add the 
    new one."
-  [resource]
-  (let [res {:label (:idspace resource)
-             :title (or (:title resource) (:idspace resource))
-             :description (or (:description resource) "")
-             :homepage (or (:homepage resource) "")}]
+  [{:keys [:idspace :label :title :description :homepage] :as resource}]
+  (let [res {:label idspace
+             :title (or title idspace)
+             :description (or description "")
+             :homepage (or homepage "")}]
     ; query to see if resource with same label exists, delete if so
     (if (empty? (st/query {:select [:*] 
                            :from [:resources] 
-                           :where [:= :label (:label res)]}))
+                           :where [:= :label idspace]}))
       (jdbc/insert! @st/state :resources res)
       (do
-        (println "UPDATING" (:label res))
-        (jdbc/delete! @st/state :resources ["label = ?" (:label res)])
+        (println "UPDATING" idspace)
+        (jdbc/delete! @st/state :resources ["label = ?" idspace])
         (jdbc/insert! @st/state :resources res)))))
 
 (defn init-dir!
@@ -138,7 +159,8 @@
       :else true)))
 
 (defn link-resource-exists?
-  ""
+  "Given a resources directory and a :direct-link resource, determine if the 
+   resource has already been retrieved."
   [dir resource]
   (let [fname (-> resource
                   :idspace
@@ -169,7 +191,8 @@
 ;; INIT RESOURCES
 
 (defn process-response!
-  ""
+  "Given a resource, a URL, an HTTP response, and a file to write to, process 
+   the response and write the content to file."
   [resource url response file]
   (if-not response
     (do
@@ -188,7 +211,8 @@
           resource)))))
 
 (defn get-link-resource!
-  ""
+  "Given a resources directory and a :direct-link resource, get the content from 
+   the URL."
   [dir resource]
   (let [fname (-> resource
                   :idspace
@@ -211,14 +235,48 @@
         response (util/get-response url)]
     (process-response! resource url response file)))
 
+(defn copy-branch-resource!
+  "Given a resource directory, an :obo-github-repo resource, and a branch object, 
+   copy the resource file (specified by :path or an OWL file in the root of the 
+   repository) from the branch to a new file in the resource directory with name 
+   [id]-[branch].[ext]. Return the new file name."
+  [dir {:keys [:idspace :path] :as resource} branch]
+  (let [fname (->> idspace s/lower-case)
+        src-file (if path
+                   (str dir "/" fname "/" path)
+                   (str dir "/" fname "/" fname ".owl"))
+        tgt-file (str 
+                   dir "/" fname "-" 
+                   (-> (.getName branch) (s/split #"/") last) "." 
+                   (-> src-file (s/split #"\.") last))]
+    (-> src-file
+        io/as-file
+        (io/copy (io/as-file tgt-file)))
+    (-> tgt-file (s/split #"/") last)))
+
+(defn copy-branch-resources!
+  "Given a resource directory and an :obo-github-repo resource, get the resource 
+   files from each of the git branches. Return the resource with a :paths key 
+   listing the path to each new resource file, copied from the repo."
+  [dir resource]
+  (let [rname (->> resource :idspace s/lower-case)
+        repo (git/load-repo (str dir "/" rname))]
+    (git/git-fetch-all repo)
+    (when-let [branches (git/git-branch-list repo :all)]
+      (->> branches
+           (map #(copy-branch-resource! dir resource %))
+           distinct
+           (assoc resource :paths)))))
+
 (defn get-github-repo!
   "Given a resources directory and a resource of type :obo-github-repo, 
-   download the resource as a github repository to the directory."
+   download the resource as a github repository to the directory. Copy the 
+   resource files from any different branches and return the updated resource."
   [dir resource]
   (let [fname (->> resource :idspace s/lower-case)
         github (:github resource)
         repo (:repo (git/git-clone-full github (str dir "/" fname)))]
-    resource))
+    (copy-branch-resources! dir resource)))
 
 (defn get-resource!
   "Given a resources directory and a resource that does not exist, download 
@@ -282,12 +340,13 @@
     (different-version? resource response)))
 
 (defn update-github-repo!
-  ""
+  "Given a resource directory and an :obo-github-repo resource, use git-fetch to 
+   update the repository then copy the resource files from each branch."
   [dir resource]
   (let [fname (->> resource :idspace s/lower-case)
         repo (git/load-repo (str dir "/" fname))]
     (git/git-fetch repo)
-    resource))
+    (copy-branch-resources! dir resource)))
 
 (defn maybe-update
   "Given a resources directory and an existing resource, update the resource. 
@@ -364,21 +423,6 @@
 
 ;; MOVE RESOURCES TO ONTOLOGY DIRECTORY
 
-(defn switch-branch!
-  "Given a resource directory and a resource of type :obo-github-repo,
-   maybe switch the branch determined by the :branch key in the resource.
-   If :branch is not provided, stay on master branch."
-  [dir resource]
-  (let [fname (->> resource :idspace s/lower-case)
-        repo (git/load-repo (str dir "/" fname))
-        branch (:branch resource)]
-    (if-not (nil? branch)
-      (do
-        (println "Fetching all refs...")
-        (git/git-fetch-all repo)
-        (println "Switching to branch" branch)
-        (git/git-checkout repo branch)))))
-
 (defn copy-file!
   "Given a source file and a target file (in KN format),
    copy the source file to the target file in knotation format. 
@@ -389,7 +433,7 @@
       ; if the src file is already in knotation,
       ; just copy it to the destination
       (-> src-file 
-          (io/as-file)
+          io/as-file
           (io/copy out-file))
       ; otherwise, we need to convert to kn
       (kn/render-path :kn nil (kn/read-path nil nil src-file) out-file))
@@ -402,8 +446,16 @@
       ; otherwise, return the path to the target file
       tgt-file)))
 
-; Assumes there is a published '.owl' file in the root of the github repo
-; TODO: detect where the file is? Allow a config file?
+(defn copy-git-resources
+  "Given an :obo-github-repo resource, a source directory to copy resources 
+   from, and a target directory to copy resources to, copy each resource 
+   specified by the :paths key, ensuring they are in KN format."
+  [{:keys [:paths :idspace] :as resource} src-dir tgt-dir]
+  (doseq [p paths]
+    (let [src-file (str src-dir "/" p)
+          tgt-file (str tgt-dir "/" (-> p (s/split #"\." -1) first) ".kn")]
+      (copy-file! src-file tgt-file))))
+
 (defn copy-resource
   "Given a resource, a source directory to copy from, and a target directory to 
    copy to, copy the resource to the target in kn format. Return the path to the
@@ -411,14 +463,11 @@
   [resource src-dir tgt-dir]
   (let [fname (->> resource :idspace s/lower-case)
         tgt-file (str tgt-dir "/" fname ".kn")]
-    (println (str "Copying resource '" (:idspace resource) "'..."))
     (case (:type resource)
       :local-file
       (copy-file! (:path resource) tgt-file)
       :obo-github-repo 
-      (do
-        (switch-branch! src-dir resource)
-        (copy-file! (str src-dir "/" fname "/" fname ".owl") tgt-file))
+      (copy-git-resources resource src-dir tgt-dir)
       :obo-published-owl 
       (copy-file! (str src-dir "/" fname ".owl") tgt-file)
       :direct-link

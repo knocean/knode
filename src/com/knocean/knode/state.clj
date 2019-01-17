@@ -208,7 +208,7 @@
          (map (apply juxt columns))
          (jdbc/insert-multi! @state :states sql-columns))
     (do 
-      (println "UPDATING STATES FOR" idspace)
+      (println "Old entries exist! Updating states for" idspace)
       (jdbc/delete! @state :states ["rt = ?" idspace])
       (->> quads
            (map (apply juxt columns))

@@ -157,6 +157,7 @@ ex:0000111
               "TSV (tsv)"]])
          is)
     (->> (html/select doc [:.subject :li :span html/text-node])
+         rest
          (= ["barn owl primary remex feather"
              "grange hibou primaire remex plume"
              "A primary remex feather of a barn owl"])

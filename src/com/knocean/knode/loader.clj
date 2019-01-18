@@ -119,7 +119,6 @@ CREATE INDEX states_si ON states(si);"))
      (catch Exception e
        (println "The 'states' table does not exist.")
        (create-tables)))
-   (println (kn/read-paths nil nil args))
    (->> (if (second args)
           (kn/read-paths nil nil args)
           (kn/read-path nil nil (first args)))

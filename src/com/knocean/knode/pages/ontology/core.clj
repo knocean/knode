@@ -5,7 +5,9 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.json-ld :as json-ld]
             [org.knotation.clj-api :as kn]
+            [org.knotation.ttl :as ttl]
             [org.knotation.state :as knst]
+            [org.knotation.environment :as en]
 
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.mimetypes :as mime]
@@ -39,25 +41,40 @@
                         [:li (mime/req->format-link req format)])
                       mime/mimetype-table)]]}))
 
+
+
 (defn assign-rdf
   ""
   [quads]
   (reduce
     (fn [quads quad]
-      (conj quads {::knst/quad quad}))
+      (let [subject (or (::rdf/si quad) (::rdf/sb quad))
+            stanza (::rdf/zn quad)
+            event (first (knst/insert-events [{::rdf/quad quad
+                                        ::rdf/subject subject
+                                        ::rdf/stanza stanza}]))]
+        (conj quads {::rdf/quad quad
+                     ::rdf/subject subject
+                     ::rdf/stanza stanza
+                     ::knst/event (::knst/event event)})))
     []
-    (map
-      #(clojure.set/rename-keys 
-        (select-keys % [:di :oi :si :gi :ln :dt :zn :ol])
-        {:di ::rdf/di
-         :oi ::rdf/oi
-         :si ::rdf/si
-         :gi ::rdf/gi
-         :ln ::rdf/ln
-         :dt ::rdf/dt
-         :zn ::rdf/zn
-         :ol ::rdf/ol})
-      quads)))
+    (rdf/assign-stanzas
+      (map
+        #(clojure.set/rename-keys 
+          (select-keys % [:di :oi :si :gi :ln :dt :zn :ol])
+          {:di ::rdf/di
+           :oi ::rdf/oi
+           :si ::rdf/si
+           :gi ::rdf/gi
+           :ln ::rdf/ln
+           :dt ::rdf/dt
+           :zn ::rdf/zn
+           :ol ::rdf/ol})
+        quads))))
+
+(defn render-output
+  [states fmt]
+  (map #(knst/render-output % fmt nil) states))
 
 (defmethod ontology-result "json"
   [{:keys [requested-iris env] :as req}]
@@ -82,7 +99,11 @@
                  (->> (if iri [:= :si iri] [:= :rt resource])
                       st/select
                       assign-rdf))]
-     (kn/render-string :ttl (st/latest-env) states))})
+     ;;(println states)
+     (->> states
+          (ttl/render-stanza (st/latest-env))
+          (map #(knst/output % :ttl nil))
+          knst/render-output-string))})
 
 (defn ontology-request
   [{:keys [:request-method] :as req}]

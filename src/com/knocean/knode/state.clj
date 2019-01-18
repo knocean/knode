@@ -214,16 +214,32 @@
            (map (apply juxt columns))
            (jdbc/insert-multi! @state :states sql-columns)))))
 
+(defn get-quads
+  "Given a lazy seq of states, return a seq of all quads."
+  [states]
+  (->> states
+       (map ::st/quad)
+       (conj (->> states
+                  (map ::st/quad-stack)
+                  flatten))
+       (filter ::rdf/pi)
+       set))
+
 (def -env-cache (atom nil))
 (defn clear-env-cache! []
   (reset! -env-cache nil))
 
+;; TODO: need to get prefixes from the input file too
 (defn base-env
   []
   (-> en/default-env
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-      (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
-      (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
+      ;; (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+      ;; (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
+      (en/add-prefix "rdfs" "http://www.w3.org/2000/01/rdf-schema#")
+      (en/add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+      (en/add-prefix "owl" "http://www.w3.org/2002/07/owl#")
+      (en/add-prefix "kn" "https://knotation.org/kn/")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn build-env

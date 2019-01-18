@@ -63,21 +63,11 @@ DROP INDEX IF EXISTS states_si;"))
    "CREATE INDEX states_rt ON states(rt);
 CREATE INDEX states_si ON states(si);"))
 
-(defn get-quads
-  "Given an ID and a lazy seq of states, return a seq of all quads."
-  [id states]
-  (->> states
-       (map ::knst/quad)
-       (conj (->> states
-                  (map ::knst/quad-stack)
-                  flatten))
-       (filter ::rdf/pi)
-       (map #(assoc % :rt id))))
-
 (defn load-states
   [id fpath]
   (->> (kn/read-path :kn nil fpath)
-       (get-quads id)
+       st/get-quads
+       (map #(assoc % :rt id))
        (partition-all 2000)
        (map-indexed
          (fn [i p]
@@ -133,7 +123,8 @@ CREATE INDEX states_si ON states(si);"))
    (->> (if (second args)
           (kn/read-paths nil nil args)
           (kn/read-path nil nil (first args)))
-        (get-quads resource)
+        st/get-quads
+        (map #(assoc % :rt resource))
         (partition-all 2000) ; WARN: This number is pretty arbitrary
         (map-indexed
          (fn [i p]

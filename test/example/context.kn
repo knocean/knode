@@ -3,20 +3,19 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 @prefix owl: <http://www.w3.org/2002/07/owl#>
 @prefix obo: <http://purl.obolibrary.org/obo/>
-@prefix knd: <https://knotation.org/datatype/>
-@prefix knp: <https://knotation.org/predicate/>
+@prefix kn: <https://knotation.org/kn/>
 @prefix ex: <https://example.com/>
 
 : rdfs:label
 rdfs:label: label
 
-: knd:link
+: kn:link
 label: link
 
-: knd:omn
+: kn:omn
 label: OWL Manchester Syntax
 
-: knp:default-datatype
+: kn:default-datatype
 label: default datatype
 default datatype; link: link
 
@@ -56,7 +55,7 @@ label: primary remex feather
 definition: A remex feather that is connected to the manus
 
 : ex:template
-knp:template-content: 
+kn:template-content: 
  label: Foo {label}
 
 : ex:0000001

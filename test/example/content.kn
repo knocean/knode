@@ -3,7 +3,7 @@ type: owl:Ontology
 rdfs:comment: This is the example ontology.
 
 : ex:01
-knp:apply-template: ex:template 
+kn:apply-template: ex:template 
  label: Bar
 
 : ex:0000111
@@ -35,15 +35,10 @@ part of: barn owl 2222
 length (cm): 25.0
 coloration: light brown with darker bands
 
-: SUBJECT
-knp:apply-template: ex:template
- label: REQUIRED
-
 : ex:0033334
-knp:apply-template: ex:template
+kn:apply-template: ex:template
  label: manually added example
 
-
 : ex:12321
-knp:apply-template: ex:template
+kn:apply-template: ex:template
  label: example 12321

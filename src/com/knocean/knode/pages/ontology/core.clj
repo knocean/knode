@@ -1,10 +1,11 @@
 (ns com.knocean.knode.pages.ontology.core
   (:require [cheshire.core :as json]
+            [clojure.string :as string]
 
             [org.knotation.rdf :as rdf]
-            [org.knotation.environment :as en]
             [org.knotation.json-ld :as json-ld]
-            [org.knotation.api :as kn]
+            [org.knotation.clj-api :as kn]
+            [org.knotation.state :as knst]
 
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.mimetypes :as mime]
@@ -38,6 +39,26 @@
                         [:li (mime/req->format-link req format)])
                       mime/mimetype-table)]]}))
 
+(defn assign-rdf
+  ""
+  [quads]
+  (reduce
+    (fn [quads quad]
+      (conj quads {::knst/quad quad}))
+    []
+    (map
+      #(clojure.set/rename-keys 
+        (select-keys % [:di :oi :si :gi :ln :dt :zn :ol])
+        {:di ::rdf/di
+         :oi ::rdf/oi
+         :si ::rdf/si
+         :gi ::rdf/gi
+         :ln ::rdf/ln
+         :dt ::rdf/dt
+         :zn ::rdf/zn
+         :ol ::rdf/ol})
+      quads)))
+
 (defmethod ontology-result "json"
   [{:keys [requested-iris env] :as req}]
   {:status 200
@@ -47,7 +68,7 @@
     (first requested-iris)
     (concat
      (st/latest-prefix-states)
-     (st/select [:= :si (first requested-iris)])))})
+     (assign-rdf (st/select [:= :si (first requested-iris)]))))})
 
 (defmethod ontology-result "ttl"
   [{:keys [requested-iris params env] :as req}]
@@ -60,8 +81,8 @@
                  (st/latest-prefix-states)
                  (->> (if iri [:= :si iri] [:= :rt resource])
                       st/select
-                      rdf/assign-stanzas))]
-     (kn/render-to :ttl (st/latest-env) states))})
+                      assign-rdf))]
+     (kn/render-string :ttl (st/latest-env) states))})
 
 (defn ontology-request
   [{:keys [:request-method] :as req}]

@@ -102,6 +102,7 @@ https://example.com/0000111	barn owl primary remex feather	true
 ")
        is)
 
+;; TODO: ttl is not being created due to states not being in correct format
   (->> {:uri ""
         :params
         {:resource "ex"
@@ -110,7 +111,7 @@ https://example.com/0000111	barn owl primary remex feather	true
        res/subject-page
        :body
        (= "@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix knd: <https://knotation.org/datatype/> .
+@prefix kn: <https://knotation.org/kn/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix obo: <http://purl.obolibrary.org/obo/> .
 @prefix kn: <https://knotation.org/> .
@@ -119,7 +120,6 @@ https://example.com/0000111	barn owl primary remex feather	true
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix ncbitaxon: <http://purl.obolibrary.org/obo/ncbitaxon#> .
-@prefix knp: <https://knotation.org/predicate/> .
 
 ex:0000111
   rdfs:label \"barn owl primary remex feather\" ;
@@ -157,12 +157,13 @@ ex:0000111
               "TSV (tsv)"]])
          is)
     (->> (html/select doc [:.subject :li :span html/text-node])
-         rest
          (= ["barn owl primary remex feather"
              "grange hibou primaire remex plume"
              "A primary remex feather of a barn owl"])
          is)))
 
+;; TODO: kn CURIES are not being added (from context)
+;; all other predicates are showing up fine (from content)
 (deftest test-predicates-page
   (->> {:uri ""
         :params
@@ -171,20 +172,21 @@ ex:0000111
          "compact" "true"}}
        res/predicates-page
        :body
-       (= "CURIE	label	obsolete	replacement
-obo:BFO_0000050	part of		
-obo:IAO_0000115	definition		
-obo:IAO_0000118	alternative term		
-obo:IAO_0100001	replacement		
-rdf:type	type		
-rdfs:comment			
-rdfs:label	label		
-owl:deprecated	obsolete		
-ex:0000001	birth date		
-ex:0000002	length (cm)		
-knp:applied-template			
-knp:default-datatype	default datatype		
-knp:template-content			
+       (= "CURIE\tlabel\tobsolete\treplacement
+obo:BFO_0000050\tpart of\t\t
+obo:IAO_0000115\tdefinition\t\t
+obo:IAO_0000118\talternative term\t\t
+obo:IAO_0100001\treplacement\t\t
+rdf:type\ttype\t\t
+rdfs:comment\t\t\t
+rdfs:label\tlabel\t\t
+owl:deprecated\tobsolete\t\t
+ex:0000001\tbirth date\t\t
+ex:0000002\tlength (cm)\t\t
+ex:0000003\tcoloration\t\t
+kn:apply-template\t\t\t
+kn:default-datatype\tdefault datatype\t\t
+kn:template-content\t\t\t
 ")
        is))
 

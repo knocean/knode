@@ -181,9 +181,9 @@
        configure-from-file
        (reset! state)))
 
-(def columns [:rt ::rdf/gi ::rdf/si ::rdf/sb ::rdf/pi ::rdf/oi ::rdf/ob ::rdf/ol ::rdf/di ::rdf/ln])
+(def columns [:rt ::rdf/gi ::rdf/si ::rdf/sb ::rdf/pi ::rdf/oi ::rdf/ob ::rdf/ol ::rdf/di ::rdf/lt])
 
-(def sql-columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+(def sql-columns [:rt :gi :si :sb :pi :oi :ob :ol :di :lt])
 
 (defn query
   [honey]
@@ -218,12 +218,8 @@
   "Given a lazy seq of states, return a seq of all quads."
   [states]
   (->> states
-       (map ::st/quad)
-       (conj (->> states
-                  (map ::st/quad-stack)
-                  flatten))
-       (filter ::rdf/pi)
-       set))
+       (map ::rdf/quad)
+       (filter ::rdf/pi)))
 
 (def -env-cache (atom nil))
 (defn clear-env-cache! []
@@ -233,12 +229,13 @@
 (defn base-env
   []
   (-> en/default-env
-      (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       ;; (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
       ;; (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
-      (en/add-prefix "rdfs" "http://www.w3.org/2000/01/rdf-schema#")
       (en/add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+      (en/add-prefix "rdfs" "http://www.w3.org/2000/01/rdf-schema#")
+      (en/add-prefix "xsd" "http://www.w3.org/2001/XMLSchema#")
       (en/add-prefix "owl" "http://www.w3.org/2002/07/owl#")
+      (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       (en/add-prefix "kn" "https://knotation.org/kn/")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
@@ -271,9 +268,15 @@
             select
             build-env-from-states))))
 
+(defn prefix-states
+  [env]
+  (->> env
+       ::en/prefix-seq
+      (map (fn [prefix]
+             {::st/event ::st/prefix
+              ::en/prefix prefix
+              ::en/iri (get-in env [::en/prefix-iri prefix])}))))
+
 (defn latest-prefix-states []
-  (map (fn [[prefix iri]]
-         {::st/event ::st/prefix
-          :prefix prefix
-          :iri iri})
-       (::en/prefix-iri latest-env)))
+    (prefix-states latest-env))
+

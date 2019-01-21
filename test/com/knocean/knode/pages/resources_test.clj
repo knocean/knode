@@ -110,16 +110,13 @@ https://example.com/0000111	barn owl primary remex feather	true
          "format" "ttl"}}
        res/subject-page
        :body
-       (= "@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix kn: <https://knotation.org/kn/> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix obo: <http://purl.obolibrary.org/obo/> .
-@prefix kn: <https://knotation.org/> .
-@prefix NCBITaxon: <http://purl.obolibrary.org/obo/NCBITaxon_> .
-@prefix ex: <https://example.com/> .
+       (= "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ncbitaxon: <http://purl.obolibrary.org/obo/ncbitaxon#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+@prefix kn: <https://knotation.org/kn/> .
+@prefix ex: <https://example.com/> .
 
 ex:0000111
   rdfs:label \"barn owl primary remex feather\" ;
@@ -184,7 +181,7 @@ owl:deprecated\tobsolete\t\t
 ex:0000001\tbirth date\t\t
 ex:0000002\tlength (cm)\t\t
 ex:0000003\tcoloration\t\t
-kn:apply-template\t\t\t
+kn:applied-template\t\t\t
 kn:default-datatype\tdefault datatype\t\t
 kn:template-content\t\t\t
 ")

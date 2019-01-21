@@ -36,7 +36,7 @@
                                   (try
                                     (object->nquads-object
                                      {::rdf/lexical (:ol entry)
-                                      ::rdf/language (:ln entry)
+                                      ::rdf/language (:lt entry)
                                       ::rdf/datatype (:di entry)})
                                     (catch Exception e
                                       (or (:oi entry) "")))

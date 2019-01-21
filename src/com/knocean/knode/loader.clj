@@ -43,7 +43,7 @@ DROP TABLE IF EXISTS states;"))
   ob text,
   ol text,
   di text,
-  ln text
+  lt text
 );"
     (case (:database-type @state)
       "sqlite" "integer PRIMARY KEY AUTOINCREMENT"
@@ -84,33 +84,33 @@ CREATE INDEX states_si ON states(si);"))
 
 (defn load-resource
   ([resource]
-    (println "Loading resource" (:idspace resource))
-    ; add the resource to the 'resources' table
-    (try
-    (st/query {:select [:*] :from [:resources] :limit 1})
-    (catch Exception e
-        (println "The 'resources' table does not exist... Creating...")
-        (create-tables)))
-    (if (= (:type resource) :obo-github-repo)
-      ;; add a resource for each branch
-      (r/insert-branches! resource)
-      (r/insert! resource))
-    ; then add the states for the resource to the 'states' table
-    (try
-      (st/query {:select [:*] :from [:states] :limit 1})
-      (catch Exception e
-        (println "The 'states' table does not exist... Creating...")
-        (create-tables)))
+   (println "Loading resource" (:idspace resource))
+   ; add the resource to the 'resources' table
+   (try
+     (st/query {:select [:*] :from [:resources] :limit 1})
+     (catch Exception e
+         (println "The 'resources' table does not exist... Creating...")
+         (create-tables)))
+   (if (= (:type resource) :obo-github-repo)
+     ;; add a resource for each branch
+     (r/insert-branches! resource)
+     (r/insert! resource))
+   ; then add the states for the resource to the 'states' table
+   (try
+     (st/query {:select [:*] :from [:states] :limit 1})
+     (catch Exception e
+       (println "The 'states' table does not exist... Creating...")
+       (create-tables)))
 
-    ; get the ontology directory and resource file path
-    (let [dir (if (s/ends-with? (:absolute-dir @state) "/")
-                    (str (:absolute-dir @state) "ontology/")
-                    (str (:absolute-dir @state) "/ontology/"))
-          ; all resources should be in KN
-          fpath (str dir (:idspace resource) ".kn")]
-      (if (= (:type resource) :obo-github-repo)
-        (load-branch-states dir resource)
-        (load-states fpath (:idspace resource)))))
+   ; get the ontology directory and resource file path
+   (let [dir (if (s/ends-with? (:absolute-dir @state) "/")
+                (str (:absolute-dir @state) "ontology/")
+                (str (:absolute-dir @state) "/ontology/"))
+         ; all resources should be in KN
+         fpath (str dir (:idspace resource) ".kn")]
+     (if (= (:type resource) :obo-github-repo)
+       (load-branch-states dir resource)
+       (load-states fpath (:idspace resource)))))
 
   ([resource args]
    (println "LOAD" (:connection @state) resource args)

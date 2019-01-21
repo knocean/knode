@@ -55,7 +55,7 @@
         states
         (->> [:= :si iri]
              st/select
-             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
+             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
              distinct)]
     [:div
      [:h2 (en/iri->curie env iri) " " (en/iri->name env iri)]

@@ -23,7 +23,7 @@
       (base/remove-falsies
        [[:oi (::rdf/iri res)]
         [:ol (::rdf/lexical res)]
-        [:ln (::rdf/language res)]
+        [:lt (::rdf/language res)]
         [:di (::rdf/datatype res)]]))
     (catch Exception e
       {:oi s})))
@@ -63,7 +63,7 @@
               (or (nil? q)
                   (= q (get entry k))
                   (and (= ":blank" q) (get entry (get blanks k))))))
-          [:gi :si :pi :oi :ol :ln :di]))))
+          [:gi :si :pi :oi :ol :lt :di]))))
 
 (defn paginated [per-page pg seq]
   {:total (count seq)

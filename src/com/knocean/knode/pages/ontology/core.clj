@@ -17,8 +17,8 @@
             [com.knocean.knode.pages.ontology.base :as base :refer [ontology-result]]
             [com.knocean.knode.pages.authentication :as auth]
             [com.knocean.knode.pages.ontology.html]
-            [com.knocean.knode.pages.ontology.tsv]
-            [com.knocean.knode.pages.ontology.edit :as edit]))
+            [com.knocean.knode.pages.ontology.tsv]))
+            ;[com.knocean.knode.pages.ontology.edit :as edit]))
 
 (defn subject-by-iri
   [iri]
@@ -46,31 +46,25 @@
 (defn assign-rdf
   ""
   [quads]
-  (reduce
-    (fn [quads quad]
-      (let [subject (or (::rdf/si quad) (::rdf/sb quad))
-            stanza (::rdf/zn quad)
-            event (first (knst/insert-events [{::rdf/quad quad
-                                        ::rdf/subject subject
-                                        ::rdf/stanza stanza}]))]
-        (conj quads {::rdf/quad quad
-                     ::rdf/subject subject
-                     ::rdf/stanza stanza
-                     ::knst/event (::knst/event event)})))
-    []
-    (rdf/assign-stanzas
-      (map
+  (->> quads
+       (map
         #(clojure.set/rename-keys 
-          (select-keys % [:di :oi :si :gi :ln :dt :zn :ol])
-          {:di ::rdf/di
-           :oi ::rdf/oi
-           :si ::rdf/si
-           :gi ::rdf/gi
-           :ln ::rdf/ln
-           :dt ::rdf/dt
+          (select-keys % [:gi :zn :si :sb :pi :oi :ob :ol :di :lt])
+          {:gi ::rdf/gi
            :zn ::rdf/zn
-           :ol ::rdf/ol})
-        quads))))
+           :si ::rdf/si
+           :sb ::rdf/sb
+           :pi ::rdf/pi
+           :oi ::rdf/oi
+           :ob ::rdf/ob
+           :ol ::rdf/ol
+           :di ::rdf/di
+           :lt ::rdf/lt}))
+       rdf/assign-stanzas
+       (map (fn [quad] {::knst/event ::knst/statement
+                        ::rdf/stanza (::rdf/zn quad)
+                        ::rdf/subject (or (::rdf/si quad) (::rdf/sb quad))
+                        ::rdf/quad quad}))))
 
 (defn render-output
   [states fmt]
@@ -94,24 +88,26 @@
    (let [iri (first requested-iris)
          resource (or (:resource params)
                       (:project-name @state))
+         env (st/base-env)
+         quads (st/select
+                     (if iri [:= :si iri] [:= :rt resource])
+                     :order-by [:id])
          states (concat
-                 (st/latest-prefix-states)
-                 (->> (if iri [:= :si iri] [:= :rt resource])
-                      st/select
-                      assign-rdf))]
-     ;;(println states)
-     (->> states
-          (ttl/render-stanza (st/latest-env))
-          (map #(knst/output % :ttl nil))
-          knst/render-output-string))})
+                 (st/prefix-states env)
+                 [{::knst/event ::knst/blank}]
+                 (assign-rdf quads))]
+       (->> states
+            (ttl/render-stanza env)
+            (map #(knst/output % :ttl nil))
+            knst/render-output-string))})
 
 (defn ontology-request
   [{:keys [:request-method] :as req}]
-  (if (= request-method :put)
-    (edit/add-term req)
-    ((base/with-requested-terms ontology-result) req)))
+  ;(if (= request-method :put)
+  ;  (edit/add-term req)
+  ((base/with-requested-terms ontology-result) req))
 
 (def routes
-  [["/ontology/add-term" (->> edit/add-term auth/api-key-only base/with-requested-terms)]
-   ["/ontology/validate-term" (auth/logged-in-only (base/with-requested-terms #(edit/validate-term %)))]
+  [;["/ontology/add-term" (->> edit/add-term auth/api-key-only base/with-requested-terms)]
+   ;["/ontology/validate-term" (auth/logged-in-only (base/with-requested-terms #(edit/validate-term %)))]
    ["/ontology" [[true #(ontology-request %)]]]])

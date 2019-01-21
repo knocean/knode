@@ -77,7 +77,7 @@
   ;; TODO FIXME
   (case (node-type thing)
     :literal {:ol (.getLiteralLexicalForm thing)
-              :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
+              :lt (let [lt (.getLiteralLanguage thing)] (if (empty? lt) nil lt))
               ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
               ;; whether the original input to Node_Literal had a datatype or not.
               ;; I guess that means #string needs to match either itself or the

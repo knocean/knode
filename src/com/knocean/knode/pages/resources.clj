@@ -152,7 +152,7 @@
                    [:and [:= :si iri] [:= :rt resource]]
                    [:= :si iri])
                  st/select
-                 (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
+                 (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
                  distinct)
             env (st/build-env-from-states states)]
         (html

@@ -15,3 +15,25 @@ body {
 td ul {
   padding-left: 0;
 }
+
+.subject-search label {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.subject-search button {
+  margin-left: 1em;
+}
+
+.subject-search form {
+  padding-bottom: 1em;
+}
+
+.subject-nav {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
+.subject-nav * {
+  padding-right: 1em;
+}

@@ -5,6 +5,7 @@
             :url "https://opensource.org/licenses/BSD-3-Clause"}
   :plugins [[lein-cljsbuild "1.1.6"]]
   :hooks [leiningen.cljsbuild]
+  ;; :repositories {"local" "file:mvn"}
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/clojurescript "1.10.217"]
                  [org.clojure/test.check "0.9.0"]
@@ -14,12 +15,14 @@
                  [com.cemerick/url "0.1.1"]
                  [bidi "2.1.3"]
                  [hiccup "1.0.5"]
+                 [enlive "1.1.6"]
                  [org.apache.jena/jena-core "3.7.0"]
                  [org.apache.jena/jena-arq "3.7.0"]
                  [org.apache.jena/jena-iri "3.7.0"]
                  [org.apache.jena/jena-tdb "3.7.0"]
 
-                 [org.clojure/java.jdbc "0.7.6"]
+                 [honeysql "0.9.2"]
+                 [org.clojure/java.jdbc "0.7.8"]
                  [org.xerial/sqlite-jdbc "3.21.0"]
                  [org.postgresql/postgresql "42.2.2"]
 
@@ -27,11 +30,17 @@
                  [cheshire "5.8.0"]
                  [me.raynes/fs "1.4.6"]
                  [oauth-clj "0.1.15"]
+                 [io.forward/yaml "1.0.6"]
 
                  [clj-jgit "0.8.10"]
 
-                 [org.knotation/knotation-cljc "0.1.1-SNAPSHOT"]
-                 [org.knotation/knotation-editor "1.0.1-SNAPSHOT"]]
+                 ;; knotation-cljc from Clojars will NOT work with this v of Knode
+                 ;; JAR should be built from most recent version of knotation-cljc 
+                 ;; and deployed to local "mvn" file in project directory
+                 ;; (uncomment line 8 to include)
+                 [org.knotation/knotation-cljc "0.4.0-SNAPSHOT"]]
+                 ;; editing is currently disabled
+                 ;; [org.knotation/knotation-editor "1.2.0-SNAPSHOT"]
   :cljsbuild {:builds [{:source-paths ["src/com/knocean/knode/front_end"]
                         :compiler {:output-to "resources/public/js/knode.js"
                                    :optimizations :whitespace

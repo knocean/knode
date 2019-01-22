@@ -1,50 +1,49 @@
 (ns com.knocean.knode.util
   (:require
-   [clojure.string :as string]))
+   [clojure.string :as string]
+   [org.httpkit.client :as http]
+   [clojure.set]
 
-(def mimetype-table
-  {"text/html" "html"
-   "text/turtle" "ttl"
-   "text/tab-separated-values" "tsv"
-   "application/json" "json"
-   "application/edn" "edn"})
+   [org.knotation.environment :as en]))
 
-(defn content-type->format [content-type]
-  (get mimetype-table content-type))
-
-(defn req->format-link
-  [req format]
-  [:a
-   {:href
-    (str
-     (:uri req) "?"
-     (string/join
-      "&" (map #(str (first %) "=" (second %))
-               (assoc (:query-params req) "output-format" format))))}
-   format])
-
-(defn format->content-type
-  ([format] (format->content-type format "text/html"))
-  ([format default]
-   (get (clojure.set/map-invert mimetype-table) format default)))
-
-(defn req->output-format
-  [{:keys [params uri headers] :as req}]
-  (let [accept (string/split (get headers "accept" "") #", ?")]
-    (or (when (find params "output-format")
-          (string/lower-case (get params "output-format")))
-        (when (find params "format")
-          (string/lower-case (get params "format")))
-        (when-let [[_ extension]
-                   (re-matches
-                    #"^.*\.(html|ttl|json|tsv)$"
-                    (string/lower-case (or uri "")))]
-          extension)
-        (first (drop-while nil? (map #(get mimetype-table %) accept))))))
-
-(defn req->content-type [req]
-  (if-let [format (req->output-format req)]
-    (format->content-type format)))
+(defn escape
+  [iri]
+  (try
+    (java.net.URLEncoder/encode iri)
+    (catch Exception e
+      nil)))
 
 (defn redirect [location]
   {:status 302 :headers {"Location" location}})
+
+(defn get-response
+  "Manually follows redirects and returns a vector containing all
+   redirect URLs. The final URL with content is the last entry."
+  [url]
+  (loop [redirs []
+         new-url url]
+    ;; No headers from FTP, so that's final content
+    (if (.contains new-url "ftp://")
+      {:redirs (conj redirs new-url)}
+      ;; Otherwise get HTTP status and determine what to do
+      (let [{:keys [status headers]
+             :as res} @(http/request {:url new-url
+                                      :method :head
+                                      :follow-redirects false})]
+        (case status
+          200
+          {:redirs (conj redirs new-url)
+           ;; Also get ETag and Last-Modified
+           :etag (string/replace (:etag headers) #"\"" "")
+           :last-modified (:last-modified headers)}
+          (301 302 303 307 308)
+          (recur (conj redirs new-url) (:location headers))
+          nil)))))       ;; Anthing else will not be returned
+
+(defn ->iri
+  [env input]
+  (or 
+    (en/wrapped-iri->iri input)
+    (en/curie->iri env input)
+    (en/label->iri env input)
+    (en/name->iri env input)))

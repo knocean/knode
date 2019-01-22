@@ -5,12 +5,10 @@
             [clojure.string :as string]
             [clojure.set :as set]
 
-            [org.knotation.object :as ob]
             [org.knotation.rdf :as rdf]
 
             [com.knocean.knode.linked-data-fragments.base :as base]
-            [com.knocean.knode.linked-data-fragments.core :as ldf]
-            [com.knocean.knode.linked-data-fragments.sql :as sql]))
+            [com.knocean.knode.linked-data-fragments.core :as ldf]))
 
 (s/def ::full-string (s/and string? #(> (count %) 0)))
 
@@ -27,17 +25,18 @@
         :args string?
         :ret ::object)
 
-(deftest test-string->object
-  (testing "Defaults to assuming IRI"
-    (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
-    (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
-  (testing "Deals with pointied IRIs"
-    (is (= {:oi "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
-  (testing "Deals with quoted strings"
-    (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
-    (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
-    (is (= {:ol "Foo" :di "http://example.com/string"}
-           (ldf/string->object "\"Foo\"^^<http://example.com/string>")))))
+(comment
+  (deftest test-string->object
+    (testing "Defaults to assuming IRI"
+      (is (= {:oi "http://example.com/foo"} (ldf/string->object "http://example.com/foo")))
+      (is (= {:oi "Foo"} (ldf/string->object "Foo"))))
+    (testing "Deals with pointied IRIs"
+      (is (= {:oi "http://example.com/foo"} (ldf/string->object "<http://example.com/foo>"))))
+    (testing "Deals with quoted strings"
+      (is (= {:ol "Foo"} (ldf/string->object "\"Foo\"")))
+      (is (= {:ol "Foo" :ln "en"} (ldf/string->object "\"Foo\"@en")))
+      (is (= {:ol "Foo" :di "http://example.com/string"}
+             (ldf/string->object "\"Foo\"^^<http://example.com/string>"))))))
 
 (s/def ::gi ::full-string) (s/def ::si ::full-string) (s/def ::pi ::full-string)
 (s/def ::sb ::full-string) (s/def ::ob ::full-string)
@@ -92,7 +91,7 @@
 (deftest test-matches-query?
   (testing "Nonexistent slots match anything"
     (doseq [e (gen/sample (s/gen ::entry))]
-      (is (ldf/matches-query? {} e) )))
+      (is (ldf/matches-query? {} e))))
   (testing "Slots with values match literally"
     (is (ldf/matches-query?
          {:gi "foo" :si "bar"}
@@ -112,7 +111,7 @@
 (s/def ::items coll?)
 (s/def ::paginated (s/keys :req-un [::total ::per-page ::page ::items]))
 
-(s/fdef ldf/paginated 
+(s/fdef ldf/paginated
         :args (s/cat :per-page ::per-page :page ::page :seq ::items)
         :ret ::object)
 
@@ -129,10 +128,3 @@
   (testing "If we paginate past the first page, drop the appropriate number of items"
     (is (= {:total 12, :per-page 5, :page 1, :items [6 7 8 9 10]}
            (ldf/paginated 5 1 [1 2 3 4 5 6 7 8 9 10 11 12])))))
-
-(deftest test-query->where-clause
-  (testing "Returns nil when no clauses present"
-    (is (nil? (sql/-query->sql-where-clause {}))))
-  (testing "Applies WHERE clause for all present slots"))
-(deftest test-query->sql-pagination
-  (testing "Applies LIMIT and OFFSET for "))

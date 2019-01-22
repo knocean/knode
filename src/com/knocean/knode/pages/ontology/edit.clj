@@ -3,9 +3,9 @@
             [clj-jgit.porcelain :as git]
 
             [org.knotation.rdf :as rdf]
-            [org.knotation.rdfa :as rdfa]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
+            [org.knotation.state :as knst]
+            [org.knotation.api :as api]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -14,73 +14,99 @@
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.pages.ontology.template :as tmp]))
 
-(defn update-state! [valid-kn]
-  (let [states (->> valid-kn
-                    string/split-lines
-                    (assoc {:org.knotation.state/line-number 1} :org.knotation.state/lines)
-                    (org.knotation.kn/read-input (st/latest-env)))]
-    (swap! state (fn [st] (update st :states #(concat % states))))
-    nil))
+(defn update-state! [stanza]
+  (-> stanza
+      (api/read-from :kn (st/latest-env))
+      (filter #(= :statement (:event %)))
+      (map #(select-keys % st/columns))
+      st/insert!))
 
 (defn commit-term!
-  [valid-kn user]
+  [stanza user]
   (let [st @state
         id {:name (:ssh-identity st) :exclusive true}]
     (spit
      (str (:absolute-dir st) "/" (:write-file st))
-     (str \newline \newline valid-kn \newline) :append true)
-    (git/git-add (:repo st) (:write-file st))
-    (git/git-commit
-     (:repo st) "Add new term" user)
-    (git/with-identity 
-      (if-let [pass (:ssh-passphrase st)]
-        (assoc id :passphrase pass) id)
-      (git/git-push (:repo st)))
-    (update-state! valid-kn)
+     (str \newline stanza \newline)
+     :append true)
+    (git/git-add (:git-repo st) (:write-file st))
+    (git/git-commit (:git-repo st) "Add new term"); user)
+    (when id
+      (git/with-identity
+        (if-let [pass (:ssh-passphrase st)]
+          (assoc id :passphrase pass)
+          id)
+        (git/git-push (:git-repo st))))
+    (update-state! stanza)
+    (st/clear-env-cache!)
     nil))
 
-(defn -parse-template-application
-  [env raw-template-input]
-  (let [parsed (string/split-lines raw-template-input)
-        [_ subject] (string/split (second parsed) #": ")
-        template-iri (ln/subject->iri env subject)
-        template (tmp/template-by-iri template-iri)
-        content (string/join \newline (drop 2 parsed))]
-    {:iri template-iri
-     :template template
-     :content content
-     :content-map (tmp/parse-content content)}))
+;; TODO - these functions (and probably the template validation stuff)
+;;        should all be moved to knotation-cljc
+(defn validate-knotation
+  ([snippet] (validate-knotation (st/latest-env) snippet))
+  ([env snippet]
+   (try
+     (filter identity (api/errors-of (api/read-from :kn env snippet)))
+     (catch Exception e
+       (list [:bad-parse (.getMessage e)])))))
+
+(defn valid-knotation?
+  ([snippet] (valid-knotation? (st/latest-env) snippet))
+  ([env snippet]
+   (empty? (validate-knotation env snippet))))
+
+(defn next-iri
+  [resource base-iri]
+  (->> {:select [:si] :modifiers [:distinct] :from [:states]
+        :where [:and [:= :rt resource] [:like :si (str base-iri "%")]]}
+       st/query
+       (map :si)
+       (map #(last (string/split % #"_")))
+       (map #(try (Integer/parseInt %) (catch Exception e nil)))
+       (filter int?)
+       (apply max)
+       inc
+       (format (str base-iri "%07d"))))
 
 (defn add-term
   [{:keys [env params session] :as req}]
-  (if-let [raw (get params "template-text")]
-    (let [parsed (-parse-template-application env raw)
-          valid? (tmp/valid-application? (:template parsed) (:content-map parsed))]
-      (when (and valid? (auth/logged-in? req))
-        (commit-term! raw (select-keys session [:name :email])))
-      (html
-       {:session session
-        :title "Add Term"
-        :content
-        [:div
-         [:div {:class "col-md-6"}
-          [:h3 "Add Term"]
-          [:script {:type "text/javascript" :src "/js/knode.js"}]
-          [:textarea {:id "editor" :rows "6" :name "template-text"} raw]]
-         [:div {:class "col-md-6"}
-          [:h2 "Term Added!"]]]}))
-    (util/redirect "/ontology/validate-term")))
+  (if-let [body (when (:body req) (slurp (:body req)))]
+    (let [st @st/state
+          project-name (:project-name st)
+          iri (next-iri project-name (:base-iri st))
+          stanza (str ": " iri "\n" body)
+          states (try
+                   (api/read-from :kn (st/latest-env) stanza)
+                   (catch Exception e
+                     [{::knst/error {:bad-parse (.getMessage e)}}]))
+          errors (filter ::knst/error states)]
+      (if (first errors)
+        {:status 400
+         :body (->> errors
+                    (map #(dissoc % ::en/env :input))
+                    (map str)
+                    (string/join "\n")
+                    (str "ERROR(S):\n"))}
+        (do
+          (->> states
+               (map #(assoc % :rt project-name))
+               st/insert!)
+          (commit-term! stanza nil)
+          {:status 201
+           :body iri})))
+    {:status 400
+     :body "ERROR: Term content required"}))
 
 (defn validate-term
   [{:keys [env params session] :as req}]
-  (if-let [raw (get params "template-text")]
+  (if-let [raw (string/replace (get params "template-text") #"\r\n" "\n")]
     (html
      {:session session
       :title "Validate Term"
       :content
-      (let [parsed (-parse-template-application env raw)
-            valid? (tmp/valid-application? (:template parsed) (:content-map parsed))
-            validated (tmp/validate-application (:template parsed) (:content-map parsed))]
+      (let [valid? (valid-knotation? env raw)
+            validated (validate-knotation env raw)]
         [:div
          [:div {:class "col-md-6"}
           [:h3 "Validate Term"]
@@ -91,19 +117,11 @@
                     :value (if valid? "Add Term" "Validate Term")}]]]
          [:div {:class "col-md-6"}
           [:h3 "Validation:"]
-          (when (empty? validated)
-            [:p "Valid"])
-          (when (:warnings validated)
-            [:span
-             [:h4 "Warnings:"]
-             [:ul
-              (map (fn [[k v]]
-                     [:li (name k) " :: " (map (fn [[k v]] (str k " => " v)) v)])
-                   (:warnings validated))]])
-          (when (:errors validated)
+          (if (empty? validated)
+            [:p "Valid"]
             [:span
              [:h4 "Errors:"]
              [:ul
-              (map (fn [[k v]] [:li (name k) " :: " (str (vec v))])
-                   (:errors validated))]])]] )})
+              (map (fn [[k v]] [:li (name k) " :: " v])
+                   validated)]])]])})
     (util/redirect "/ontology")))

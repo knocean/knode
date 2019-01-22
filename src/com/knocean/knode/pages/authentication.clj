@@ -24,9 +24,30 @@
          (not (string/blank? google-secret)))))
 
 (defn logged-in?
-  [{:keys [session] :as req}]
-  (and (not (empty? session))
-       (set/subset? #{:name :email :id} (set (keys session)))))
+  [{:keys [session params headers] :as req}]
+  (or (if-let [k (get @state :api-key)]
+        (or (= k (get params "api-key"))
+            (= k (get headers "x-api-key"))))
+      (and (not (empty? session))
+           (set/subset? #{:name :email :id} (set (keys session))))))
+
+(defn api-key-only
+  [f]
+  (fn [req]
+    (if (get @state :write-file)
+      (if (get @state :api-key)
+        (if-let [api-key (or (get-in req [:headers "x-api-key"])
+                             (get-in req [:params "api-key"]))]
+          (if (= api-key (get @state :api-key))
+            (f req)
+            {:status 401
+             :body "ERROR: API key not authorized"})
+          {:status 403
+           :body "ERROR: API key required"})
+        {:status 403
+         :body "ERROR: Server not configured with an API key"})
+      {:status 405
+       :body "ERROR: Server not configured with a write-file"})))
 
 (defn logged-in-only
   [f]

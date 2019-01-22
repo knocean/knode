@@ -3,9 +3,7 @@
    [clojure.string :as string]
    [cheshire.core :as json]
 
-   [org.knotation.link :as ln]
    [org.knotation.rdf :as rdf]
-   [org.knotation.rdfa :as rdfa]
    [org.knotation.environment :as en]
 
    [com.knocean.knode.pages.mimetypes :as mime]

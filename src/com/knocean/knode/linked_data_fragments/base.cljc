@@ -4,8 +4,7 @@
             [clojure.set :as set]
 
             [org.knotation.util :as util]
-            [org.knotation.rdf :as rdf]
-            [org.knotation.object :as ob]))
+            [org.knotation.rdf :as rdf]))
 
 (def +per-page+ 1000)
 
@@ -29,21 +28,17 @@
 (defn str->int
   ([str] (str->int str 0))
   ([str default]
-   (util/handler-case
+   (try
     (Integer/parseInt str)
-    (:default e default))))
+    (catch Exception e
+      default))))
 
 (defn -data-source-dispatch
   [query data]
   (cond
     (or (vector? data) (list? data)) :default
-
-    (and (map? data)
-         (set/subset?
-          (set (keys data))
-          #{:classname :subprotocol :subname :connection}))
-    :database
-
+    (and (map? data) (:connection data)) :database
+    (= clojure.lang.Atom (class data)) :atom
     :else :default))
 
 (defmulti query-stream -data-source-dispatch)

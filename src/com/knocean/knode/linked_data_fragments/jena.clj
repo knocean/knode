@@ -11,7 +11,8 @@
            (org.apache.jena.query QueryFactory QueryExecutionFactory)
            (org.apache.jena.graph NodeFactory Triple)
            (org.apache.jena.graph.impl GraphBase)
-           (org.apache.jena.sparql.core DatasetGraphBase Quad)))
+           (org.apache.jena.sparql.core DatasetGraphBase Quad)
+           (org.apache.jena.query DatasetFactory)))
 
 (defn reflect [thing]
   (pp/print-table (sort-by :name (filter :exception-types (:members (r/reflect thing))))))
@@ -55,42 +56,53 @@
   [xs]
   (org.apache.jena.util.iterator.WrappedIterator/create (seq->iterator xs)))
 
-(defn ->query-val
+(defn node-type
   [thing]
   (let [c (class thing)]
-    (cond ;; case DOES NOT work here, despite the equivalence comparison
-      (= c org.apache.jena.graph.Node_ANY) nil
+    (cond ;; NOTE - case DOES NOT work here, despite the equivalence comparison
+      (= c org.apache.jena.graph.Node_ANY) :any
       (= c org.apache.jena.graph.Node_Blank) :blank
-      (= c org.apache.jena.graph.Node_URI) (.toString thing))))
+      (= c org.apache.jena.graph.Node_URI) :uri
+      (= c org.apache.jena.graph.Node_Literal) :literal)))
+
+(defn ->query-val
+  [thing]
+  (case (node-type thing)
+    :any nil
+    :blank :blank
+    :uri (.toString thing)))
 
 (defn ->query-obj
   [thing]
-  ;; TODO
-  (if (= (class thing) org.apache.jena.graph.Node_Literal)
-    {:o (.getLiteralLexicalForm thing)
-     :ln (let [ln (.getLiteralLanguage thing)] (if (empty? ln) nil ln))
-     ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
-     ;; whether the original input to Node_Literal had a datatype or not.
-     ;; I guess that means #string needs to match either itself or the
-     ;; empty datatype?
-     :di (.getLiteralDatatypeURI thing)} 
-    {:o (->query-val thing)}))
+  ;; TODO FIXME
+  (case (node-type thing)
+    :literal {:ol (.getLiteralLexicalForm thing)
+              :lt (let [lt (.getLiteralLanguage thing)] (if (empty? lt) nil lt))
+              ;; It look like this returns http://www.w3.org/2001/XMLSchema#string
+              ;; whether the original input to Node_Literal had a datatype or not.
+              ;; I guess that means #string needs to match either itself or the
+              ;; empty datatype?
+              :di (.getLiteralDatatypeURI thing)}
+    :uri {:oi (->query-val thing)}
+    :blank {:ob (->query-val thing)}
+    :any nil))
 
 (defn spo->query
   [s p o]
   (into {} (filter second (merge
-                           {:s (->query-val s)
-                            :p (->query-val p)}
+                           (if (= :uri (node-type s))
+                             {:si (->query-val s)}
+                             {:sb (->query-val s)})
+                           {:pi (->query-val p)}
                            (->query-obj o)))))
 
-;; (def gs
-;;   (proxy [DatasetGraphBase] []
-;;     (find
-;;       ([g s p o]
-;;        (println "FOUR" g s p o)
-;;        (wrapped-iterator [(make-quad)])))))
+(defn gspo->query
+  [g s p o]
+  (merge
+   {:gi (->query-val g)}
+   (spo->query s p o)))
 
-(defn data [source]
+(defn graph [source]
   (proxy [GraphBase] []
     (graphBaseFind
       ([s p o]
@@ -100,26 +112,45 @@
               (spo->query s p o)
               source)))))))
 
-(def source #(:maps @st/state))
+(defn dataset-graph [source]
+  (proxy [DatasetGraphBase] []
+    ;; NOTE - it looks like this is never actually used; the queries run against
+    ;;        whatever is returned by getDefaultGraph (even when specifying GRAPH)
+    (find
+      ([g s p o]
+       (println "FINDING...")
+       (wrapped-iterator
+        (map map->quad)
+        (query-stream
+         (gspo->query s p o)
+         source))))
 
-(def g (atom (data (source))))
-(def m (atom (ModelFactory/createModelForGraph @g)))
+    (getGraph
+      ([] (println "GETTING PLAIN GRAPH...") (graph source))
+      ([node] (println "GETTING GRAPH BY NODE..." node) (graph source)))
+    (getDefaultGraph ([] (println "GETTING DEFAULT GRAPH...") (graph source)))
 
-(do
-  (add-watch
-   st/state :jena-base-recompute
-   (fn [k atom old new]
-     (when (= k :jena-base-recompute)
-       (println "Recomputing Jena graph on @state change...")
-       (reset! g (data (source)))
-       (reset! m (atom (ModelFactory/createModelForGraph @g))))
-     nil))
-  nil)
+    ;; NOTE - leaving this out causes errors when calling DatasetFactory/wrap on this proxy
+    ;;        based on
+    ;;          https://jena.apache.org/documentation/javadoc/arq/org/apache/jena/sparql/core/DatasetGraph.html#supportsTransactions--
+    ;;        it looks like we shouldn't have to worry about returning false for read-only datasets
+    (supportsTransactions ([] false))))
 
 (defn query-jena [sparql-string]
-  (->> (QueryExecutionFactory/create (QueryFactory/create sparql-string) @m)
+  (->> @state
+       dataset-graph
+       (DatasetFactory/wrap)
+       (QueryExecutionFactory/create (QueryFactory/create sparql-string))
        (.execSelect)
-       iterator-seq
-       first))
+       iterator-seq))
 
-(query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")
+;(query-jena "select * where {?s ?p ?o } limit 1")
+;(query-jena "select * where {<https://ontology.iedb.org/ontology/ONTIE_0000002> ?p ?o }")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> ?o } limit 1")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> ?o ; <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?p } limit 10")
+;(query-jena "select * where {?s <http://www.w3.org/2000/01/rdf-schema#label> \"Mus musculus BALB/c\" }")
+;(query-jena "select * where {<https://ontology.iedb.org/ontology/ONTIE_0000002> <http://www.w3.org/2000/01/rdf-schema#label> ?o }")
+;(query-jena "select * where { GRAPH ?g {?s ?p ?o} } limit 1")
+;(query-jena "select * where {?s <http://example.com/p> ?o ; ?p \"1\"}")
+;(query-jena "select * where {?s <http://protege.stanford.edu/plugins/owl/protege#defaultLanguage> ?o }")
+;(query-jena "select ?g ?s ?p ?o where { {?s ?p ?o} union { GRAPH ?g {?s ?p ?o} } }")

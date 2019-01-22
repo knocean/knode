@@ -1,0 +1,44 @@
+: <https://example.com/>
+type: owl:Ontology
+rdfs:comment: This is the example ontology.
+
+: ex:01
+kn:apply-template: ex:template 
+ label: Bar
+
+: ex:0000111
+label: barn owl primary remex feather
+type: owl:Class
+definition: A primary remex feather of a barn owl
+alternative term; @fr: grange hibou primaire remex plume
+
+: ex:0002222
+label: barn owl 2222
+type: Tyto alba
+birth date: 2016-05-04
+
+: ex:0033331
+label: obsolete sample feather
+type: barn owl primary remex feather
+obsolete: true
+
+: ex:0033332
+label: replaced sample feather
+type: barn owl primary remex feather
+obsolete: true
+replacement: sample feather 33333
+
+: ex:0033333
+label: sample feather 33333
+type: barn owl primary remex feather
+part of: barn owl 2222
+length (cm): 25.0
+coloration: light brown with darker bands
+
+: ex:0033334
+kn:apply-template: ex:template
+ label: manually added example
+
+: ex:12321
+kn:apply-template: ex:template
+ label: example 12321

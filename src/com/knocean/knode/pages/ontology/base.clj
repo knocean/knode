@@ -4,37 +4,43 @@
             [com.knocean.knode.pages.mimetypes :as mime]
 
             [com.knocean.knode.state :refer [state] :as st]
-            [org.knotation.link :as ln]))
+            [com.knocean.knode.util :as util]
+            
+            [org.knotation.environment :as en]))
 
 (defmulti ontology-result mime/req->output-format)
 
 (defn all-subjects
   []
-  (->> @state :states
-       (filter #(= :org.knotation.state/subject-start (:org.knotation.state/event %)))
-       (map :org.knotation.rdf/subject)))
+  (->> {:select [:si] :modifiers [:distinct]
+        :from [:states] :where [:= :rt (:project-name @state)] :order-by [:si]}
+       st/query
+       (map :si)
+       (filter #(.startsWith % (:base-iri @state)))))
 
 (defn parse-body-terms
   [req]
   (when (and (= :post (:request-method req))
-             (= "GET" (get-in req [:params "method"])))
-    (rest (string/split-lines (slurp (:body req))))))
+             (= "GET" (get-in req [:params "method"]))
+             (:body-string req))
+    (rest (string/split-lines (:body-string req)))))
 
 (defn parse-request-terms
-  [env {:keys [params] :as req}]
-  (let [remaining-path (vec (drop 2 (string/split (:uri req) #"/")))
-        path-var (when (last remaining-path) (string/replace (last remaining-path) #"\.....?$" ""))
-        main-iri (or (get params "iri")
-                     (and path-var (ln/subject->iri env path-var))
-                     path-var)
-        ->terms (fn [s]
+  [env {:keys [params uri] :as req}]
+  (let [->terms (fn [s]
                   (when s
                     (if-let [_operator (second (re-find #"^(in|eq)\." s))]
                       (string/split (subs s 3) #" +"))))]
     (map
-     #(ln/subject->iri env %)
+     #(util/->iri env %)
      (concat
-      (when main-iri [main-iri])
+      (when (.startsWith uri (str "/ontology/" (:project-name @state) "_"))
+        [(-> uri
+             (string/replace #"^/ontology/" "")
+             (string/replace #"\.ttl$" "")
+             (string/replace #"\.json$" "")
+             (string/replace #"\.tsv$" "")
+             (string/replace "_" ":"))])
       (->terms (get params "CURIE"))
       (->terms (get params "IRI"))
       (parse-body-terms req)))))
@@ -42,11 +48,12 @@
 (defn with-requested-terms
   [f]
   (mime/with-content-header
-    (fn [{:keys [params] :as req}]
+    (fn [{:keys [params uri requested-iris] :as req}]
       (let [env (st/latest-env)
-            remaining-path (vec (drop 2 (string/split (:uri req) #"/")))]
+            remaining-path (vec (drop 2 (string/split (:uri req) #"/")))
+            req (assoc req :body-string (when (:body req) (-> req :body slurp)))]
         (f (assoc
             req
             :env env
             :remaining-path remaining-path
-            :requested-iris (vec (parse-request-terms env req))))))))
+            :requested-iris (or requested-iris (vec (parse-request-terms env req)))))))))

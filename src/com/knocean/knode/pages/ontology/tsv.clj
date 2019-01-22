@@ -1,87 +1,85 @@
 (ns com.knocean.knode.pages.ontology.tsv
   (:require [clojure.string :as string]
+            [clojure.java.jdbc :as jdbc]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
-            [org.knotation.environment :as en]
+            [org.knotation.environment :as en] 
 
+            [com.knocean.knode.util :as util]
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
-            [com.knocean.knode.state :refer [state] :as st]
-            [com.knocean.knode.pages.term-status :as stat]))
+            [com.knocean.knode.state :refer [state] :as st]))
 
-(defn tap!
-  ([thing] (tap! "TAPPED" thing))
-  ([label thing] (println label thing) thing))
+(defn tsv-join
+  [seq]
+  (->> seq
+       (map (partial string/join \tab))
+       (map #(str % \newline))
+       string/join))
 
-(defn node->tsv
-  [env node]
-  (let [s (stat/term-status (::rdf/iri node))]
-    (assoc s :label (get-in env [::en/iri-label (:IRI s)]))))
+(defn render-object
+  [env format {:keys [oi ob ol] :as state}]
+  (cond
+    oi (case format
+         :CURIE (en/iri->curie env oi)
+         :label (en/iri->name env oi)
+         oi)
+    ob ob
+    ol ol
+    :else ""))
 
-(defn tsv-join [seq]
-  (string/join \newline (map #(string/join \tab %) seq)))
-
-(defn nodes->seqs
-  [env headers nodes & {:keys [compact?] :or {compact false}}]
-  (map
-   #(map
-     (fn [[k format]]
-       (let [val (cond
-                   (= :CURIE k) [(:IRI %)]
-                   (keyword? k) [(get % k)]
-                   (string? k) (get % (ln/subject->iri env k)))
-             iris (map (fn [v] (or (ln/subject->iri env v)
-                                   (ln/subject->iri env (::rdf/lexical v))
-                                   v)) val)
-             collapsed (fn [f]
-                         (map
-                          (fn [v]
-                            (cond (or (boolean? v) (empty? v)) (str v)
-                                  (and (map? v) (::rdf/lexical v)) (::rdf/lexical v)
-                                  :else (f env v)))
-                          iris))
-             formatted (vec
-                        (case format
-                          :IRI iris
-                          :CURIE (collapsed ln/iri->curie)
-                          :label (collapsed ln/iri->name)))]
-         (string/join "|" (map str formatted))))
-     headers)
-   nodes))
+(defn iri->seq
+  [env headers iri]
+  (let [states (st/select [:= :si iri] :order-by :id)]
+    (for [[column pi format] headers]
+      (case column
+        "IRI" iri
+        "CURIE" (en/iri->curie env iri)
+        "recognized" (->> states first boolean str)
+        (->> states
+             (filter #(= pi (:pi %)))
+             (map (partial render-object env format))
+             distinct
+             (string/join "|"))))))
 
 (defn parse-tsv-select
+  "Given a query string, return a vector of required columns."
   [env compact? select]
-  (let [format-reg #" \[(CURIE|IRI|label)\]$"]
+  (let [format-reg #" \[(CURIE|IRI|label)\]$"
+        default (if compact? :CURIE :IRI)]
     (->> (string/split select #",")
-         (map (fn [k]
-                (if-let [format (second (re-find format-reg k))]
-                  [(string/replace k format-reg "") (keyword format)]
-                  (cond
-                    (= k "IRI") [:IRI :IRI]
-                    (= k "CURIE") [:CURIE :CURIE]
-                    (= k "recognized") [:recognized :label]
-                    (= k "obsolete") [:obsolete :label]
-                    (= (ln/subject->iri env k) "http://www.w3.org/2000/01/rdf-schema#label")
-                      [k :label]
-                    :else [k (if compact? :CURIE :label)]))))
+         (map
+          (fn [k]
+            (if-let [format (second (re-find format-reg k))]
+              [k (util/->iri env (string/replace k format-reg "")) (keyword format)]
+              (cond
+                (= k "IRI") ["IRI" nil :IRI]
+                (= k "CURIE") ["CURIE" nil :CURIE]
+                (= (util/->iri env k) (rdf/rdfs "label"))
+                [k (rdf/rdfs "label") :literal]
+                :else [k (util/->iri env k) default]))))
          vec)))
 
 (defmethod ontology-result "tsv"
   [{:keys [requested-iris params env] :as req}]
   {:status 200
-   :body (let [show-headers? (not (= (get params "show-headers") "false"))
-               compact? (= (get params "compact") "true")
-               headers (if-let [sel (get params "select")]
-                         (parse-tsv-select env compact? sel)
-                         (if compact?
-                           [[:CURIE :CURIE] ["label" :label] [:recognized :label] [:obsolete :label]]
-                           [[:IRI :IRI] ["label" :label] [:recognized :label] [:obsolete :label]]))
-               nodes (map (partial node->tsv env)
-                          (if (not (empty? requested-iris))
-                            (map (fn [iri] {::rdf/iri iri}) requested-iris)
-                            (base/all-subjects)))
-               rows (nodes->seqs env headers nodes :compact? compact?)]
-           (tsv-join
-            (if show-headers?
-              (cons (->> headers (map first) (map #(if (keyword? %) (name %) %))) rows)
-              rows)))})
+   :body
+   (let [show-headers? (not (= (get params "show-headers") "false"))
+         compact? (= (get params "compact") "true")
+         curie-column (when (:body-string req)
+                        (->> req :body-string string/split-lines first string/trim (= "CURIE")))
+         default (if compact? :CURIE :IRI)
+         headers (if-let [select (get params "select")]
+                   (parse-tsv-select env compact? select)
+                   [(if (or compact? curie-column) ["CURIE" nil :CURIE] ["IRI" nil :IRI])
+                    ["label" (rdf/rdfs "label") :label]
+                    ["recognized" nil :boolean]
+                    ["obsolete" (rdf/owl "deprecated") :boolean]
+                    ["replacement" "http://purl.obolibrary.org/obo/IAO_0100001" default]])
+         iris (if (first requested-iris)
+                requested-iris
+                (base/all-subjects))
+         rows (map (partial iri->seq env headers) iris)]
+     (tsv-join
+      (if show-headers?
+        (cons (map first headers) rows)
+        rows)))})

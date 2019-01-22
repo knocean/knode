@@ -9,7 +9,7 @@
             [honeysql.core :as sql]
             [clojure.java.jdbc :as jdbc]
 
-            [org.knotation.api :as kn-api]
+            [org.knotation.state :as st]
             [org.knotation.clj-api :as kn]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]))
@@ -68,6 +68,10 @@
     :default (constantly nil)}
    {:key :write-file
     :label "Write file"
+    :default #(->> % :build-files last)}
+    
+   {:key :resources
+    :label "Resources"
     :default (constantly nil)}])
 
    ; Older
@@ -122,6 +126,24 @@
         (select-keys base))
    configurators))
 
+(defn configure-from-file
+  "Given a config file containing a map of configuration options, apply the 
+   configurators (in order) and return a new map."
+  [config]
+  (let [file (io/as-file config)
+        config-str (if (.exists file) (slurp config) nil)
+        state (if-not (nil? config-str) (read-string config-str) {})]
+    (reduce
+      (fn [state {:keys [key label default] :as configurator}]
+        (println "RUNNING CONFIGURATOR" label "...")
+        (if (find state key)
+          state
+          (assoc state key (default state))))
+      (->> configurators
+           (map :key)
+           (select-keys state))
+      configurators)))
+
 (defn plain-view
   [label value]
   (format "%-20s %s" (str label ":") (str value)))
@@ -142,7 +164,7 @@
 (defonce state (atom {}))
 
 (defn init
-  "Initialize the state atom."
+  "Initialize the state atom from environment variables."
   []
   (->> env
        (filter #(.startsWith (name (key %)) "knode-"))
@@ -151,11 +173,22 @@
        configure
        (reset! state)))
 
-(def columns [:rt :gi :si :sb :pi :oi :ob :ol :di :ln])
+(defn init-from-config
+  "Initialize the state atom from a configuration file."
+  [& {:keys [config]
+      :or {config "knode.edn"}}]
+  (->> config
+       configure-from-file
+       (reset! state)))
+
+(def columns [:rt ::rdf/gi ::rdf/si ::rdf/sb ::rdf/pi ::rdf/oi ::rdf/ob ::rdf/ol ::rdf/di ::rdf/lt])
+
+(def sql-columns [:rt :gi :si :sb :pi :oi :ob :ol :di :lt])
 
 (defn query
   [honey]
-  (jdbc/query @state (sql/format honey)))
+  (let [dbspec {:connection-uri (:database-url @state)}]
+    (jdbc/query dbspec (sql/format honey))))
 
 (defn select
   [where & args]
@@ -166,44 +199,44 @@
   (jdbc/execute! @state query))
 
 (defn insert!
+  "Given an ID space and a collection of states from a resource, add the states 
+   to the 'states' table. If states with the same resource ID already exist, 
+   remove them and add the new states."
+  [idspace quads]
+  (if (empty? (query {:select [:*] :from [:states] :where [:= :rt idspace]}))
+    (->> quads
+         (map (apply juxt columns))
+         (jdbc/insert-multi! @state :states sql-columns))
+    (do 
+      (println "Old entries exist! Updating states for" idspace)
+      (jdbc/delete! @state :states ["rt = ?" idspace])
+      (->> quads
+           (map (apply juxt columns))
+           (jdbc/insert-multi! @state :states sql-columns)))))
+
+(defn get-quads
+  "Given a lazy seq of states, return a seq of all quads."
   [states]
   (->> states
-       (filter :pi)
-       (map (apply juxt columns))
-       (jdbc/insert-multi! @state "states" columns)))
+       (map ::rdf/quad)
+       (filter ::rdf/pi)))
 
 (def -env-cache (atom nil))
 (defn clear-env-cache! []
   (reset! -env-cache nil))
-(defn latest-env []
-  (or @-env-cache
-      (reset!
-       -env-cache
-       (-> [:= :rt (:project-name @state)]
-           select
-           kn/collect-env
-           (en/add-prefix "rdf" (rdf/rdf))
-           (en/add-prefix "rdfs" (rdf/rdfs))
-           (en/add-prefix "xsd" (rdf/xsd))
-           (en/add-prefix "owl" (rdf/owl))
-           (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-           (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
-           (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
-           (en/add-prefix "kn" (rdf/kn))
-           (en/add-prefix "knd" (rdf/kn "datatype/"))
-           (en/add-prefix "knp" (rdf/kn "predicate/"))
-           (en/add-prefix (:project-name @state) (:base-iri @state))))))
 
-(defn latest-prefix-states
-  []
-  (kn-api/prefix-states (latest-env)))
-
+;; TODO: need to get prefixes from the input file too
 (defn base-env
   []
   (-> en/default-env
+      ;; (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
+      ;; (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
+      (en/add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+      (en/add-prefix "rdfs" "http://www.w3.org/2000/01/rdf-schema#")
+      (en/add-prefix "xsd" "http://www.w3.org/2001/XMLSchema#")
+      (en/add-prefix "owl" "http://www.w3.org/2002/07/owl#")
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
-      (en/add-prefix "NCBITaxon" "http://purl.obolibrary.org/obo/NCBITaxon_")
-      (en/add-prefix "ncbitaxon" "http://purl.obolibrary.org/obo/ncbitaxon#")
+      (en/add-prefix "kn" "https://knotation.org/kn/")
       (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn build-env
@@ -226,3 +259,24 @@
        (remove nil?)
        set
        build-env))
+
+(defn latest-env []
+  (or @-env-cache
+      (reset!
+       -env-cache
+       (-> [:= :rt (:project-name @state)]
+            select
+            build-env-from-states))))
+
+(defn prefix-states
+  [env]
+  (->> env
+       ::en/prefix-seq
+      (map (fn [prefix]
+             {::st/event ::st/prefix
+              ::en/prefix prefix
+              ::en/iri (get-in env [::en/prefix-iri prefix])}))))
+
+(defn latest-prefix-states []
+    (prefix-states latest-env))
+

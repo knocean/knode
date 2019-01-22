@@ -18,14 +18,15 @@
 ;;;;; Query parsing/manipulating
 (defn string->object
   [s]
-  (util/handler-case
-   (let [res (nquads-object->object s)]
-     (base/remove-falsies
-      [[:oi (::rdf/iri res)]
-       [:ol (::rdf/lexical res)]
-       [:ln (::rdf/language res)]
-       [:di (::rdf/datatype res)]]))
-   (:default e {:oi s})))
+  (try
+    (let [res (nquads-object->object s)]
+      (base/remove-falsies
+       [[:oi (::rdf/iri res)]
+        [:ol (::rdf/lexical res)]
+        [:lt (::rdf/language res)]
+        [:di (::rdf/datatype res)]]))
+    (catch Exception e
+      {:oi s})))
 
 (defn req->query
   [req]
@@ -62,7 +63,7 @@
               (or (nil? q)
                   (= q (get entry k))
                   (and (= ":blank" q) (get entry (get blanks k))))))
-          [:gi :si :pi :oi :ol :ln :di]))))
+          [:gi :si :pi :oi :ol :lt :di]))))
 
 (defn paginated [per-page pg seq]
   {:total (count seq)

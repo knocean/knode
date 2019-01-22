@@ -2,9 +2,11 @@
   (:require [clojure.string :as string]
             [clojure.java.jdbc :as jdbc]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
-            [org.knotation.environment :as en] [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
+            [org.knotation.environment :as en] 
+
+            [com.knocean.knode.util :as util]
+            [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]
             [com.knocean.knode.state :refer [state] :as st]))
 
 (defn tsv-join
@@ -18,8 +20,8 @@
   [env format {:keys [oi ob ol] :as state}]
   (cond
     oi (case format
-         :CURIE (ln/iri->curie env oi)
-         :label (ln/iri->name env oi)
+         :CURIE (en/iri->curie env oi)
+         :label (en/iri->name env oi)
          oi)
     ob ob
     ol ol
@@ -31,7 +33,7 @@
     (for [[column pi format] headers]
       (case column
         "IRI" iri
-        "CURIE" (ln/iri->curie env iri)
+        "CURIE" (en/iri->curie env iri)
         "recognized" (->> states first boolean str)
         (->> states
              (filter #(= pi (:pi %)))
@@ -48,13 +50,13 @@
          (map
           (fn [k]
             (if-let [format (second (re-find format-reg k))]
-              [k (ln/->iri env (string/replace k format-reg "")) (keyword format)]
+              [k (util/->iri env (string/replace k format-reg "")) (keyword format)]
               (cond
                 (= k "IRI") ["IRI" nil :IRI]
                 (= k "CURIE") ["CURIE" nil :CURIE]
-                (= (ln/->iri env k) (rdf/rdfs "label"))
+                (= (util/->iri env k) (rdf/rdfs "label"))
                 [k (rdf/rdfs "label") :literal]
-                :else [k (ln/->iri env k) default]))))
+                :else [k (util/->iri env k) default]))))
          vec)))
 
 (defmethod ontology-result "tsv"

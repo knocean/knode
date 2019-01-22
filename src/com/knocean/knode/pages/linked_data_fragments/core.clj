@@ -3,7 +3,7 @@
             [cemerick.url :as url]
 
             [org.knotation.rdf :as rdf]
-            [org.knotation.link :as ln]
+            [org.knotation.environment :as en]
 
             [com.knocean.knode.pages.mimetypes :as mime]
             
@@ -36,7 +36,7 @@
                                   (try
                                     (object->nquads-object
                                      {::rdf/lexical (:ol entry)
-                                      ::rdf/language (:ln entry)
+                                      ::rdf/language (:lt entry)
                                       ::rdf/datatype (:di entry)})
                                     (catch Exception e
                                       (or (:oi entry) "")))
@@ -47,12 +47,12 @@
                          (cond
                            (:si entry)
                            [:a {:href (str "?subject=" (url/url-encode (:si entry)))}
-                            (ln/iri->name env (:si entry))]
+                            (en/iri->name env (:si entry))]
 
                            (:sb entry)
                            [:a {:href (str "?subject=" (url/url-encode (:sb entry)))}
                             (:sb entry)]) " "
-                         [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (ln/iri->name env (:pi entry))] " "
+                         [:a {:href (str "?predicate=" (url/url-encode (:pi entry)))} (en/iri->name env (:pi entry))] " "
                          [:a {:href (str "?object=" (url/url-encode obj))} obj]]))
                     (:items res))]]))}))
 

@@ -2,11 +2,11 @@
   (:require [clojure.string :as string]
             [clojure.set :as set]
 
-            [org.knotation.link :as ln]
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.state :as s]
 
+            [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]
             [com.knocean.knode.pages.ontology.base :refer [ontology-result] :as base]))
@@ -34,7 +34,7 @@
     {:template content
      :predicates preds
      :input {}
-     :name (ln/iri->name (st/latest-env) iri) :iri iri}))
+     :name (en/iri->name (st/latest-env) iri) :iri iri}))
 
 (defn template-dummy
   [template]
@@ -59,7 +59,7 @@
   ([template content] (validate-application (st/latest-env) template content))
   ([env template content]
    (let [unknowns (->> content
-                       (filter #(nil? (ln/->iri env (second %))))
+                       (filter #(nil? (util/->iri env (second %))))
                        (map (fn [[k v]] [:unrecognized-name v])))
          base (if (empty? unknowns) {} {:warnings unknowns})]
      (if (valid-application? template content)
@@ -78,7 +78,7 @@
   [env raw-template-input]
   (let [parsed (string/split-lines raw-template-input)
         [_ subject] (string/split (second parsed) #": ")
-        template-iri (ln/->iri env subject)
+        template-iri (util/->iri env subject)
         template (template-by-iri template-iri)
         content (string/join \newline (drop 2 parsed))]
     {:iri template-iri

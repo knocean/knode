@@ -4,7 +4,9 @@
             [com.knocean.knode.pages.mimetypes :as mime]
 
             [com.knocean.knode.state :refer [state] :as st]
-            [org.knotation.link :as ln]))
+            [com.knocean.knode.util :as util]
+            
+            [org.knotation.environment :as en]))
 
 (defmulti ontology-result mime/req->output-format)
 
@@ -30,7 +32,7 @@
                     (if-let [_operator (second (re-find #"^(in|eq)\." s))]
                       (string/split (subs s 3) #" +"))))]
     (map
-     #(ln/->iri env %)
+     #(util/->iri env %)
      (concat
       (when (.startsWith uri (str "/ontology/" (:project-name @state) "_"))
         [(-> uri

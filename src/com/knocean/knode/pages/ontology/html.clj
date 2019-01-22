@@ -4,7 +4,6 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -15,21 +14,21 @@
 
 (defn render-link
   [env iri]
-  [:a {:href iri} (ln/iri->name env iri)])
+  [:a {:href iri} (en/iri->name env iri)])
 
 (defn local-link
   [env iri]
-  (let [curie (ln/iri->curie env iri)]
+  (let [curie (en/iri->curie env iri)]
     (str "/ontology/" (string/replace curie ":" "_"))))
 
 (defn render-subject
   [env iri]
-  (let [curie (ln/iri->curie env iri)]
+  (let [curie (en/iri->curie env iri)]
     [:a
      {:href (if curie (str "/ontology/" (string/replace curie ":" "_")) iri)}
      curie
      " "
-     (ln/iri->name env iri)]))
+     (en/iri->name env iri)]))
 
 (defn render-pair
   [env {:keys [pi oi ob ol] :as state}]
@@ -37,9 +36,9 @@
    (render-link env pi)
    ": "
    (cond
-     oi [:a {:href oi :property (ln/iri->curie env pi)} (ln/iri->name env oi)]
+     oi [:a {:href oi :property (en/iri->curie env pi)} (en/iri->name env oi)]
      ob ob
-     ol [:span {:property (ln/iri->curie env pi)} ol])])
+     ol [:span {:property (en/iri->curie env pi)} ol])])
 
 (def obo (partial apply str "http://purl.obolibrary.org/obo/"))
 
@@ -56,10 +55,10 @@
         states
         (->> [:= :si iri]
              st/select
-             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :ln]))
+             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
              distinct)]
     [:div
-     [:h2 (ln/iri->curie env iri) " " (ln/iri->name env iri)]
+     [:h2 (en/iri->curie env iri) " " (en/iri->name env iri)]
      [:p [:a {:href iri} iri]]
      (->> states
           (map :pi)
@@ -127,7 +126,7 @@
          [:ul (map (fn [s] [:li (render-subject env s)])
                    (base/all-subjects))]]}
      1 {:session session
-        :title (ln/iri->name env (first requested-iris))
+        :title (en/iri->name env (first requested-iris))
         :content (render-subject-html (first requested-iris))}
      {:session session
       :title (:project-name @state)

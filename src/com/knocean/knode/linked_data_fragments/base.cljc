@@ -28,9 +28,10 @@
 (defn str->int
   ([str] (str->int str 0))
   ([str default]
-   (util/handler-case
+   (try
     (Integer/parseInt str)
-    (:default e default))))
+    (catch Exception e
+      default))))
 
 (defn -data-source-dispatch
   [query data]

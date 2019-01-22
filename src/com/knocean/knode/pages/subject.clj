@@ -5,14 +5,13 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
-            [org.knotation.link :as ln]
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
             [com.knocean.knode.pages.html :refer [html]]))
 
 (defn render-link
   [env iri]
-  [:a {:href (str "/subject?iri=" (util/escape iri))} (ln/iri->name env iri)])
+  [:a {:href (str "/subject?iri=" (util/escape iri))} (en/iri->name env iri)])
 
 (defn render-object
   [env {:keys [oi ob ol dt ln] :as state}]

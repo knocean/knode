@@ -237,10 +237,7 @@
       (en/add-prefix "owl" "http://www.w3.org/2002/07/owl#")
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       (en/add-prefix "kn" "https://knotation.org/kn/")
-      ;(en/add-prefix (:project-name @state) (:base-iri @state))
-
-      (en/add-prefix "cebsld" "https://cebs-dev.ontodev.com/ontology/CEBSLD_")
-      (en/add-prefix "study" "https://cebs-dev.ontodev.com/ontology/CEBSLD_20009-04_")))
+      (en/add-prefix (:project-name @state) (:base-iri @state))))
 
 (defn build-env
   [iris]

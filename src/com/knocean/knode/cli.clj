@@ -19,8 +19,10 @@
   (let [task (first args)]
     (case task
       "help" (println usage)
-      "config" (do (st/init-from-config) (println (st/report @st/state)))
-      "serve" (do (st/init-from-config) (server/start))
+      "config" (do (st/init) (println (st/report @st/state)))
+      "serve" (do (st/init) (server/start))
+      ;"config" (do (st/init-from-config) (println (st/report @st/state)))
+      ;"serve" (do (st/init-from-config) (server/start))
 
       "load-config"
       (let [config (or (second args) "knode.edn")]

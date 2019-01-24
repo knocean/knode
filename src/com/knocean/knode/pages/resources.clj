@@ -32,19 +32,19 @@
 
 (defn iri->seq
   [resource env headers iri]
-  (let [states (st/select
-                (if (not= "all" resource)
-                  [:and [:= :rt resource] [:= :si iri]]
-                  [:= :si iri])
-                :order-by [:id])]
+  (let [quads (st/select
+               (if (not= "all" resource)
+                 [:and [:= :rt resource] [:= :si iri]]
+                 [:= :si iri])
+               :order-by [:id])]
     (into
      [:tr]
      (for [[column pi format] headers]
        (case column
          "IRI" [:td [:a {:href (local-link env resource iri)} iri]]
          "CURIE" [:td [:a {:href (local-link env resource iri)} (en/iri->curie env iri)]]
-         "recognized" [:td (->> states first boolean str)]
-         (->> states
+         "recognized" [:td (->> quads first boolean str)]
+         (->> quads
               (filter #(= pi (:pi %)))
               (map (partial render-object resource env format))
               distinct
@@ -104,13 +104,13 @@
                     first
                     :si)]
            (when iri
-             (let [states
+             (let [quads
                    (st/query {:select [:*] :from [:states]
                               :where [:and
                                       [:= :rt (:label resource)]
                                       [:= :si iri]]})
-                   env (st/build-env-from-states states)]
-               (->> states
+                   env (st/build-env-from-quads quads)]
+               (->> quads
                     (map (partial render-pair env (:label resource)))
                     (into [:ul])
                     (conj [:div [:h3 "Details"]]))))))]})))
@@ -147,14 +147,14 @@
     (if (= "html" (get params "format" "html"))
       (let [resource (get-in req [:params :resource] "all")
             resource-map (get-resource-entry resource)
-            states
+            quads
             (->> (if (not= "all" resource)
                    [:and [:= :si iri] [:= :rt resource]]
                    [:= :si iri])
                  st/select
                  (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
                  distinct)
-            env (st/build-env-from-states states)]
+            env (st/build-env-from-quads quads)]
         (html
          {:title (en/iri->name env iri)
           :content
@@ -166,7 +166,7 @@
             ". "
             (when (not= resource "all")
               [:a {:href (local-link env "all" iri)} "Query all resources for this subject."])]
-           (->> states
+           (->> quads
                 (map :pi)
                 (remove nil?)
                 distinct
@@ -174,7 +174,7 @@
                 (into predicates)
                 (mapcat
                  (fn [predicate]
-                   (->> states
+                   (->> quads
                         (filter #(= predicate (:pi %)))
                         (map (partial render-pair env resource)))))
                 distinct
@@ -228,7 +228,7 @@
         op (case operator
              "eq" :=
              "like" :like
-                   (throw (Exception. (str "Unhandled query parameter: " value))))
+             (throw (Exception. (str "Unhandled query parameter: " value))))
         v (if (= :like op) (string/replace raw "*" "%") raw)]
     [op obj v]))
 
@@ -347,7 +347,7 @@ $('#compact')[0].checked = false;
 $('#predicate').val('');
 $('#operator').val('eq.');
 $('#object').val('');
-return false" this-select)} 
+return false" this-select)}
        "Reset"]]
      [:p
       [:b "Search tips: "]

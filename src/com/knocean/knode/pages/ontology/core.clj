@@ -41,14 +41,12 @@
                         [:li (mime/req->format-link req format)])
                       mime/mimetype-table)]]}))
 
-
-
 (defn assign-rdf
   ""
   [quads]
   (->> quads
        (map
-        #(clojure.set/rename-keys 
+        #(clojure.set/rename-keys
           (select-keys % [:gi :zn :si :sb :pi :oi :ob :ol :di :lt])
           {:gi ::rdf/gi
            :zn ::rdf/zn
@@ -88,18 +86,18 @@
    (let [iri (first requested-iris)
          resource (or (:resource params)
                       (:project-name @state))
-         env (st/base-env)
          quads (st/select
-                     (if iri [:= :si iri] [:= :rt resource])
-                     :order-by [:id])
-         states (concat
-                 (st/prefix-states env)
-                 [{::knst/event ::knst/blank}]
-                 (assign-rdf quads))]
-       (->> states
-            (ttl/render-stanza env)
-            (map #(knst/output % :ttl nil))
-            knst/render-output-string))})
+                (if iri [:= :si iri] [:= :rt resource])
+                :order-by [:id])
+         states (assign-rdf quads)
+         env (st/base-env)]
+     (->> (concat
+           (st/prefix-states env)
+           [{::knst/event ::knst/blank}]
+           states)
+          (ttl/render-stanza env)
+          (map #(knst/output % :ttl nil))
+          knst/render-output-string))})
 
 (defn ontology-request
   [{:keys [:request-method] :as req}]

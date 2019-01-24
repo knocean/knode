@@ -69,7 +69,7 @@
    {:key :write-file
     :label "Write file"
     :default #(->> % :build-files last)}
-    
+
    {:key :resources
     :label "Resources"
     :default (constantly nil)}])
@@ -134,15 +134,15 @@
         config-str (if (.exists file) (slurp config) nil)
         state (if-not (nil? config-str) (read-string config-str) {})]
     (reduce
-      (fn [state {:keys [key label default] :as configurator}]
-        (println "RUNNING CONFIGURATOR" label "...")
-        (if (find state key)
-          state
-          (assoc state key (default state))))
-      (->> configurators
-           (map :key)
-           (select-keys state))
-      configurators)))
+     (fn [state {:keys [key label default] :as configurator}]
+       (println "RUNNING CONFIGURATOR" label "...")
+       (if (find state key)
+         state
+         (assoc state key (default state))))
+     (->> configurators
+          (map :key)
+          (select-keys state))
+     configurators)))
 
 (defn plain-view
   [label value]
@@ -203,11 +203,11 @@
    to the 'states' table. If states with the same resource ID already exist, 
    remove them and add the new states."
   [idspace quads]
-  (if (empty? (query {:select [:*] :from [:states] :where [:= :rt idspace]}))
+  (if true ; (empty? (query {:select [:*] :from [:states] :where [:= :rt idspace]}))
     (->> quads
          (map (apply juxt columns))
          (jdbc/insert-multi! @state :states sql-columns))
-    (do 
+    (do
       (println "Old entries exist! Updating states for" idspace)
       (jdbc/delete! @state :states ["rt = ?" idspace])
       (->> quads
@@ -237,7 +237,10 @@
       (en/add-prefix "owl" "http://www.w3.org/2002/07/owl#")
       (en/add-prefix "obo" "http://purl.obolibrary.org/obo/")
       (en/add-prefix "kn" "https://knotation.org/kn/")
-      (en/add-prefix (:project-name @state) (:base-iri @state))))
+      ;(en/add-prefix (:project-name @state) (:base-iri @state))
+
+      (en/add-prefix "cebsld" "https://cebs-dev.ontodev.com/ontology/CEBSLD_")
+      (en/add-prefix "study" "https://cebs-dev.ontodev.com/ontology/CEBSLD_20009-04_")))
 
 (defn build-env
   [iris]
@@ -248,35 +251,45 @@
                   [:in :si (remove nil? iris)]]}
          query
          (reduce
-          (fn [env row] (en/add-label env (:ol row) (:si row)))
+          (fn [env row]
+            (en/add-label env (:ol row) (:si row)))
           (base-env)))
     (base-env)))
 
 (defn build-env-from-states
   [states]
   (->> states
+       (filter ::rdf/quad)
+       (map ::rdf/quad)
+       (mapcat (juxt ::rdf/si ::rdf/pi ::rdf/oi))
+       (remove nil?)
+       set
+       build-env))
+
+(defn build-env-from-quads
+  [quads]
+  (->> quads
        (mapcat (juxt :si :pi :oi))
        (remove nil?)
        set
        build-env))
 
 (defn latest-env []
-  (or @-env-cache
-      (reset!
-       -env-cache
-       (-> [:= :rt (:project-name @state)]
-            select
-            build-env-from-states))))
+  ;(or @-env-cache
+  ;    (reset!
+  ;     -env-cache
+  (-> [:= :rt (:project-name @state)]
+      select
+      build-env-from-quads))
 
 (defn prefix-states
   [env]
   (->> env
        ::en/prefix-seq
-      (map (fn [prefix]
-             {::st/event ::st/prefix
-              ::en/prefix prefix
-              ::en/iri (get-in env [::en/prefix-iri prefix])}))))
+       (map (fn [prefix]
+              {::st/event ::st/prefix
+               ::en/prefix prefix
+               ::en/iri (get-in env [::en/prefix-iri prefix])}))))
 
 (defn latest-prefix-states []
-    (prefix-states latest-env))
-
+  (prefix-states latest-env))

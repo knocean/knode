@@ -11,6 +11,7 @@
 
   knode serve    Serve resources
   knode config   Show configuration
+  knode load-config [config]
   knode load [resource] [files]
   knode db (create|drop) (tables|indexes)
   knode help     Show this help message")
@@ -31,9 +32,13 @@
           (println "\tyou must specify a configuration file")
           (System/exit 1))
         (println "Woo! Doing the thing!")
+        ; Get the configurators from the config file
         (st/init-from-config)
-        (println "Loading resources...")
+        ; Set up the local resource files
+        (println "Retrieving resources...")
         (r/resources! config)
+        ; Load the new resources
+        (println "Loading resources...")
         (doseq [r (:resources @st/state)]
           (loader/load-resource r))
         (System/exit 0))

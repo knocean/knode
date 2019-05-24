@@ -38,7 +38,7 @@ To view the configuration settings:
 knode config knode.edn
 ```
 
-#### Resources
+### Resources
 
 To load resources from the configuration file (if you are using `knode.edn`, you do not need to specify the path):
 ```
@@ -68,7 +68,7 @@ Valid types of resources are:
 * `:direct-link`: include a `:url` to point to the remote resource
 * `:obo-github-repo`: include a `:repo` pointing to a `.git` repository in the standard OBO directory layout
 
-#### Example Config
+### Example Config
 
 ```
 {:project-name "ONTIE",

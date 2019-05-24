@@ -38,19 +38,22 @@
 
 (defn insert!
   "Given a resource entry, add the resource to the 'resources' table. If a 
-   resource with the same label (idspace) already exists, add the states
-   to the existing resource."
+   resource with the same label (idspace) already exists, delete the old
+   resource entry and add the new entry."
   [{:keys [:idspace :label :title :description :homepage] :as resource}]
   (let [res {:label idspace
              :title (or title idspace)
              :description (or description "")
              :homepage (or homepage "")}]
-    (when 
+    (if 
       (empty? 
         (st/query {:select [:*] 
                    :from [:resources] 
                    :where [:= :label idspace]}))
-      (jdbc/insert! @st/state :resources res))))
+      (jdbc/insert! @st/state :resources res)
+      (do
+        (jdbc/delete! @st/state :resources ["label = ?" idspace])
+        (jdbc/insert! @st/state :resource res)))))
 
 (defn init-dir!
   "Given a string path to a directory, create the directory and any parent 

@@ -18,7 +18,8 @@
    [com.knocean.knode.pages.term-status :as stat]
    [com.knocean.knode.pages.linked-data-fragments.core :as ldf]
    [com.knocean.knode.pages.subject :as subject]
-   [com.knocean.knode.pages.resources :as resources]))
+   [com.knocean.knode.pages.resources :as resources]
+   [com.knocean.knode.pages.tree-view :as tree]))
 
 (defn not-found
   [request]
@@ -45,6 +46,7 @@
     ;subject/routes
     ontology/routes
     resources/routes
+    tree/routes
     ;stat/routes
     ldf/routes
     [["" (bring/redirect "/")]

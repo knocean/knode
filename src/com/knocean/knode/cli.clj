@@ -41,7 +41,6 @@
           (println "No '" config "' exists in current directory...")
           (println "\tyou must specify a configuration file")
           (System/exit 1))
-        (println "Woo! Doing the thing!")
         ; Get the configurators from the config file
         (st/init-from-config)
         ; Set up the local resource files

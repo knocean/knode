@@ -11,6 +11,7 @@
 
   knode serve    Serve resources
   knode config   Show configuration
+  knode load-config [config]
   knode load [resource] [files]
   knode db (create|drop) (tables|indexes)
   knode help     Show this help message")
@@ -19,10 +20,20 @@
   (let [task (first args)]
     (case task
       "help" (println usage)
-      "config" (do (st/init) (println (st/report @st/state)))
-      "serve" (do (st/init) (server/start))
-      ;"config" (do (st/init-from-config) (println (st/report @st/state)))
-      ;"serve" (do (st/init-from-config) (server/start))
+
+      "config" 
+      (if (not (empty? (rest args)))
+        (do
+          (st/init-from-config)
+          (println (st/report @st/state)))
+        (do (st/init) (println (st/report @st/state))))
+
+      "serve" 
+      (if (not (empty? (rest args)))
+        (do
+          (st/init-from-config)
+          (server/start))
+        (do (st/init) (server/start)))
 
       "load-config"
       (let [config (or (second args) "knode.edn")]
@@ -30,10 +41,13 @@
           (println "No '" config "' exists in current directory...")
           (println "\tyou must specify a configuration file")
           (System/exit 1))
-        (println "Woo! Doing the thing!")
+        ; Get the configurators from the config file
         (st/init-from-config)
-        (println "Loading resources...")
+        ; Set up the local resource files
+        (println "Retrieving resources...")
         (r/resources! config)
+        ; Load the new resources
+        (println "Loading resources...")
         (doseq [r (:resources @st/state)]
           (loader/load-resource r))
         (System/exit 0))

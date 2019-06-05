@@ -64,8 +64,8 @@ DROP INDEX IF EXISTS states_si;"))
 CREATE INDEX states_si ON states(si);"))
 
 (defn load-states
-  [id fpath]
-  (->> (kn/read-path :kn nil fpath)
+  [id states]
+  (->> states
        st/get-quads
        (map #(assoc % :rt id))
        (partition-all 2000)
@@ -84,12 +84,11 @@ CREATE INDEX states_si ON states(si);"))
 
 (defn load-resource
   ([resource]
-   (println "Loading resource" (:idspace resource))
+   (println "LOAD" (:idspace resource))
    ; add the resource to the 'resources' table
    (try
      (st/query {:select [:*] :from [:resources] :limit 1})
      (catch Exception e
-         (println "The 'resources' table does not exist... Creating...")
          (create-tables)))
    (if (= (:type resource) :obo-github-repo)
      ;; add a resource for each branch
@@ -99,34 +98,32 @@ CREATE INDEX states_si ON states(si);"))
    (try
      (st/query {:select [:*] :from [:states] :limit 1})
      (catch Exception e
-       (println "The 'states' table does not exist... Creating...")
        (create-tables)))
-
    ; get the ontology directory and resource file path
    (let [dir (if (s/ends-with? (:absolute-dir @state) "/")
                 (str (:absolute-dir @state) "ontology/")
                 (str (:absolute-dir @state) "/ontology/"))
-         ; all resources should be in KN
-         fpath (str dir (:idspace resource) ".kn")]
+         id (:idspace resource)
+         fpath (:path resource)
+         paths (:paths resource)]
      (if (= (:type resource) :obo-github-repo)
        (load-branch-states dir resource)
-       (load-states fpath (:idspace resource)))))
+       (if (not (nil? paths))
+        (load-states id (kn/read-paths nil nil paths))
+        (load-states id (kn/read-path nil nil fpath))))))
 
   ([resource args]
    (println "LOAD" (:connection @state) resource args)
    (try
+     (st/query {:select [:*] :from [:resources] :limit 1})
+     (catch Exception e
+         (create-tables)))
+   (r/insert! {:idspace resource :label resource :type :local-file})
+   (try
      (st/query {:select [:*] :from [:states] :limit 1})
      (catch Exception e
-       (println "The 'states' table does not exist.")
        (create-tables)))
    (->> (if (second args)
           (kn/read-paths nil nil args)
           (kn/read-path nil nil (first args)))
-        st/get-quads
-        (map #(assoc % :rt resource))
-        (partition-all 2000) ; WARN: This number is pretty arbitrary
-        (map-indexed
-         (fn [i p]
-           (println "Loading partition" i)
-           (st/insert! resource p)))
-        doall)))
+        (load-states resource))))

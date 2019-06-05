@@ -35,6 +35,7 @@
        st/configure
        (reset! state))
   (loader/load-resource "ex" ["test/example/context.kn" "test/example/content.kn"])
+  (jdbc/delete! @state "resources" ["label = ?" "ex"])
   (jdbc/insert! @state "resources" example-resource))
 
 (defn example-state-fixture

@@ -38,22 +38,22 @@
 
 (defn insert!
   "Given a resource entry, add the resource to the 'resources' table. If a 
-   resource with the same label (idspace) already exists, remove it and add the 
-   new one."
+   resource with the same label (idspace) already exists, delete the old
+   resource entry and add the new entry."
   [{:keys [:idspace :label :title :description :homepage] :as resource}]
   (let [res {:label idspace
              :title (or title idspace)
              :description (or description "")
              :homepage (or homepage "")}]
-    ; query to see if resource with same label exists, delete if so
-    (if (empty? (st/query {:select [:*] 
-                           :from [:resources] 
-                           :where [:= :label idspace]}))
+    (if 
+      (empty? 
+        (st/query {:select [:*] 
+                   :from [:resources] 
+                   :where [:= :label idspace]}))
       (jdbc/insert! @st/state :resources res)
       (do
-        (println "UPDATING" idspace)
         (jdbc/delete! @st/state :resources ["label = ?" idspace])
-        (jdbc/insert! @st/state :resources res)))))
+        (jdbc/insert! @st/state :resource res)))))
 
 (defn init-dir!
   "Given a string path to a directory, create the directory and any parent 
@@ -171,7 +171,8 @@
 
 (defn exists?
   "Given a resources directory and a resource, return true if the resource does 
-   exist, false otherwise."
+   exist, false otherwise. For local file resources with multiple paths, check
+   that all files exist."
   [dir resource]
   (case (:type resource)
     :direct-link (link-resource-exists? dir resource)
@@ -183,10 +184,9 @@
           file (io/as-file (str dir "/" fname))]
       (.exists file))
     :local-file
-    (let [file (io/as-file (:path resource))]
-      (if (.exists file)
-        true
-        false))))
+    (let [paths (or (:paths resource) (list (:path resource)))
+          fs (map #(io/as-file %) paths)]
+      (every? true? (map #(.exists %) fs)))))
 
 ;; INIT RESOURCES
 
@@ -205,10 +205,12 @@
       (spit (.getAbsolutePath file) (slurp (last (:redirs response))))
       ; then return the (probably) updated resource map
       (if (:etag response)
-        (assoc resource :etag (:etag response))
+        (assoc resource :etag (:etag response) :path (.getAbsolutePath file))
         (if (:last-modified response)
-          (assoc resource :last-modified (:last-modified response))
-          resource)))))
+          (assoc resource 
+            :last-modified (:last-modified response) 
+            :path (.getAbsolutePath file))
+          (assoc resource :path (.getAbsolutePath file)))))))
 
 (defn get-link-resource!
   "Given a resources directory and a :direct-link resource, get the content from 
@@ -283,6 +285,8 @@
    the resource to the directory."
   [dir resource]
   (let [type (:type resource)]
+    (when (not (= type :local-file))
+      (println "GET" (:idspace resource)))
     (case type
       ; error when local file does not exist
       :local-file
@@ -292,7 +296,7 @@
             "Cannot configure resource '"
             (:idspace resource)
             "'\nCAUSE: "
-            (:path resource)
+            (or (:paths resource) (:path resource))
             " does not exist"))
         (System/exit 1))
       ; anything else should be fetched
@@ -410,89 +414,6 @@
       []
       resources)))
 
-;; MAIN CONFIG METHODS
-
-(defn update-resources-and-config
-  "Given the dereferenced application state and the path to the configuration 
-   file, configure the resources for the application and write any updates to 
-   the configuration file. Return the state with any updates to the resources."
-  [state config]
-  (let [resources (update-resources state)]
-    (update-config! config resources)
-    (assoc state :resources resources)))
-
-;; MOVE RESOURCES TO ONTOLOGY DIRECTORY
-
-(defn copy-file!
-  "Given a source file and a target file (in KN format),
-   copy the source file to the target file in knotation format. 
-   Return the path to the new file on success, nil on failure."
-  [src-file tgt-file]
-  (let [out-file (io/as-file tgt-file)]
-    (if (s/ends-with? src-file ".kn")
-      ; if the src file is already in knotation,
-      ; just copy it to the destination
-      (-> src-file 
-          io/as-file
-          (io/copy out-file))
-      ; otherwise, we need to convert to kn
-      (kn/render-path :kn nil (kn/read-path nil nil src-file) out-file))
-    (if-not (.exists out-file)
-      ; if the file does not exist after copying/converting,
-      ; throw an error
-      (do
-        (println (str "ERROR: Unable to copy " src-file " to " tgt-file))
-        (System/exit 1))
-      ; otherwise, return the path to the target file
-      tgt-file)))
-
-(defn copy-git-resources
-  "Given an :obo-github-repo resource, a source directory to copy resources 
-   from, and a target directory to copy resources to, copy each resource 
-   specified by the :paths key, ensuring they are in KN format."
-  [{:keys [:paths :idspace] :as resource} src-dir tgt-dir]
-  (doseq [p paths]
-    (let [src-file (str src-dir "/" p)
-          tgt-file (str tgt-dir "/" (-> p (s/split #"\." -1) first) ".kn")]
-      (copy-file! src-file tgt-file))))
-
-(defn copy-resource
-  "Given a resource, a source directory to copy from, and a target directory to 
-   copy to, copy the resource to the target in kn format. Return the path to the
-   new file on success, nil on failure."
-  [resource src-dir tgt-dir]
-  (let [fname (->> resource :idspace s/lower-case)
-        tgt-file (str tgt-dir "/" fname ".kn")]
-    (case (:type resource)
-      :local-file
-      (copy-file! (:path resource) tgt-file)
-      :obo-github-repo 
-      (copy-git-resources resource src-dir tgt-dir)
-      :obo-published-owl 
-      (copy-file! (str src-dir "/" fname ".owl") tgt-file)
-      :direct-link
-      (copy-file! (str src-dir "/" fname ".owl") tgt-file))))
-
-(defn copy-resources
-  "Given the dereferenced application state, convert any ontology files in the 
-   resources directory to knotation and move them to the ontology directory. 
-   Return a collection of the paths to the new files (if they were successfully
-   copied)."
-  [state]
-  (let [resources (:resources state)
-        project-dir (if (s/ends-with? (:absolute-dir state) "/")
-                      (:absolute-dir state)
-                      (str (:absolute-dir state) "/"))
-        src-dir (str project-dir "resources")
-        tgt-dir (str project-dir "ontology")]
-    (init-dir! tgt-dir)
-    (remove nil?
-      (reduce
-        (fn [coll resource]
-          (conj coll (copy-resource resource src-dir tgt-dir)))
-        []
-        resources))))
-
 ;; DO EVERYTHING
 
 (defn resources!
@@ -500,5 +421,6 @@
    ontology directory in knotation format. Update the state with any changes to 
    the resources. Return a collection of the new ontology paths."
   [config]
-  (reset! st/state (update-resources-and-config @st/state config))
-  (copy-resources @st/state))
+  (let [resources (update-resources @st/state)]
+    (update-config! config resources)
+    (reset! st/state (assoc @st/state :resources resources))))

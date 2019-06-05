@@ -48,6 +48,7 @@
         [:ul {:class "nav navbar-nav"}
          [:li [:a {:href "/ontology"} "Ontology"]]
          [:li [:a {:href "/resources"} "Resources"]]
+         [:li [:a {:href "/trees"} "Tree Views"]]
          [:li [:a {:href "/doc/"} "Documentation"]]]]]]
         ;[:ul {:class "nav navbar-nav navbar-right"}
         ; (if (empty? session)

@@ -138,6 +138,49 @@
    (rdf/rdfs "subClassOf")
    (obo "ncbitaxon#has_rank")])
 
+(defn subject-html
+  [iri resource]
+  (let [resource-map (get-resource-entry resource)
+        quads
+        (->> (if (not= "all" resource)
+               [:and [:= :si iri] [:= :rt resource]]
+               [:= :si iri])
+             st/select
+             (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
+             distinct)
+        env (st/build-env-from-quads quads)]
+   {:title (en/iri->name env iri)
+    :content
+    [:div.subject
+     [:h2 (en/iri->name env iri)]
+     [:p [:b "IRI:"] " " [:a {:href iri} iri]]
+     [:p "Showing data from "
+      [:a {:href (str "/resources/" resource)} (:label resource-map)]
+      ". "
+      (when (not= resource "all")
+        [:a {:href (local-link env "all" iri)} "Query all resources for this subject."])]
+     (->> quads
+          (map :pi)
+          (remove nil?)
+          distinct
+          (remove (set predicates))
+          (into predicates)
+          (mapcat
+           (fn [predicate]
+             (->> quads
+                  (filter #(= predicate (:pi %)))
+                  (map (partial render-pair env resource)))))
+          distinct
+          (into [:ul]))
+     [:div
+      "Other formats: "
+      [:a {:href (str (local-link env resource iri) "&format=ttl")} "Turtle (ttl)"]
+      ", "
+      [:a {:href (str (local-link env resource iri) "&format=json")} "JSON-LD (json)"]
+      ", "
+      [:a {:href (str (local-link env resource iri) "&format=tsv")} "TSV (tsv)"]
+      "."]]}))
+
 (defn subject-page
   [{:keys [params] :as req}]
   (if-let [iri (or (:iri req)
@@ -145,48 +188,7 @@
                    (when-let [curie (get-in req [:params "curie"])]
                      (en/curie->iri (st/latest-env) curie)))]
     (if (= "html" (get params "format" "html"))
-      (let [resource (get-in req [:params :resource] "all")
-            resource-map (get-resource-entry resource)
-            quads
-            (->> (if (not= "all" resource)
-                   [:and [:= :si iri] [:= :rt resource]]
-                   [:= :si iri])
-                 st/select
-                 (map #(select-keys % [:si :sb :pi :oi :ob :ol :di :lt]))
-                 distinct)
-            env (st/build-env-from-quads quads)]
-        (html
-         {:title (en/iri->name env iri)
-          :content
-          [:div.subject
-           [:h2 (en/iri->name env iri)]
-           [:p [:b "IRI:"] " " [:a {:href iri} iri]]
-           [:p "Showing data from "
-            [:a {:href (str "/resources/" resource)} (:label resource-map)]
-            ". "
-            (when (not= resource "all")
-              [:a {:href (local-link env "all" iri)} "Query all resources for this subject."])]
-           (->> quads
-                (map :pi)
-                (remove nil?)
-                distinct
-                (remove (set predicates))
-                (into predicates)
-                (mapcat
-                 (fn [predicate]
-                   (->> quads
-                        (filter #(= predicate (:pi %)))
-                        (map (partial render-pair env resource)))))
-                distinct
-                (into [:ul]))
-           [:div
-            "Other formats: "
-            [:a {:href (str (local-link env resource iri) "&format=ttl")} "Turtle (ttl)"]
-            ", "
-            [:a {:href (str (local-link env resource iri) "&format=json")} "JSON-LD (json)"]
-            ", "
-            [:a {:href (str (local-link env resource iri) "&format=tsv")} "TSV (tsv)"]
-            "."]]}))
+      (html (subject-html iri (get-in req [:params :resource] "all")))
       ((base/with-requested-terms base/ontology-result)
        (assoc req :requested-iris [iri])))
     (html

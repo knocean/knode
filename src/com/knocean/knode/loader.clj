@@ -85,6 +85,7 @@ CREATE INDEX states_si ON states(si);"))
 (defn load-resource
   ([resource]
    (println "LOAD" (:idspace resource))
+   (create-tables)
    ; add the resource to the 'resources' table
    (try
      (st/query {:select [:*] :from [:resources] :limit 1})
@@ -114,6 +115,7 @@ CREATE INDEX states_si ON states(si);"))
 
   ([resource args]
    (println "LOAD" (:connection @state) resource args)
+   (create-tables)
    (try
      (st/query {:select [:*] :from [:resources] :limit 1})
      (catch Exception e

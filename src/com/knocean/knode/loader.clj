@@ -15,24 +15,28 @@
    "DROP TABLE IF EXISTS resources;
 DROP TABLE IF EXISTS states;"))
 
-(defn create-tables
+(defn create-resources-table
   []
-  (println "Creating tables...")
+  (println "Creating resources table...")
   (st/execute!
-   (format
-    "CREATE TABLE resources (
+    (format
+     "CREATE TABLE resources (
   id %s,
   label text,
   title text,
   description text,
   homepage text
 );"
-    (case (:database-type @state)
+     (case (:database-type @state)
       "sqlite" "integer PRIMARY KEY AUTOINCREMENT"
-      "postgres" "serial PRIMARY KEY")))
+      "postgres" "serial PRIMARY KEY"))))
+
+(defn create-states-table
+  []
+  (println "Creating table states...")
   (st/execute!
-   (format
-    "CREATE TABLE states (
+    (format
+     "CREATE TABLE states (
   id %s,
   rt text,
   gi text,
@@ -48,6 +52,11 @@ DROP TABLE IF EXISTS states;"))
     (case (:database-type @state)
       "sqlite" "integer PRIMARY KEY AUTOINCREMENT"
       "postgres" "serial PRIMARY KEY"))))
+
+(defn create-tables
+  []
+  (create-resources-table)
+  (create-states-table))
 
 (defn drop-indexes
   []
@@ -85,12 +94,11 @@ CREATE INDEX states_si ON states(si);"))
 (defn load-resource
   ([resource]
    (println "LOAD" (:idspace resource))
-   (create-tables)
    ; add the resource to the 'resources' table
    (try
      (st/query {:select [:*] :from [:resources] :limit 1})
      (catch Exception e
-         (create-tables)))
+         (create-resources-table)))
    (if (= (:type resource) :obo-github-repo)
      ;; add a resource for each branch
      (r/insert-branches! resource)
@@ -99,7 +107,7 @@ CREATE INDEX states_si ON states(si);"))
    (try
      (st/query {:select [:*] :from [:states] :limit 1})
      (catch Exception e
-       (create-tables)))
+       (create-states-table)))
    ; get the ontology directory and resource file path
    (let [dir (if (s/ends-with? (:absolute-dir @state) "/")
                 (str (:absolute-dir @state) "ontology/")
@@ -115,16 +123,15 @@ CREATE INDEX states_si ON states(si);"))
 
   ([resource args]
    (println "LOAD" (:connection @state) resource args)
-   (create-tables)
    (try
      (st/query {:select [:*] :from [:resources] :limit 1})
      (catch Exception e
-         (create-tables)))
+         (create-resources-table)))
    (r/insert! {:idspace resource :label resource :type :local-file})
    (try
      (st/query {:select [:*] :from [:states] :limit 1})
      (catch Exception e
-       (create-tables)))
+       (create-states-table)))
    (->> (if (second args)
           (kn/read-paths nil nil args)
           (kn/read-path nil nil (first args)))

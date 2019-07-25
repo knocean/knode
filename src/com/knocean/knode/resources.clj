@@ -53,7 +53,7 @@
       (jdbc/insert! @st/state :resources res)
       (do
         (jdbc/delete! @st/state :resources ["label = ?" idspace])
-        (jdbc/insert! @st/state :resource res)))))
+        (jdbc/insert! @st/state :resources res)))))
 
 (defn init-dir!
   "Given a string path to a directory, create the directory and any parent 

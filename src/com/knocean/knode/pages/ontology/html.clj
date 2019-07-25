@@ -4,6 +4,8 @@
 
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
+            [org.knotation.omn :as omn]
+            [org.knotation.state :as knst]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -30,6 +32,49 @@
      " "
      (en/iri->name env iri)]))
 
+(declare sort-statements)
+
+(defn render-statement
+  "Adapted from omn/render-statement."
+  [{:keys [::en/env ::knst/exact ::rdf/quad] :as state}]
+  (cond
+    exact (->> exact flatten (filter string?))
+    :else
+    (when (and (::rdf/oi quad) (not= (rdf/rdf "nil") (::rdf/oi quad)))
+     (let [name (en/iri->name env (::rdf/oi quad))]
+       (if (re-find #"\s" name)
+         [:a {:href (::rdf/oi quad)} (str "'" name "'")]
+         [:a {:href (::rdf/oi quad)} name])))))
+
+(defn get-blank-states
+  [env bnode]
+  (let [trps (st/query {:select [:pi :oi :ob] :from [:states] :where [:= :sb bnode]})]
+    (reduce 
+      (fn [states trp]
+        (conj 
+          states 
+          {::en/env env
+           ::knst/event ::knst/statement
+           ::rdf/quad {::rdf/pi (:pi trp) 
+                       ::rdf/oi (:oi trp) 
+                       ::rdf/ob (:ob trp)} 
+           ::rdf/subject bnode}))
+      [] trps)))
+
+(defn render-omn
+  [env bnode]
+  (let [states (get-blank-states env bnode)]
+    (->> states
+         (group-by ::rdf/subject)
+         (#(assoc %
+                 ::rdf/subjects (->> states (map ::rdf/subject) distinct)
+                 ::knst/states []))
+         omn/sort-statements
+         ::knst/states
+         (map render-statement)
+         (concat [:span])
+         (into []))))
+
 (defn render-pair
   [env {:keys [pi oi ob ol] :as state}]
   (when-not (string/ends-with? pi "applied-template")
@@ -38,7 +83,7 @@
      ": "
      (cond
        oi [:a {:href oi :property (en/iri->curie env pi)} (en/iri->name env oi)]
-       ob ob
+       ob (render-omn env ob)
        ol [:span {:property (en/iri->curie env pi)} ol])]))
 
 (def obo (partial apply str "http://purl.obolibrary.org/obo/"))

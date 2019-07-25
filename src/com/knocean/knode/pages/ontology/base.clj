@@ -16,6 +16,7 @@
         :from [:states] :where [:= :rt (:project-name @state)] :order-by [:si]}
        st/query
        (map :si)
+       (remove nil?)
        (filter #(.startsWith % (:base-iri @state)))))
 
 (defn parse-body-terms

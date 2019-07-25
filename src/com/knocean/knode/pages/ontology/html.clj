@@ -77,13 +77,14 @@
 
 (defn render-pair
   [env {:keys [pi oi ob ol] :as state}]
-  [:li
-   (render-link env pi)
-   ": "
-   (cond
-     oi [:a {:href oi :property (en/iri->curie env pi)} (en/iri->name env oi)]
-     ob (render-omn env ob)
-     ol [:span {:property (en/iri->curie env pi)} ol])])
+  (when-not (string/ends-with? pi "applied-template")
+    [:li
+     (render-link env pi)
+     ": "
+     (cond
+       oi [:a {:href oi :property (en/iri->curie env pi)} (en/iri->name env oi)]
+       ob (render-omn env ob)
+       ol [:span {:property (en/iri->curie env pi)} ol])]))
 
 (def obo (partial apply str "http://purl.obolibrary.org/obo/"))
 

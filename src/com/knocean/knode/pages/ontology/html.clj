@@ -5,6 +5,7 @@
             [org.knotation.rdf :as rdf]
             [org.knotation.environment :as en]
             [org.knotation.omn :as omn]
+            [org.knotation.state :as knst]
 
             [com.knocean.knode.util :as util]
             [com.knocean.knode.state :refer [state] :as st]
@@ -35,7 +36,7 @@
 
 (defn render-statement
   "Adapted from omn/render-statement."
-  [{:keys [::en/env ::st/exact ::rdf/quad] :as state}]
+  [{:keys [::en/env ::knst/exact ::rdf/quad] :as state}]
   (cond
     exact (->> exact flatten (filter string?))
     :else
@@ -53,7 +54,7 @@
         (conj 
           states 
           {::en/env env
-           ::st/event ::st/statement
+           ::knst/event ::knst/statement
            ::rdf/quad {::rdf/pi (:pi trp) 
                        ::rdf/oi (:oi trp) 
                        ::rdf/ob (:ob trp)} 
@@ -67,9 +68,9 @@
          (group-by ::rdf/subject)
          (#(assoc %
                  ::rdf/subjects (->> states (map ::rdf/subject) distinct)
-                 ::st/states []))
-         sort-statements
-         ::st/states
+                 ::knst/states []))
+         omn/sort-statements
+         ::knst/states
          (map render-statement)
          (concat [:span])
          (into []))))
@@ -175,150 +176,3 @@
      {:session session
       :title (:project-name @state)
       :content (map render-subject-html requested-iris)})))
-
-;; -----------------------------------------
-;; OMN rendering helper function
-;; -----------------------------------------
-
-(defn sort-statements
-  "Adapted from omn/sort-statements."
-  [coll]
-  (loop [{:keys [::rdf/subjects ::depth] :as coll} coll]
-    (if-let [subject (first subjects)]
-      (recur
-       (if (first (get coll subject))
-         (let [coll (->> (get coll subject)
-                         (map #(assoc % ::omn/omn true))
-                         (assoc coll subject))
-               states (get coll subject)
-               state (first states)
-               rdf-type        (omn/find-state states (rdf/rdf "type"))
-               complement-of   (omn/find-state states (rdf/owl "complementOf"))
-               intersection-of (omn/find-state states (rdf/owl "intersectionOf"))
-               union-of        (omn/find-state states (rdf/owl "unionOf"))
-               on-property     (omn/find-state states (rdf/owl "onProperty"))
-               some-values     (omn/find-state states (rdf/owl "someValuesFrom"))
-               all-values      (omn/find-state states (rdf/owl "allValuesFrom"))
-               one-of          (omn/find-state states (rdf/owl "oneOf"))
-               first-item      (omn/find-state states (rdf/rdf "first"))
-               rest-item       (omn/find-state states (rdf/rdf "rest"))]
-           (cond
-             complement-of
-             (let [ob (-> complement-of ::rdf/quad ::rdf/ob)]
-               (-> coll
-                   (update ::st/states conj (assoc rdf-type ::st/silent true))
-                   (update ::st/states conj (assoc complement-of
-                                                   ::st/before
-                                                   (concat
-                                                    [[:keyword "not"]
-                                                     [:space " "]]
-                                                    (when ob [[:symbol "("]]))))
-                   (update subject (partial remove #{rdf-type complement-of}))
-                   (update ::depth (fnil inc 0))
-                   (assoc ::rdf/subjects (concat
-                                          (when ob [ob])
-                                          subjects))))
-
-             one-of
-             (let [ob (-> one-of ::rdf/quad ::rdf/ob)]
-               (-> coll
-                   (update ::st/states conj (assoc rdf-type ::st/silent true))
-                   (update ::st/states conj (assoc one-of ::st/before [[:symbol "{"]]))
-                   (update subject (partial remove #{rdf-type one-of}))
-                   (update ::depth (fnil inc 0))
-                   (assoc ::rdf/subjects (concat
-                                          (when ob [ob])
-                                          subjects))))
-
-             (or union-of intersection-of)
-             (-> coll
-                 (update ::st/states conj (assoc rdf-type ::st/silent true))
-                 (update ::st/states conj (assoc (or union-of intersection-of) ::st/silent true))
-                 (update subject (partial remove #{rdf-type union-of intersection-of}))
-                 (assoc ::rdf/subjects (concat
-                                        (when-let [ob (-> union-of ::rdf/quad ::rdf/ob)] [ob])
-                                        (when-let [ob (-> intersection-of ::rdf/quad ::rdf/ob)] [ob])
-                                        subjects)))
-
-             on-property
-             (let [obp (-> on-property ::rdf/quad ::rdf/ob)
-                   obv (-> (or some-values all-values) ::rdf/quad ::rdf/ob)
-                   keyword (concat
-                            (when obp [[:symbol ")"]])
-                            [[:space " "]
-                             [:keyword (if some-values "some" "only")]
-                             [:space " "]]
-                            (when obv [[:symbol "("]]))]
-               (-> coll
-                   (update ::st/states conj (assoc on-property ::st/before (when obp [[:symbol "("]])))
-                   (update ::st/states conj (assoc rdf-type ::st/exact keyword))
-                   (update subject (partial remove #{rdf-type on-property}))
-                   (assoc ::rdf/subjects (concat
-                                          (when obp [obp])
-                                          (when obv [obv])
-                                          subjects))))
-
-             (or some-values all-values)
-             (let [obv (-> (or some-values all-values) ::rdf/quad ::rdf/ob)]
-               (-> coll
-                   (update ::st/states conj (assoc (or some-values all-values) ::st/after (when obv [[:symbol ")"]])))
-                   (update subject (partial remove #{some-values all-values}))))
-
-             first-item
-             (if-let [ob (-> first-item ::rdf/quad ::rdf/ob)]
-               (-> coll
-                   (update ::st/states conj (assoc first-item ::st/silent true))
-                   (update subject (partial remove #{first-item}))
-                   (assoc ::rdf/subjects (concat [ob] subjects)))
-               (-> coll
-                   (update ::st/states conj first-item)
-                   (update subject (partial remove #{first-item}))))
-
-             rest-item
-             (let [collection
-                   (->> coll
-                        ::st/states
-                        reverse
-                        (map ::rdf/quad)
-                        (map ::rdf/pi)
-                        (filter #{(rdf/owl "unionOf") (rdf/owl "intersectionOf") (rdf/owl "oneOf")})
-                        first)]
-               (if-let [ob (-> rest-item ::rdf/quad ::rdf/ob)]
-                 (-> coll
-                     (update ::st/states conj (assoc rest-item
-                                                     ::st/exact
-                                                     (condp = collection
-                                                       (rdf/owl "unionOf") [[:space " "] [:keyword "or"] [:space " "]]
-                                                       (rdf/owl "intersectionOf") [[:space " "] [:keyword "and"] [:space " "]]
-                                                       (rdf/owl "oneOf") [[:symbol ","] [:space " "]])))
-                     (update subject (partial remove #{rest-item}))
-                     (assoc ::rdf/subjects (concat [ob] subjects)))
-                 (if (and depth (> depth 0))
-                   (-> coll
-                       (update ::st/states conj (assoc rest-item ::st/exact [(if (= collection (rdf/owl "oneOf")) [:symbol "}"] [:symbol ")"])]))
-                       (update subject (partial remove #{rest-item}))
-                       (update ::depth dec))
-                   (-> coll
-                       (update ::st/states conj (assoc rest-item ::st/silent true))
-                       (update subject (partial remove #{rest-item}))))))
-
-             ; this should never be reached?
-             :else
-             (-> coll
-                 (update ::st/states conj state)
-                 (update subject rest))))
-         ; no more states for this subject
-         (-> coll
-             (dissoc subject)
-             (update ::rdf/subjects rest))))
-      ; no more subjects
-      (let [states (::st/states coll)
-            last-state (last states)]
-        (assoc
-         coll
-         ::st/states
-         (conj (vec (butlast states))
-               (-> last-state
-                   (dissoc ::st/silent)
-                   (assoc ::last true))))))))
-
